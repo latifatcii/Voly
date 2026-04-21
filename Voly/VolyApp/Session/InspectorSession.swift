@@ -3,6 +3,7 @@ import Network
 import OSLog
 import VolyProtocol
 import VolyModels
+import VolyHost
 
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", category: "InspectorSession")
 
@@ -20,8 +21,11 @@ final class InspectorSession {
     /// automatically. Reset to false if the user explicitly disconnects.
     var autoConnectEnabled: Bool = true
     private var hasAutoConnected: Bool = false
+    private let portFileWatcher = PortFileWatcher()
+    private var fileDiscoveryTimer: Timer?
 
     init() {
+        startFileDiscoveryLoop()
         connections.startBrowsing()
         connections.onPeerAppeared = { [weak self] peer in
             guard let self else { return }
@@ -85,6 +89,27 @@ final class InspectorSession {
         // Explicit disconnect disables auto-connect until next launch/toggle.
         autoConnectEnabled = false
         hasAutoConnected = false
+    }
+
+    private func startFileDiscoveryLoop() {
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                await self?.pollPortFiles()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        fileDiscoveryTimer = timer
+    }
+
+    private func pollPortFiles() async {
+        do {
+            let devices = try await SimInventory().listDevices(bootedOnly: true)
+            let agents = portFileWatcher.scan(deviceUDIDs: devices.map(\.udid))
+            connections.updateFileDiscoveredPeers(agents)
+        } catch {
+            log.error("pollPortFiles: \(String(describing: error), privacy: .public)")
+        }
     }
 
     // MARK: - High-level operations
