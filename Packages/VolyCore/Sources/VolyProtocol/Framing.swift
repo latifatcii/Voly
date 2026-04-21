@@ -4,15 +4,27 @@ import VolyModels
 #endif
 
 public enum Framing {
+    // UIKit views can legitimately hold NaN/Infinity in Double-valued
+    // properties (unlayed-out frames, infinite shadow offsets, etc). Default
+    // JSONEncoder throws on those with "data couldn't be written… not in the
+    // correct format", aborting the whole hierarchy response. Use matching
+    // string-conversion strategies so these edge cases round-trip cleanly.
+    private static let floatEncoding: JSONEncoder.NonConformingFloatEncodingStrategy =
+        .convertToString(positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
+    private static let floatDecoding: JSONDecoder.NonConformingFloatDecodingStrategy =
+        .convertFromString(positiveInfinity: "+inf", negativeInfinity: "-inf", nan: "nan")
+
     public static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
+        e.nonConformingFloatEncodingStrategy = floatEncoding
         return e
     }()
 
     public static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
+        d.nonConformingFloatDecodingStrategy = floatDecoding
         return d
     }()
 
