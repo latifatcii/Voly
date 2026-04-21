@@ -104,8 +104,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CF5A0100000000000000000B /* SampleApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = SampleApp;
 			sourceTree = "<group>";
 		};
@@ -155,7 +153,6 @@
 			children = (
 				4C44277A0D21FDDE43857235 /* RuntimeScanner.swift */,
 			);
-			name = Runtime;
 			path = Runtime;
 			sourceTree = "<group>";
 		};
@@ -165,7 +162,6 @@
 				BA9301694EE44677850F1997 /* VolyAgentLoader.h */,
 				D413493B7B60C203D58DD5E8 /* VolyAgentLoader.m */,
 			);
-			name = LoaderShim;
 			path = LoaderShim;
 			sourceTree = SOURCE_ROOT;
 		};
@@ -175,7 +171,6 @@
 				B795FF470C0F42B181962F54 /* LayerProps+CALayer.swift */,
 				8DCC7C54D22AC2DB8C4002B0 /* SnapshotBuilder.swift */,
 			);
-			name = Snapshot;
 			path = Snapshot;
 			sourceTree = "<group>";
 		};
@@ -184,7 +179,6 @@
 			children = (
 				75F2F20EE705CA81D6149488 /* PreviewHostVC.swift */,
 			);
-			name = Preview;
 			path = Preview;
 			sourceTree = "<group>";
 		};
@@ -215,7 +209,6 @@
 			children = (
 				5849A6DAAF79B57ECE61060E /* CGCodables.swift */,
 			);
-			name = VolyCodables;
 			path = VolyCodables;
 			sourceTree = "<group>";
 		};
@@ -227,7 +220,6 @@
 				B4B7299DCC910828A0ED9532 /* VolyAgent.swift */,
 				AD6EF61EAF01932F91DCAB02 /* VolyAgentInjection.swift */,
 			);
-			name = Bootstrap;
 			path = Bootstrap;
 			sourceTree = "<group>";
 		};
@@ -237,7 +229,6 @@
 				B36F062D6E3492DD5C34FA99 /* Framing.swift */,
 				07A86BDE7BE375DBA7601BC8 /* Messages.swift */,
 			);
-			name = VolyProtocol;
 			path = VolyProtocol;
 			sourceTree = "<group>";
 		};
@@ -247,7 +238,6 @@
 				585151A81D22151E6502C052 /* OverlayHost.swift */,
 				2A8B11EBF80E11FEB34E0F08 /* PickEngine.swift */,
 			);
-			name = Selection;
 			path = Selection;
 			sourceTree = "<group>";
 		};
@@ -278,7 +268,6 @@
 				886232C60EC15895E7D5B13D /* CommandDispatcher.swift */,
 				6C6303CDA5BFD2BDCB46C112 /* WebSocketServer.swift */,
 			);
-			name = Transport;
 			path = Transport;
 			sourceTree = "<group>";
 		};
@@ -287,7 +276,6 @@
 			children = (
 				8D4A290CB66FFF5DE195A2D6 /* URLExecutor.swift */,
 			);
-			name = URL;
 			path = URL;
 			sourceTree = "<group>";
 		};
@@ -305,7 +293,6 @@
 				D0DEC95E60C23B00055E3F41 /* Transport */,
 				DA47E668A9DD2254E359A2B2 /* URL */,
 			);
-			name = VolyAgent;
 			path = VolyAgent;
 			sourceTree = "<group>";
 		};
@@ -321,7 +308,6 @@
 				2120DB677A5A3AD92EB1C9E7 /* UserDefaultsItem.swift */,
 				F78A333E379AFBEAC081EAA0 /* ViewNode.swift */,
 			);
-			name = VolyModels;
 			path = VolyModels;
 			sourceTree = "<group>";
 		};
@@ -339,7 +325,6 @@
 			children = (
 				C6E4A3E5BA6DC5AED6BC0DEC /* UserDefaultsProvider.swift */,
 			);
-			name = Defaults;
 			path = Defaults;
 			sourceTree = "<group>";
 		};
@@ -348,7 +333,6 @@
 			children = (
 				B6996815536348FB1CD302E4 /* MutationExecutor.swift */,
 			);
-			name = Mutation;
 			path = Mutation;
 			sourceTree = "<group>";
 		};
@@ -357,7 +341,6 @@
 			children = (
 				F4736ACE6E71AB4889998E3E /* ObjectRegistry.swift */,
 			);
-			name = Registry;
 			path = Registry;
 			sourceTree = "<group>";
 		};
@@ -460,7 +443,7 @@
 			mainGroup = CF5AAE762F97772C00B39BA0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				CF5A00000000000000000001 /* XCLocalSwiftPackageReference "VolyCore" */,
+				CF5A00000000000000000001 /* XCLocalSwiftPackageReference "Packages/VolyCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CF5AAE802F97772C00B39BA0 /* Products */;
@@ -962,7 +945,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		CF5A00000000000000000001 /* XCLocalSwiftPackageReference "VolyCore" */ = {
+		CF5A00000000000000000001 /* XCLocalSwiftPackageReference "Packages/VolyCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/VolyCore;
 		};
@@ -979,7 +962,7 @@
 		};
 		D3A352E6DB13E632E88428C7 /* VolyHost */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = CF5A00000000000000000001 /* XCLocalSwiftPackageReference "VolyCore" */;
+			package = CF5A00000000000000000001 /* XCLocalSwiftPackageReference "Packages/VolyCore" */;
 			productName = VolyHost;
 		};
 /* End XCSwiftPackageProductDependency section */
