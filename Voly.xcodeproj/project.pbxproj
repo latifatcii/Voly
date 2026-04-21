@@ -23,6 +23,7 @@
 		6FD85E8FC768AE38E4CC3B1A /* ConstraintNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB09255AAFB6781CDE9D5A7 /* ConstraintNode.swift */; };
 		764E53BDBB9992277CBD6842 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 220DCB948C91BD5F58BC0331 /* Network.framework */; };
 		80062E0C332A2A675333647B /* ObjectRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4736ACE6E71AB4889998E3E /* ObjectRegistry.swift */; };
+		9DF924CBE44BC47F877277B6 /* VolyHost in Frameworks */ = {isa = PBXBuildFile; productRef = D3A352E6DB13E632E88428C7 /* VolyHost */; };
 		9F922403DFB2794C9303B73C /* ViewNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78A333E379AFBEAC081EAA0 /* ViewNode.swift */; };
 		B04A9501C0474D941BE00E6B /* Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A86BDE7BE375DBA7601BC8 /* Messages.swift */; };
 		BD31DD54C76270290858C2F3 /* AgentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC6E782E10338FDA5CC9698 /* AgentGate.swift */; };
@@ -122,6 +123,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CF5A00000000000000000003 /* VolyCore in Frameworks */,
+				9DF924CBE44BC47F877277B6 /* VolyHost in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -393,6 +395,7 @@
 			name = Voly;
 			packageProductDependencies = (
 				CF5A00000000000000000002 /* VolyCore */,
+				D3A352E6DB13E632E88428C7 /* VolyHost */,
 			);
 			productName = Voly;
 			productReference = CF5AAE7F2F97772C00B39BA0 /* Voly.app */;
@@ -725,7 +728,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BY986JF6MT;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -757,7 +760,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BY986JF6MT;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -924,6 +927,11 @@
 		CF5A010000000000000000A2 /* VolyAgent */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = VolyAgent;
+		};
+		D3A352E6DB13E632E88428C7 /* VolyHost */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CF5A00000000000000000001 /* XCLocalSwiftPackageReference "VolyCore" */;
+			productName = VolyHost;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
