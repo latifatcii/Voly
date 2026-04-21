@@ -19,7 +19,7 @@ public enum AgentGate {
         #endif
     }
 
-    public static func isSDKEnabled(environment: [String: String], args: [String]) -> Bool {
+    static func isSDKEnabled(environment: [String: String], args: [String]) -> Bool {
         if environment[sdkEnvVar] == "1" { return true }
         if args.contains(sdkArg) { return true }
         return false
@@ -31,7 +31,7 @@ public enum AgentGate {
         isInjectionEnabled(environment: ProcessInfo.processInfo.environment)
     }
 
-    public static func isInjectionEnabled(environment: [String: String]) -> Bool {
+    static func isInjectionEnabled(environment: [String: String]) -> Bool {
         environment[disableEnvVar] != "1"
     }
 }
