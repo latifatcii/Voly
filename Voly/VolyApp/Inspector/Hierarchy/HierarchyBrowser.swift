@@ -53,7 +53,10 @@ struct HierarchyBrowser: View {
     private func revealSelection(id: ObjectID?, proxy: ScrollViewProxy) {
         guard let id else { return }
         session.state.expandAncestors(of: id)
-        DispatchQueue.main.async {
+        // Deep DisclosureGroup chains need a few render ticks to materialize
+        // the rows so scrollTo can target them. 120ms is comfortably more than
+        // a single runloop pass yet invisible in practice.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             withAnimation(.easeInOut(duration: 0.2)) {
                 proxy.scrollTo(id, anchor: .center)
             }
@@ -64,13 +67,17 @@ struct HierarchyBrowser: View {
 private struct NodeRow: View {
     let node: ViewNode
     let searchText: String
-    let session: InspectorSession
+    @Bindable var session: InspectorSession
 
     var body: some View {
+        // Read the Set here (not only inside the Binding closure) so SwiftUI
+        // registers NodeRow as an observer; without this, mutating
+        // expandedNodeIDs programmatically doesn't re-render the DisclosureGroup.
+        let isExpanded = session.state.expandedNodeIDs.contains(node.id)
         let hasChildren = !node.childIDs.isEmpty
         if hasChildren {
             DisclosureGroup(isExpanded: Binding(
-                get: { session.state.expandedNodeIDs.contains(node.id) },
+                get: { isExpanded },
                 set: { newValue in
                     if newValue {
                         session.state.expandedNodeIDs.insert(node.id)

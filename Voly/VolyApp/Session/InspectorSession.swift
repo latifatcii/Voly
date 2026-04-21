@@ -140,13 +140,21 @@ final class InspectorSession {
 
     func select(_ id: ObjectID) async {
         log.notice("select(\(id)) called")
-        state.selectedViewID = id
+        // Make sure the hierarchy cache contains the target BEFORE we set
+        // selectedViewID. Otherwise expansion/scroll run against a stale tree,
+        // can't locate the node, and the middle panel stays collapsed.
         if state.findNode(id: id) == nil {
             log.info("select: node \(id) not in cached tree → refreshHierarchy")
             await refreshHierarchy()
         } else {
             log.info("select: node \(id) found in cached tree")
         }
+        // Expand the ancestor chain first so the row is guaranteed to exist in
+        // the rendered list by the time we set selectedViewID; the onChange
+        // handler in HierarchyBrowser can then just scroll.
+        state.expandAncestors(of: id)
+        log.info("select: expandedNodeIDs=\(self.state.expandedNodeIDs)")
+        state.selectedViewID = id
         await loadProperties(for: id)
         await loadConstraints(for: id)
     }
