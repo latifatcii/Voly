@@ -140,7 +140,10 @@ public final class VolyAgentRuntime: PreviewHostProvider {
                     log.error("pick notification with no id — ignoring")
                     return
                 }
-                log.notice("pick id=\(id) — highlight + send event + exit")
+                // Keep pick mode active so the user can select another view
+                // without round-tripping through the toolbar. The inspector
+                // sends Command.exitPickMode when the user explicitly toggles off.
+                log.notice("pick id=\(id) — highlight + send event (pick stays active)")
                 self.overlay.highlight(viewID: id)
                 if let server = self.server {
                     let event = Event.selectionChanged(id)
@@ -153,7 +156,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
                         }
                     }
                 }
-                self.pick.exit()
             }
         }
     }

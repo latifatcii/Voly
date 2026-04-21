@@ -31,13 +31,13 @@ struct HierarchyBrowser: View {
                     }
                     .listStyle(.sidebar)
                     .onChange(of: session.state.selectedViewID) { _, newID in
-                        guard let id = newID else { return }
-                        session.state.expandAncestors(of: id)
-                        DispatchQueue.main.async {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                proxy.scrollTo(id, anchor: .center)
-                            }
-                        }
+                        revealSelection(id: newID, proxy: proxy)
+                    }
+                    // When the hierarchy snapshot refreshes (e.g. after a pick
+                    // whose view wasn't yet in the cached tree) re-run reveal
+                    // so ancestors expand and we scroll to the new row.
+                    .onChange(of: session.state.hierarchy?.issuedAt) { _, _ in
+                        revealSelection(id: session.state.selectedViewID, proxy: proxy)
                     }
                 }
             } else {
@@ -46,6 +46,16 @@ struct HierarchyBrowser: View {
                     systemImage: "rectangle.3.group",
                     description: Text("Connect to a running VolyAgent-enabled app.")
                 )
+            }
+        }
+    }
+
+    private func revealSelection(id: ObjectID?, proxy: ScrollViewProxy) {
+        guard let id else { return }
+        session.state.expandAncestors(of: id)
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(id, anchor: .center)
             }
         }
     }
@@ -85,9 +95,11 @@ private struct NodeRow: View {
                 NodeLabel(node: node)
             }
             .tag(node.id)
+            .id(node.id)
         } else {
             NodeLabel(node: node)
                 .tag(node.id)
+                .id(node.id)
         }
     }
 
