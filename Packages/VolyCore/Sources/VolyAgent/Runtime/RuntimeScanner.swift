@@ -1,8 +1,12 @@
 #if canImport(UIKit)
 import UIKit
 import ObjectiveC.runtime
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 /// Scans a UIView for runtime-visible custom properties via the Objective-C runtime
 /// (class_copyPropertyList + property attribute strings). Merges results with

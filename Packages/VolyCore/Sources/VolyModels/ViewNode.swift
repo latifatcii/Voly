@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
     public let id: ObjectID

@@ -1,8 +1,14 @@
 #if canImport(UIKit)
 import UIKit
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
+#if canImport(VolyProtocol)
 import VolyProtocol
+#endif
 
 @MainActor
 public final class MutationExecutor {

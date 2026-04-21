@@ -1,8 +1,12 @@
 #if canImport(UIKit)
 import UIKit
 import Foundation
+#if canImport(VolyProtocol)
 import VolyProtocol
+#endif
+#if canImport(VolyModels)
 import VolyModels
+#endif
 
 @MainActor
 public final class CommandDispatcher {

@@ -1,8 +1,12 @@
 #if canImport(UIKit)
 import UIKit
 import OSLog
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyProtocol)
 import VolyProtocol
+#endif
 
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.VolyAgent", category: "PickEngine")
 

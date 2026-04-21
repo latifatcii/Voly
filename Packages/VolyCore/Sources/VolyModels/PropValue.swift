@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 public indirect enum PropValue: Codable, Sendable, Hashable {
     case null

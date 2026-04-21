@@ -1,6 +1,8 @@
 #if canImport(UIKit)
 import Foundation
+#if canImport(VolyModels)
 import VolyModels
+#endif
 
 /// Bidirectional registry that maps opaque `ObjectID`s to weakly-retained UIKit objects.
 ///

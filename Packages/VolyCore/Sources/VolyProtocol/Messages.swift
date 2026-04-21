@@ -1,6 +1,10 @@
 import Foundation
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 public enum ProtocolVersion {
     public static let current: Int = 1

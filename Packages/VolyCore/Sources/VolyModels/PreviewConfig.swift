@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 public struct PreviewConfig: Codable, Sendable, Hashable {
     public var size: CGSizeCodable

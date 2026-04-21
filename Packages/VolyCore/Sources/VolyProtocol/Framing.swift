@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VolyModels)
 import VolyModels
+#endif
 
 public enum Framing {
     public static let encoder: JSONEncoder = {

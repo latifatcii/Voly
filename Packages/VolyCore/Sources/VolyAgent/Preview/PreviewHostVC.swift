@@ -1,7 +1,11 @@
 #if canImport(UIKit)
 import UIKit
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 @MainActor
 public final class PreviewHostVC: UIViewController {

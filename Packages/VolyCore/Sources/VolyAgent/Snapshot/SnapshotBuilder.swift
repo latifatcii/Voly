@@ -1,8 +1,12 @@
 #if canImport(UIKit)
 import UIKit
 import Foundation
+#if canImport(VolyModels)
 import VolyModels
+#endif
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 @MainActor
 public final class SnapshotBuilder {

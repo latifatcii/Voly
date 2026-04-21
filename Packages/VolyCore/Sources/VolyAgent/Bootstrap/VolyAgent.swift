@@ -2,8 +2,12 @@
 import UIKit
 import Foundation
 import OSLog
+#if canImport(VolyProtocol)
 import VolyProtocol
+#endif
+#if canImport(VolyModels)
 import VolyModels
+#endif
 
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.VolyAgent", category: "Runtime")
 

@@ -2,7 +2,9 @@
 import Foundation
 import Network
 import OSLog
+#if canImport(VolyProtocol)
 import VolyProtocol
+#endif
 
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.VolyAgent", category: "WebSocketServer")
 

@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VolyCodables)
 import VolyCodables
+#endif
 
 public struct LayerProps: Codable, Sendable, Hashable {
     public var cornerRadius: Double
