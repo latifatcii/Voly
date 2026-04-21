@@ -6,23 +6,56 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CF5A00000000000000000003 /* VolyCore in Frameworks */ = {isa = PBXBuildFile; productRef = CF5A00000000000000000002 /* VolyCore */; };
+		CF5A010000000000000000A1 /* VolyAgent in Frameworks */ = {isa = PBXBuildFile; productRef = CF5A010000000000000000A2 /* VolyAgent */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		CF5A0100000000000000000A /* SampleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SampleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF5AAE7F2F97772C00B39BA0 /* Voly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CF5A02000000000000000001 /* Exceptions for "Voly" folder in "Voly" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CF5AAE7E2F97772C00B39BA0 /* Voly */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		CF5A0100000000000000000B /* SampleApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SampleApp;
+			sourceTree = "<group>";
+		};
 		CF5AAE812F97772C00B39BA0 /* Voly */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CF5A02000000000000000001 /* Exceptions for "Voly" folder in "Voly" target */,
+			);
 			path = Voly;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		CF5A0100000000000000000C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF5A010000000000000000A1 /* VolyAgent in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF5AAE7C2F97772C00B39BA0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CF5A00000000000000000003 /* VolyCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +66,7 @@
 			isa = PBXGroup;
 			children = (
 				CF5AAE812F97772C00B39BA0 /* Voly */,
+				CF5A0100000000000000000B /* SampleApp */,
 				CF5AAE802F97772C00B39BA0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +75,7 @@
 			isa = PBXGroup;
 			children = (
 				CF5AAE7F2F97772C00B39BA0 /* Voly.app */,
+				CF5A0100000000000000000A /* SampleApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +83,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		CF5A0100000000000000000F /* SampleApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF5A010000000000000000A5 /* Build configuration list for PBXNativeTarget "SampleApp" */;
+			buildPhases = (
+				CF5A0100000000000000000D /* Sources */,
+				CF5A0100000000000000000C /* Frameworks */,
+				CF5A0100000000000000000E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CF5A0100000000000000000B /* SampleApp */,
+			);
+			name = SampleApp;
+			packageProductDependencies = (
+				CF5A010000000000000000A2 /* VolyAgent */,
+			);
+			productName = SampleApp;
+			productReference = CF5A0100000000000000000A /* SampleApp.app */;
+			productType = "com.apple.product-type.application";
+		};
 		CF5AAE7E2F97772C00B39BA0 /* Voly */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = CF5AAE8B2F97772E00B39BA0 /* Build configuration list for PBXNativeTarget "Voly" */;
@@ -65,6 +123,7 @@
 			);
 			name = Voly;
 			packageProductDependencies = (
+				CF5A00000000000000000002 /* VolyCore */,
 			);
 			productName = Voly;
 			productReference = CF5AAE7F2F97772C00B39BA0 /* Voly.app */;
@@ -80,6 +139,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					CF5A0100000000000000000F = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					CF5AAE7E2F97772C00B39BA0 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -94,17 +156,28 @@
 			);
 			mainGroup = CF5AAE762F97772C00B39BA0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CF5A00000000000000000001 /* XCLocalSwiftPackageReference "Packages/VolyCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CF5AAE802F97772C00B39BA0 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				CF5AAE7E2F97772C00B39BA0 /* Voly */,
+				CF5A0100000000000000000F /* SampleApp */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		CF5A0100000000000000000E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF5AAE7D2F97772C00B39BA0 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -115,6 +188,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		CF5A0100000000000000000D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF5AAE7B2F97772C00B39BA0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -125,6 +205,72 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		CF5A010000000000000000A3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SampleApp/SampleApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BY986JF6MT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSBonjourServices = "_voly-agent._tcp";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Voly inspector agent uses local network to communicate with the macOS host.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolySampleApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CF5A010000000000000000A4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SampleApp/SampleApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BY986JF6MT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSBonjourServices = "_voly-agent._tcp";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Voly inspector agent uses local network to communicate with the macOS host.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolySampleApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		CF5AAE892F97772E00B39BA0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -250,6 +396,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Voly/Voly.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -257,10 +404,8 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMainNibFile = MainMenu;
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Voly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -283,6 +428,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Voly/Voly.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -290,10 +436,8 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSMainNibFile = MainMenu;
-				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Voly/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -314,6 +458,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		CF5A010000000000000000A5 /* Build configuration list for PBXNativeTarget "SampleApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CF5A010000000000000000A3 /* Debug */,
+				CF5A010000000000000000A4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		CF5AAE7A2F97772C00B39BA0 /* Build configuration list for PBXProject "Voly" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -333,6 +486,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CF5A00000000000000000001 /* XCLocalSwiftPackageReference "Packages/VolyCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/VolyCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CF5A00000000000000000002 /* VolyCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VolyCore;
+		};
+		CF5A010000000000000000A2 /* VolyAgent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VolyAgent;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CF5AAE772F97772C00B39BA0 /* Project object */;
 }
