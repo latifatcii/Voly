@@ -64,4 +64,26 @@ final class PortFilePublisherTests: XCTestCase {
         XCTAssertEqual(parsed.port, 9)
         XCTAssertEqual(parsed.pid, 8)
     }
+
+    func test_publish_uses_injected_clock_for_issuedAt() throws {
+        let fixedDate = Date(timeIntervalSinceReferenceDate: 1000)
+        let publisher = PortFilePublisher(directory: tempDir, clock: { fixedDate })
+        try publisher.publish(port: 1, pid: 2, bundleIdentifier: "x", processName: "y")
+
+        let data = try Data(contentsOf: tempDir.appendingPathComponent("voly.port"))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let parsed = try decoder.decode(PortFilePublisher.Record.self, from: data)
+        XCTAssertEqual(parsed.issuedAt, fixedDate)
+    }
+
+    func test_publish_creates_intermediate_directory_if_missing() throws {
+        let nested = tempDir.appendingPathComponent("does/not/exist/yet")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: nested.path))
+
+        let publisher = PortFilePublisher(directory: nested)
+        try publisher.publish(port: 1, pid: 2, bundleIdentifier: "x", processName: "y")
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: nested.appendingPathComponent("voly.port").path))
+    }
 }
