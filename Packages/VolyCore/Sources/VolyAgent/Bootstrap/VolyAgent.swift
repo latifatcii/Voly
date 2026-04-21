@@ -23,12 +23,20 @@ public final class VolyAgentRuntime: PreviewHostProvider {
 
     public weak var previewHost: PreviewHostVC?
 
-    private var server: WebSocketServer?
-    private var bootstrapped = false
+    public enum Mode: Sendable {
+        case sdk        // linked via SPM; Bonjour advertising on
+        case injected   // loaded via DYLD_INSERT_LIBRARIES; port file only
+    }
 
-    public func bootstrap() {
+    private var server: WebSocketServer?
+    private var portFilePublisher: PortFilePublisher?
+    private var bootstrapped = false
+    private var mode: Mode = .sdk
+
+    public func bootstrap(mode: Mode = .sdk) {
         guard !bootstrapped else { return }
         bootstrapped = true
+        self.mode = mode
 
         self.registry = ObjectRegistry()
         self.snapshots = SnapshotBuilder(registry: registry)
@@ -59,9 +67,51 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         let name = "\(appName) — \(deviceName)"
         let server = WebSocketServer(serviceName: name)
         self.server = server
+        let advertise = (mode == .sdk)
+        let shouldPublishPortFile = (mode == .injected)
         Task {
-            try? await server.start()
+            try? await server.start(advertise: advertise)
+            if shouldPublishPortFile {
+                await self.publishPortFileIfReady()
+            }
             await self.pumpIncoming(server: server)
+        }
+    }
+
+    private func publishPortFileIfReady() async {
+        // Poll briefly for the listener to bind.
+        for _ in 0..<20 {
+            if let port = await server?.boundPort {
+                let publisher = PortFilePublisher()
+                let pid = ProcessInfo.processInfo.processIdentifier
+                let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+                let processName = ProcessInfo.processInfo.processName
+                do {
+                    try publisher.publish(
+                        port: port, pid: pid,
+                        bundleIdentifier: bundleID, processName: processName
+                    )
+                    self.portFilePublisher = publisher
+                    installTerminationObserver()
+                } catch {
+                    log.error("failed to publish port file: \(String(describing: error), privacy: .public)")
+                }
+                return
+            }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        log.error("server never bound to a port; port file not published")
+    }
+
+    private func installTerminationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.portFilePublisher?.remove()
+            }
         }
     }
 
