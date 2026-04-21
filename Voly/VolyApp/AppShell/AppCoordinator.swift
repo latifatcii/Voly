@@ -118,7 +118,11 @@ final class AppCoordinator {
                       result.edge != .detached,
                       !self.window.userHasDetached
                 else { continue }
-                self.window.setFrame(result.frame, animated: true)
+                // animated: false — live-tracking ticks at 15 Hz; AppKit's
+                // implicit animation would lag the cadence and race with the
+                // isProgrammaticMove flag reset, wrongly marking the window
+                // as user-detached mid-animation.
+                self.window.setFrame(result.frame, animated: false)
             }
         }
     }
