@@ -13,6 +13,10 @@ final class InspectorStateStore {
     var hierarchy: HierarchySnapshot?
     var selectedViewID: ObjectID?
     var pickModeActive = false
+    /// IDs whose DisclosureGroup in the hierarchy browser is open. Owned here
+    /// (rather than on each NodeRow's @State) so `expandAncestors(of:)` can
+    /// open the chain when a new selection arrives via pick or programmatic select.
+    var expandedNodeIDs: Set<ObjectID> = []
     var propertyBag: PropertyBag?
     var constraints: [ConstraintNode] = []
     var userDefaults: [UserDefaultsItem] = []
@@ -85,5 +89,35 @@ final class InspectorStateStore {
             if let found = findNode(id: id, in: child) { return found }
         }
         return nil
+    }
+
+    /// Walk the cached hierarchy and insert every ancestor of `id` into
+    /// `expandedNodeIDs`. No-op if `id` is not in the cached tree.
+    func expandAncestors(of id: ObjectID) {
+        guard let snapshot = hierarchy else { return }
+        for scene in snapshot.scenes {
+            for window in scene.windowsInline {
+                if collectAncestors(of: id, in: window, into: &expandedNodeIDs) {
+                    return
+                }
+            }
+        }
+    }
+
+    /// Returns true if `target` was found in this subtree; inserts every
+    /// strict ancestor into `acc` along the way.
+    private func collectAncestors(
+        of target: ObjectID,
+        in node: ViewNode,
+        into acc: inout Set<ObjectID>
+    ) -> Bool {
+        if node.id == target { return true }
+        for child in node.childrenInline ?? [] {
+            if collectAncestors(of: target, in: child, into: &acc) {
+                acc.insert(node.id)
+                return true
+            }
+        }
+        return false
     }
 }
