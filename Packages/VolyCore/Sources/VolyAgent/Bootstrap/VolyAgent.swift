@@ -2,10 +2,10 @@
 import UIKit
 import Foundation
 import OSLog
-#if canImport(VolyProtocol)
+#if !VOLY_UNIFIED_BUILD
 import VolyProtocol
 #endif
-#if canImport(VolyModels)
+#if !VOLY_UNIFIED_BUILD
 import VolyModels
 #endif
 

@@ -43,6 +43,16 @@
 		F635107CA68E92A86F4E189F /* CustomPropDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDEBA35C4F05BE6DD86D344 /* CustomPropDescriptor.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A16CC7CDDCB30E0E14690F02 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CF5AAE772F97772C00B39BA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CF5AAFD42F97BB5200B39BA0;
+			remoteInfo = VolyAgentDylib;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		07A86BDE7BE375DBA7601BC8 /* Messages.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Messages.swift; sourceTree = "<group>"; };
 		0FDEBA35C4F05BE6DD86D344 /* CustomPropDescriptor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomPropDescriptor.swift; sourceTree = "<group>"; };
@@ -384,10 +394,12 @@
 				CF5AAE7B2F97772C00B39BA0 /* Sources */,
 				CF5AAE7C2F97772C00B39BA0 /* Frameworks */,
 				CF5AAE7D2F97772C00B39BA0 /* Resources */,
+				2340FA76E828723C6DB5540D /* Embed VolyAgent.dylib */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D0BA62FE3B20518ECA53D1BE /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CF5AAE812F97772C00B39BA0 /* Voly */,
@@ -479,6 +491,31 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		2340FA76E828723C6DB5540D /* Embed VolyAgent.dylib */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/../Debug-iphonesimulator/VolyAgent.dylib",
+				"$(BUILT_PRODUCTS_DIR)/../Release-iphonesimulator/VolyAgent.dylib",
+			);
+			name = "Embed VolyAgent.dylib";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/VolyAgent.dylib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nPARENT=\"$(dirname \"$BUILT_PRODUCTS_DIR\")\"\nCANDIDATES=\"$PARENT/Debug-iphonesimulator/VolyAgent.dylib $PARENT/Release-iphonesimulator/VolyAgent.dylib\"\nSRC=\"\"\nfor c in $CANDIDATES; do\n  if [ -f \"$c\" ]; then SRC=\"$c\"; break; fi\ndone\nif [ -z \"$SRC\" ]; then\n  echo \"error: VolyAgent.dylib not found. Build VolyAgentDylib first.\"\n  echo \"Searched: $CANDIDATES\"\n  exit 1\nfi\nDST_DIR=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DST_DIR\"\ncp -f \"$SRC\" \"$DST_DIR/VolyAgent.dylib\"\necho \"Embedded $SRC -> $DST_DIR/VolyAgent.dylib\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		CF5A0100000000000000000D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -530,6 +567,15 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D0BA62FE3B20518ECA53D1BE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = VolyAgentDylib;
+			target = CF5AAFD42F97BB5200B39BA0 /* VolyAgentDylib */;
+			targetProxy = A16CC7CDDCB30E0E14690F02 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		CF5A010000000000000000A3 /* Debug */ = {
@@ -730,6 +776,7 @@
 				DEVELOPMENT_TEAM = BY986JF6MT;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Voly/Info.plist;
@@ -762,6 +809,7 @@
 				DEVELOPMENT_TEAM = BY986JF6MT;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Voly/Info.plist;
@@ -821,7 +869,7 @@
 				SKIP_INSTALL = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
 				SUPPORTED_PLATFORMS = iphonesimulator;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG VOLY_UNIFIED_BUILD";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -864,6 +912,7 @@
 				SKIP_INSTALL = NO;
 				STRIP_INSTALLED_PRODUCT = NO;
 				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = VOLY_UNIFIED_BUILD;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

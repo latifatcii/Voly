@@ -1,8 +1,8 @@
 import Foundation
-#if canImport(VolyModels)
+#if !VOLY_UNIFIED_BUILD
 import VolyModels
 #endif
-#if canImport(VolyCodables)
+#if !VOLY_UNIFIED_BUILD
 import VolyCodables
 #endif
 

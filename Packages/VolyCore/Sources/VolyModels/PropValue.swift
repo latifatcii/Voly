@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(VolyCodables)
+#if !VOLY_UNIFIED_BUILD
 import VolyCodables
 #endif
 

@@ -2,7 +2,7 @@
 import Foundation
 import Network
 import OSLog
-#if canImport(VolyProtocol)
+#if !VOLY_UNIFIED_BUILD
 import VolyProtocol
 #endif
 
