@@ -12,23 +12,34 @@ struct HierarchyBrowser: View {
                 .padding(.vertical, 6)
             Divider()
             if let snapshot = session.state.hierarchy {
-                List(selection: Binding(
-                    get: { session.state.selectedViewID },
-                    set: { newValue in
-                        if let id = newValue {
-                            Task { await session.select(id) }
+                ScrollViewReader { proxy in
+                    List(selection: Binding(
+                        get: { session.state.selectedViewID },
+                        set: { newValue in
+                            if let id = newValue {
+                                Task { await session.select(id) }
+                            }
+                        }
+                    )) {
+                        ForEach(snapshot.scenes) { scene in
+                            Section(header: Text(scene.title ?? scene.role).font(.caption).bold()) {
+                                ForEach(scene.windowsInline) { window in
+                                    NodeRow(node: window, searchText: searchText, session: session)
+                                }
+                            }
                         }
                     }
-                )) {
-                    ForEach(snapshot.scenes) { scene in
-                        Section(header: Text(scene.title ?? scene.role).font(.caption).bold()) {
-                            ForEach(scene.windowsInline) { window in
-                                NodeRow(node: window, searchText: searchText, session: session)
+                    .listStyle(.sidebar)
+                    .onChange(of: session.state.selectedViewID) { _, newID in
+                        guard let id = newID else { return }
+                        session.state.expandAncestors(of: id)
+                        DispatchQueue.main.async {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                proxy.scrollTo(id, anchor: .center)
                             }
                         }
                     }
                 }
-                .listStyle(.sidebar)
             } else {
                 ContentUnavailableView(
                     "No Hierarchy",
@@ -44,19 +55,20 @@ private struct NodeRow: View {
     let node: ViewNode
     let searchText: String
     let session: InspectorSession
-    @State private var isExpanded: Bool = false
 
     var body: some View {
-        // Expandable if it has any child references (inline or remote).
         let hasChildren = !node.childIDs.isEmpty
         if hasChildren {
             DisclosureGroup(isExpanded: Binding(
-                get: { isExpanded },
+                get: { session.state.expandedNodeIDs.contains(node.id) },
                 set: { newValue in
-                    isExpanded = newValue
-                    // Lazy-load children on first expand.
-                    if newValue, node.childrenInline == nil || (node.childrenInline?.isEmpty == true && !node.childIDs.isEmpty) {
-                        Task { await session.loadSubtree(for: node.id, depth: 4) }
+                    if newValue {
+                        session.state.expandedNodeIDs.insert(node.id)
+                        if node.childrenInline == nil || (node.childrenInline?.isEmpty == true && !node.childIDs.isEmpty) {
+                            Task { await session.loadSubtree(for: node.id, depth: 4) }
+                        }
+                    } else {
+                        session.state.expandedNodeIDs.remove(node.id)
                     }
                 }
             )) {
