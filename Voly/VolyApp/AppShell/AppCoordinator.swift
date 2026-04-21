@@ -16,6 +16,7 @@ final class AppCoordinator {
     private let autoAttach: AutoAttachInstaller
     private var hotkey: GlobalHotkey?
     private var attachmentObservation: Task<Void, Never>?
+    private var toggleInFlight = false
 
     init(session: InspectorSession) {
         self.session = session
@@ -74,7 +75,7 @@ final class AppCoordinator {
         // forget; failures log but don't block the rest of startup.
         Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: true)
+            await self.installAutoAttachOnStart()
         }
     }
 
@@ -111,45 +112,56 @@ final class AppCoordinator {
     }
 
     /// Flip between enabled and disabled. Called from the menu bar item.
+    /// Serialized by `toggleInFlight` so a rapid double-click can't
+    /// interleave two shell dispatches.
     func toggleAutoAttach() {
+        guard !toggleInFlight else { return }
+        toggleInFlight = true
         Task { @MainActor [weak self] in
+            defer { self?.toggleInFlight = false }
             guard let self else { return }
             do {
                 let current = try await self.autoAttach.currentState()
                 switch current {
                 case .enabled:
                     try await self.autoAttach.uninstall()
-                    // Reset the nudge so next install can re-nudge if needed.
                     StaleProcessNudge.resetEpoch()
                 case .disabled, .foreign:
                     try await self.autoAttach.ensureInstalled()
+                    StaleProcessNudge.runIfNeeded()
                 }
-                await self.installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: false)
-                // If we just flipped on, show the nudge if the user has Xcode/Sim open.
-                if case .disabled = current { StaleProcessNudge.runIfNeeded() }
-                if case .foreign = current { StaleProcessNudge.runIfNeeded() }
+                await self.refreshAutoAttachMenuState()
             } catch {
                 log.error("toggleAutoAttach failed: \(String(describing: error), privacy: .public)")
             }
         }
     }
 
-    /// Runs `ensureInstalled()` (unless the caller already handled the flip),
-    /// refreshes `menuBar.isAutoAttachEnabled`, and optionally fires the
-    /// one-time stale-process nudge.
-    private func installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: Bool) async {
+    /// Install if needed, then refresh the menu bar + nudge on startup.
+    /// Called once from `start()`.
+    private func installAutoAttachOnStart() async {
         do {
-            if showStaleNudgeIfNeeded {
-                try await autoAttach.ensureInstalled()
+            try await autoAttach.ensureInstalled()
+            await refreshAutoAttachMenuState()
+            let state = try await autoAttach.currentState()
+            if case .enabled = state {
+                StaleProcessNudge.runIfNeeded()
             }
+        } catch {
+            log.error("autoAttach install on start failed: \(String(describing: error), privacy: .public)")
+            menuBar.isAutoAttachEnabled = false
+        }
+    }
+
+    /// Read current installer state and reflect it into the menu bar
+    /// checkmark. Swallows errors (menu just shows Off in that case).
+    private func refreshAutoAttachMenuState() async {
+        do {
             let state = try await autoAttach.currentState()
             if case .enabled = state {
                 menuBar.isAutoAttachEnabled = true
             } else {
                 menuBar.isAutoAttachEnabled = false
-            }
-            if showStaleNudgeIfNeeded, case .enabled = state {
-                StaleProcessNudge.runIfNeeded()
             }
         } catch {
             log.error("autoAttach state refresh failed: \(String(describing: error), privacy: .public)")
