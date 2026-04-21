@@ -76,10 +76,11 @@ public final class PickEngine {
            let realWindow = scene.windows.first(where: { !$0.isVolyOverlay }) {
             realWindow.makeKey()
         }
-
-        // Remove any lingering selection highlight so exiting pick mode leaves
-        // the app visually clean.
-        overlay?.clear()
+        // Note: we deliberately do NOT clear the selection highlight here.
+        // exit() runs after every successful pick (observePickNotifications in
+        // VolyAgentRuntime calls highlight() then pick.exit()), and clearing
+        // would erase the highlight instantly. Clearing is driven by the
+        // explicit Command.clearSelection path instead.
     }
 
     public func select(at point: CGPoint, sceneID: ObjectID) throws -> ObjectID {
