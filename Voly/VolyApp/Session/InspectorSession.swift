@@ -280,10 +280,11 @@ final class InspectorSession {
     // MARK: - Events
 
     private func pumpEvents(client: WebSocketClient) {
-        Task {
+        Task { @MainActor [weak self] in
             log.info("pumpEvents: started")
             for await event in client.events {
                 log.notice("event received: \(String(describing: event), privacy: .public)")
+                guard let self else { return }
                 switch event {
                 case .selectionChanged(let id):
                     await self.select(id)
@@ -296,6 +297,13 @@ final class InspectorSession {
                 }
             }
             log.info("pumpEvents: stream ended")
+            // The client's event stream ends when the connection closes. Reset
+            // state so the watcher's next scan can auto-connect to a new peer
+            // (e.g. after the injected app was relaunched with a new pid).
+            guard let self else { return }
+            self.state.connectionStatus = .disconnected
+            self.hasAutoConnected = false
+            self.client = nil
         }
     }
 }
