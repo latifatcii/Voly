@@ -6,9 +6,9 @@ struct AppPickerSheet: View {
     let dylibURL: URL
     @Environment(\.dismiss) private var dismiss
     @State private var devices: [SimDevice] = []
-    @State private var selectedDevice: SimDevice?
+    @State private var selectedDeviceID: SimDevice.ID?
     @State private var apps: [SimApp] = []
-    @State private var selectedApp: SimApp?
+    @State private var selectedAppID: SimApp.ID?
     @State private var isLoadingDevices = false
     @State private var isLoadingApps = false
     @State private var isLaunching = false
@@ -16,6 +16,14 @@ struct AppPickerSheet: View {
 
     private let inventory = SimInventory()
     private let launcher = SimctlLauncher()
+
+    private var selectedDevice: SimDevice? {
+        devices.first { $0.id == selectedDeviceID }
+    }
+
+    private var selectedApp: SimApp? {
+        apps.first { $0.id == selectedAppID }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,19 +57,20 @@ struct AppPickerSheet: View {
             Text("Booted simulators")
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.top, 8)
-            List(selection: $selectedDevice) {
+            List(selection: $selectedDeviceID) {
                 ForEach(devices) { d in
                     VStack(alignment: .leading) {
                         Text(d.name)
                         Text(d.runtime).font(.caption2).foregroundStyle(.secondary)
                     }
-                    .tag(Optional(d))
+                    .contentShape(Rectangle())
                 }
             }
-            .onChange(of: selectedDevice) { _, newDevice in
+            .onChange(of: selectedDeviceID) { _, _ in
                 apps = []
-                guard let newDevice else { return }
-                Task { await loadApps(for: newDevice) }
+                selectedAppID = nil
+                guard let dev = selectedDevice else { return }
+                Task { await loadApps(for: dev) }
             }
             if isLoadingDevices {
                 ProgressView().controlSize(.small).padding(.bottom, 8)
@@ -80,13 +89,13 @@ struct AppPickerSheet: View {
                     systemImage: "square.dashed"
                 )
             } else {
-                List(selection: $selectedApp) {
+                List(selection: $selectedAppID) {
                     ForEach(apps) { a in
                         VStack(alignment: .leading) {
                             Text(a.displayName)
                             Text(a.bundleIdentifier).font(.caption2).foregroundStyle(.secondary)
                         }
-                        .tag(Optional(a))
+                        .contentShape(Rectangle())
                     }
                 }
             }
@@ -125,7 +134,7 @@ struct AppPickerSheet: View {
         defer { isLoadingDevices = false }
         do {
             devices = try await inventory.listDevices(bootedOnly: true)
-            if selectedDevice == nil { selectedDevice = devices.first }
+            if selectedDeviceID == nil { selectedDeviceID = devices.first?.id }
         } catch {
             errorMessage = "Failed to list devices: \(error)"
         }
