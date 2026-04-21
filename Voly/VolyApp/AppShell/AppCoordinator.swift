@@ -13,6 +13,7 @@ final class AppCoordinator {
     private let menuBar: MenuBarController
     private let attachment: SimulatorAttachment
     private let locator: SimulatorLocator
+    private let autoAttach: AutoAttachInstaller
     private var hotkey: GlobalHotkey?
     private var attachmentObservation: Task<Void, Never>?
 
@@ -27,11 +28,23 @@ final class AppCoordinator {
             voly: .voly,
             screenProvider: Self.screen(for:)
         )
+        self.autoAttach = AutoAttachInstaller(
+            bundledDylibPath: Self.bundledDylibPath()
+        )
         self.menuBar = MenuBarController(
-            onToggle: {}, onQuit: {}, onAbout: {}
+            onToggle: {}, onQuit: {}, onAbout: {}, onToggleAutoAttach: {}
         )
 
         wireCallbacks()
+    }
+
+    /// Resolves `Voly.app/Contents/Resources/VolyAgent.dylib`. The dylib is
+    /// embedded by the Voly target's "Embed VolyAgent.dylib" run-script
+    /// phase — its absence is a programmer error.
+    private static func bundledDylibPath() -> String {
+        let url = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/VolyAgent.dylib")
+        return url.path
     }
 
     /// Return the visible frame of the screen that contains the Simulator,
@@ -56,6 +69,13 @@ final class AppCoordinator {
         if hotkey == nil {
             log.warning("Global hotkey registration failed; menu-bar icon still toggles Voly.")
         }
+
+        // Auto-attach install + nudge + reflect state in menu bar. Fire-and-
+        // forget; failures log but don't block the rest of startup.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: true)
+        }
     }
 
     func toggleInspector() {
@@ -68,7 +88,6 @@ final class AppCoordinator {
 
     func showInspector() {
         attachment.start()
-        // Seed the window with an immediate calculation before first tick.
         let simFrame = locator.frontmostSimulatorFrame()
         let seed = AttachmentCalculator.attach(
             simulatorFrame: simFrame,
@@ -91,6 +110,53 @@ final class AppCoordinator {
         NSApp.terminate(nil)
     }
 
+    /// Flip between enabled and disabled. Called from the menu bar item.
+    func toggleAutoAttach() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let current = try await self.autoAttach.currentState()
+                switch current {
+                case .enabled:
+                    try await self.autoAttach.uninstall()
+                    // Reset the nudge so next install can re-nudge if needed.
+                    StaleProcessNudge.resetEpoch()
+                case .disabled, .foreign:
+                    try await self.autoAttach.ensureInstalled()
+                }
+                await self.installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: false)
+                // If we just flipped on, show the nudge if the user has Xcode/Sim open.
+                if case .disabled = current { StaleProcessNudge.runIfNeeded() }
+                if case .foreign = current { StaleProcessNudge.runIfNeeded() }
+            } catch {
+                log.error("toggleAutoAttach failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Runs `ensureInstalled()` (unless the caller already handled the flip),
+    /// refreshes `menuBar.isAutoAttachEnabled`, and optionally fires the
+    /// one-time stale-process nudge.
+    private func installAutoAttachAndUpdateMenu(showStaleNudgeIfNeeded: Bool) async {
+        do {
+            if showStaleNudgeIfNeeded {
+                try await autoAttach.ensureInstalled()
+            }
+            let state = try await autoAttach.currentState()
+            if case .enabled = state {
+                menuBar.isAutoAttachEnabled = true
+            } else {
+                menuBar.isAutoAttachEnabled = false
+            }
+            if showStaleNudgeIfNeeded, case .enabled = state {
+                StaleProcessNudge.runIfNeeded()
+            }
+        } catch {
+            log.error("autoAttach state refresh failed: \(String(describing: error), privacy: .public)")
+            menuBar.isAutoAttachEnabled = false
+        }
+    }
+
     private func wireCallbacks() {
         window.onClose = { [weak self] in
             self?.menuBar.isInspectorVisible = false
@@ -100,6 +166,7 @@ final class AppCoordinator {
         menuBar.onToggle = { [weak self] in self?.toggleInspector() }
         menuBar.onQuit = { [weak self] in self?.quit() }
         menuBar.onAbout = { NSApp.orderFrontStandardAboutPanel(nil) }
+        menuBar.onToggleAutoAttach = { [weak self] in self?.toggleAutoAttach() }
     }
 
     private func startObservingAttachment() {
