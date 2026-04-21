@@ -10,12 +10,10 @@ let package = Package(
     products: [
         .library(name: "VolyCore", targets: ["VolyProtocol", "VolyModels", "VolyCodables"]),
         .library(name: "VolyAgent", targets: ["VolyAgent"]),
+        .library(name: "VolyHost", targets: ["VolyHost"]),
     ],
     targets: [
-        .target(
-            name: "VolyCodables",
-            path: "Sources/VolyCodables"
-        ),
+        .target(name: "VolyCodables", path: "Sources/VolyCodables"),
         .target(
             name: "VolyModels",
             dependencies: ["VolyCodables"],
@@ -31,10 +29,21 @@ let package = Package(
             dependencies: ["VolyProtocol", "VolyModels", "VolyCodables"],
             path: "Sources/VolyAgent"
         ),
+        .target(
+            name: "VolyHost",
+            dependencies: ["VolyProtocol", "VolyModels"],
+            path: "Sources/VolyHost"
+        ),
         .testTarget(
             name: "VolyCoreTests",
             dependencies: ["VolyAgent", "VolyProtocol", "VolyModels", "VolyCodables"],
             path: "Tests/VolyCoreTests"
+        ),
+        .testTarget(
+            name: "VolyHostTests",
+            dependencies: ["VolyHost"],
+            path: "Tests/VolyHostTests",
+            resources: [.copy("Fixtures")]
         ),
     ]
 )
