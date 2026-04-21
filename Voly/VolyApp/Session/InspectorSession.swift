@@ -155,6 +155,10 @@ final class InspectorSession {
         state.expandAncestors(of: id)
         log.info("select: expandedNodeIDs=\(self.state.expandedNodeIDs)")
         state.selectedViewID = id
+        // Mirror the selection onto the device overlay so the user sees the
+        // same view highlighted in the simulator. Fire-and-forget — the
+        // highlight is cosmetic and shouldn't block selection.
+        _ = try? await client?.send(.highlight(objectID: id))
         await loadProperties(for: id)
         await loadConstraints(for: id)
     }

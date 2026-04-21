@@ -142,6 +142,10 @@ public final class CommandDispatcher {
         case .clearSelection:
             overlay.clear()
             return .ack
+
+        case .highlight(let id):
+            overlay.highlight(viewID: id)
+            return .ack
         }
     }
 }
