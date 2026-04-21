@@ -33,7 +33,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VolyCoreTests",
-            dependencies: ["VolyProtocol", "VolyModels", "VolyCodables"],
+            dependencies: ["VolyAgent", "VolyProtocol", "VolyModels", "VolyCodables"],
             path: "Tests/VolyCoreTests"
         ),
     ]

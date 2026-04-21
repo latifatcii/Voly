@@ -110,7 +110,7 @@ public enum VolyAgent {
     /// DEBUG / env-var gate is not satisfied or when called on a non-iOS build.
     public static func start() {
         #if DEBUG
-        guard AgentGate.isEnabled else { return }
+        guard AgentGate.isSDKEnabled else { return }
         MainActor.assumeIsolated {
             VolyAgentRuntime.shared.bootstrap()
         }
@@ -121,7 +121,7 @@ public enum VolyAgent {
     /// when the agent isn't enabled, so production code stays untouched.
     @MainActor
     public static func wrap(original: UIViewController) -> UIViewController {
-        guard AgentGate.isEnabled else { return original }
+        guard AgentGate.isSDKEnabled else { return original }
         let host = PreviewHostVC(wrapping: original)
         VolyAgentRuntime.shared.bootstrap()
         VolyAgentRuntime.shared.previewHost = host
@@ -137,7 +137,7 @@ public enum VolyAgent {
         get: @escaping @MainActor (T) -> PropValue,
         set: (@MainActor (T, PropValue) -> Void)? = nil
     ) {
-        guard AgentGate.isEnabled else { return }
+        guard AgentGate.isSDKEnabled else { return }
         CustomInspectableRegistry.shared.register(viewType, property: name, type: type, get: get, set: set)
     }
 }
