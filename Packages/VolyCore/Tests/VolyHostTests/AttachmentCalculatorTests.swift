@@ -57,4 +57,28 @@ final class AttachmentCalculatorTests: XCTestCase {
         let r = AttachmentCalculator.attach(simulatorFrame: sim, voly: voly, screen: screen, gap: 20)
         XCTAssertEqual(r.frame.origin.x, sim.maxX + 20, accuracy: 0.01)
     }
+
+    func test_detached_fallback_is_entirely_inside_screen() {
+        let r = AttachmentCalculator.attach(
+            simulatorFrame: nil, voly: voly, screen: screen, gap: 6
+        )
+        XCTAssertGreaterThanOrEqual(r.frame.minX, screen.minX)
+        XCTAssertLessThanOrEqual(r.frame.maxX, screen.maxX)
+        XCTAssertGreaterThanOrEqual(r.frame.minY, screen.minY)
+        XCTAssertLessThanOrEqual(r.frame.maxY, screen.maxY)
+    }
+
+    func test_simulator_origin_outside_screen_still_clamps_voly_inside() {
+        // Simulator reports a global-coordinate frame that lives partly outside
+        // the provided screen (multi-monitor case). Voly must still end up
+        // fully inside the given screen rect.
+        let sim = CGRect(x: -200, y: -50, width: 400, height: 900)
+        let r = AttachmentCalculator.attach(
+            simulatorFrame: sim, voly: voly, screen: screen, gap: 6
+        )
+        XCTAssertGreaterThanOrEqual(r.frame.minX, screen.minX)
+        XCTAssertLessThanOrEqual(r.frame.maxX, screen.maxX)
+        XCTAssertGreaterThanOrEqual(r.frame.minY, screen.minY)
+        XCTAssertLessThanOrEqual(r.frame.maxY, screen.maxY)
+    }
 }

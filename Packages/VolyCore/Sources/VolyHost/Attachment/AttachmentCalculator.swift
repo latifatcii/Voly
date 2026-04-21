@@ -38,9 +38,15 @@ public enum AttachmentCalculator {
         return detachedFallback(voly: voly, screen: screen)
     }
 
+    private static let detachedHeightRatio: CGFloat = 0.7
+
     private static func detachedFallback(voly: SizeSpec, screen: CGRect) -> AttachmentResult {
         let width = voly.preferredWidth
-        let height = max(voly.minHeight, screen.height * 0.7)
+        // Clamp height up-front so the centered y-origin calculation is based on
+        // the height we'll actually render. Otherwise `clamp(_:to:)` papers over
+        // a negative y on small screens, silently dropping the "center vertically"
+        // intent.
+        let height = min(max(voly.minHeight, screen.height * detachedHeightRatio), screen.height)
         let x = screen.midX + (screen.width / 2 - width) / 2
         let y = screen.midY - height / 2
         let frame = CGRect(x: x, y: y, width: width, height: height)
