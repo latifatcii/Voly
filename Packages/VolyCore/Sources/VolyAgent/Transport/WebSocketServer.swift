@@ -29,7 +29,7 @@ public actor WebSocketServer {
         self.continuation = cont
     }
 
-    public func start(preferredPort: UInt16 = 0) throws {
+    public func start(preferredPort: UInt16 = 0, advertise: Bool = true) throws {
         let params = NWParameters(tls: nil)
         let ws = NWProtocolWebSocket.Options()
         ws.autoReplyPing = true
@@ -37,7 +37,9 @@ public actor WebSocketServer {
 
         let port: NWEndpoint.Port = preferredPort == 0 ? .any : (NWEndpoint.Port(rawValue: preferredPort) ?? .any)
         let listener = try NWListener(using: params, on: port)
-        listener.service = NWListener.Service(name: serviceName, type: serviceType)
+        if advertise {
+            listener.service = NWListener.Service(name: serviceName, type: serviceType)
+        }
         listener.newConnectionHandler = { [weak self] conn in
             guard let self else { return }
             Task { await self.accept(conn) }
@@ -59,6 +61,11 @@ public actor WebSocketServer {
         listener?.cancel()
         listener = nil
         continuation?.finish()
+    }
+
+    public var boundPort: UInt16? {
+        guard let port = listener?.port else { return nil }
+        return port.rawValue
     }
 
     public func send(_ envelope: MessageEnvelope) async throws {
