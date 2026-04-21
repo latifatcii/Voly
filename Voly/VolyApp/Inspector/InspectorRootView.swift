@@ -4,9 +4,14 @@ import VolyModels
 struct InspectorRootView: View {
     @Bindable var session: InspectorSession
     @State private var sidebarSelection: SidebarItem = .hierarchy
+    @State private var showAttachSheet: Bool = false
 
     enum SidebarItem: Hashable {
         case hierarchy, userDefaults, urlTester, preview
+    }
+
+    private var bundledDylibURL: URL? {
+        Bundle.main.url(forResource: "VolyAgent", withExtension: "dylib")
     }
 
     var body: some View {
@@ -22,6 +27,18 @@ struct InspectorRootView: View {
         }
         .toolbar { toolbarContent }
         .task { session.connections.startBrowsing() }
+        .sheet(isPresented: $showAttachSheet) {
+            if let url = bundledDylibURL {
+                AppPickerSheet(dylibURL: url)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "xmark.octagon")
+                    Text("VolyAgent.dylib not found in app bundle")
+                    Button("Close") { showAttachSheet = false }
+                }
+                .padding(24)
+            }
+        }
     }
 
     @ViewBuilder
@@ -98,6 +115,13 @@ struct InspectorRootView: View {
             }
         }
         ToolbarItemGroup {
+            Button {
+                showAttachSheet = true
+            } label: {
+                Label("Attach", systemImage: "arrow.down.right.square")
+            }
+            .disabled(bundledDylibURL == nil)
+
             Button {
                 Task {
                     if session.state.pickModeActive { await session.exitPickMode() }
