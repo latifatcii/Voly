@@ -138,6 +138,14 @@ public final class CommandDispatcher {
 
         case .ping:
             return .pong
+
+        case .clearSelection:
+            overlay.clear()
+            return .ack
+
+        case .highlight(let id):
+            overlay.highlight(viewID: id)
+            return .ack
         }
     }
 }

@@ -140,13 +140,25 @@ final class InspectorSession {
 
     func select(_ id: ObjectID) async {
         log.notice("select(\(id)) called")
-        state.selectedViewID = id
+        // Make sure the hierarchy cache contains the target BEFORE we set
+        // selectedViewID. Otherwise expansion/scroll run against a stale tree,
+        // can't locate the node, and the middle panel stays collapsed.
         if state.findNode(id: id) == nil {
             log.info("select: node \(id) not in cached tree → refreshHierarchy")
             await refreshHierarchy()
         } else {
             log.info("select: node \(id) found in cached tree")
         }
+        // Expand the ancestor chain first so the row is guaranteed to exist in
+        // the rendered list by the time we set selectedViewID; the onChange
+        // handler in HierarchyBrowser can then just scroll.
+        state.expandAncestors(of: id)
+        log.info("select: expandedNodeIDs=\(self.state.expandedNodeIDs)")
+        state.selectedViewID = id
+        // Mirror the selection onto the device overlay so the user sees the
+        // same view highlighted in the simulator. Fire-and-forget — the
+        // highlight is cosmetic and shouldn't block selection.
+        _ = try? await client?.send(.highlight(objectID: id))
         await loadProperties(for: id)
         await loadConstraints(for: id)
     }
@@ -207,6 +219,12 @@ final class InspectorSession {
     func exitPickMode() async {
         _ = try? await client?.send(.exitPickMode)
         state.pickModeActive = false
+        await clearSelection()
+    }
+
+    func clearSelection() async {
+        state.selectedViewID = nil
+        _ = try? await client?.send(.clearSelection)
     }
 
     func listUserDefaults(suite: String? = nil) async {
@@ -274,10 +292,11 @@ final class InspectorSession {
     // MARK: - Events
 
     private func pumpEvents(client: WebSocketClient) {
-        Task {
+        Task { @MainActor [weak self] in
             log.info("pumpEvents: started")
             for await event in client.events {
                 log.notice("event received: \(String(describing: event), privacy: .public)")
+                guard let self else { return }
                 switch event {
                 case .selectionChanged(let id):
                     await self.select(id)
@@ -290,6 +309,13 @@ final class InspectorSession {
                 }
             }
             log.info("pumpEvents: stream ended")
+            // The client's event stream ends when the connection closes. Reset
+            // state so the watcher's next scan can auto-connect to a new peer
+            // (e.g. after the injected app was relaunched with a new pid).
+            guard let self else { return }
+            self.state.connectionStatus = .disconnected
+            self.hasAutoConnected = false
+            self.client = nil
         }
     }
 }

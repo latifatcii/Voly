@@ -18,7 +18,11 @@ public final class SnapshotBuilder {
         self.registry = registry
     }
 
-    public func snapshotAllScenes(topDepth: Int = 6) -> HierarchySnapshot {
+    /// Default depth is large enough to include the full hierarchy of a
+    /// typical iOS app (UIKit chrome alone can be 10+ levels). The inspector
+    /// needs the whole chain to reveal a picked view in the tree; lazy
+    /// sub-depth fetching was dropping picks that landed beyond depth 6.
+    public func snapshotAllScenes(topDepth: Int = 64) -> HierarchySnapshot {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let sceneNodes: [SceneNode] = scenes.map { scene in
             let windows = scene.windows.filter { !$0.isVolyOverlay }

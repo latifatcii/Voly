@@ -129,6 +129,8 @@ public enum Command: Codable, Sendable {
     case clearPreview
     case resolveSource(objectID: ObjectID)
     case ping
+    case clearSelection
+    case highlight(objectID: ObjectID)
 }
 
 public enum Response: Codable, Sendable {

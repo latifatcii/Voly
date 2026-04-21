@@ -20,6 +20,10 @@ public final class PickEngine {
     unowned let registry: ObjectRegistry
     private weak var overlay: OverlayHost?
     private var pickWindow: UIWindow?
+    /// When pick mode is active, we set `isUserInteractionEnabled = false` on every
+    /// non-overlay window in the scene. This dict remembers the previous value so
+    /// we can restore it on exit.
+    private var suspendedWindowInteraction: [UIWindow: Bool] = [:]
 
     public init(registry: ObjectRegistry, overlay: OverlayHost?) {
         self.registry = registry
@@ -46,17 +50,37 @@ public final class PickEngine {
         w.isUserInteractionEnabled = true
         w.makeKeyAndVisible()
         pickWindow = w
+
+        // Freeze event delivery to every non-overlay window so buttons, gestures,
+        // and navigation don't fire while the user is tapping to pick.
+        suspendedWindowInteraction.removeAll(keepingCapacity: true)
+        for other in scene.windows where !other.isVolyOverlay && other !== w {
+            suspendedWindowInteraction[other] = other.isUserInteractionEnabled
+            other.isUserInteractionEnabled = false
+        }
     }
 
     public func exit() {
         pickWindow?.isHidden = true
         pickWindow?.resignKey()
         pickWindow = nil
+
+        // Restore each window's previous interaction state.
+        for (window, wasEnabled) in suspendedWindowInteraction {
+            window.isUserInteractionEnabled = wasEnabled
+        }
+        suspendedWindowInteraction.removeAll(keepingCapacity: true)
+
         // Restore the app's real key window.
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let realWindow = scene.windows.first(where: { !$0.isVolyOverlay }) {
             realWindow.makeKey()
         }
+        // Note: we deliberately do NOT clear the selection highlight here.
+        // exit() runs after every successful pick (observePickNotifications in
+        // VolyAgentRuntime calls highlight() then pick.exit()), and clearing
+        // would erase the highlight instantly. Clearing is driven by the
+        // explicit Command.clearSelection path instead.
     }
 
     public func select(at point: CGPoint, sceneID: ObjectID) throws -> ObjectID {
@@ -88,8 +112,10 @@ public final class PickEngine {
     }
 
     private func deepest(in view: UIView, at point: CGPoint) -> UIView? {
-        guard view.isUserInteractionEnabled,
-              !view.isHidden,
+        // Note: we intentionally do NOT check isUserInteractionEnabled. We are
+        // identifying the topmost visible view for inspection, not delivering
+        // gestures — UILabel defaults to false and must still be selectable.
+        guard !view.isHidden,
               view.alpha > 0.01,
               view.point(inside: point, with: nil)
         else { return nil }
