@@ -22,7 +22,11 @@ final class InspectorWindowController: NSObject, NSWindowDelegate {
         panel.title = "Voly"
         panel.contentView = content
         panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace, .fullScreenAuxiliary]
+        // .canJoinAllSpaces and .moveToActiveSpace are mutually exclusive.
+        // .moveToActiveSpace is the right pick for a toggle-to-show accessory:
+        // the panel materializes on whatever Space the user is on when they
+        // hit the hotkey, rather than existing in all Spaces at once.
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = false
