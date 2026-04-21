@@ -87,7 +87,7 @@ final class ConnectionManager {
             return Peer(
                 id: "file:\(agent.deviceUDID):\(agent.bundleIdentifier)",
                 displayName: "\(agent.processName) (injected)",
-                endpoint: .hostPort(host: "127.0.0.1", port: port),
+                endpoint: .hostPort(host: .ipv4(.loopback), port: port),
                 source: .portFile(deviceUDID: agent.deviceUDID)
             )
         }

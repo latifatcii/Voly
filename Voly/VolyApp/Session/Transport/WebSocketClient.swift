@@ -48,7 +48,27 @@ actor WebSocketClient {
         options.setAdditionalHeaders([("Host", "voly-agent")])
         params.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
 
-        let conn = NWConnection(to: endpoint, using: params)
+        // For hostPort endpoints (file-discovered peers), NWProtocolWebSocket needs
+        // a ws:// URL to know the path and scheme to upgrade. Convert to a URL
+        // endpoint. For Bonjour .service endpoints, pass through as-is.
+        let resolvedEndpoint: NWEndpoint
+        if case let .hostPort(host: host, port: port) = endpoint {
+            let hostString: String
+            switch host {
+            case .ipv4(let a): hostString = "\(a)"
+            case .ipv6(let a): hostString = "[\(a)]"
+            case .name(let n, _): hostString = n
+            @unknown default: hostString = "\(host)"
+            }
+            if let url = URL(string: "ws://\(hostString):\(port.rawValue)/") {
+                resolvedEndpoint = .url(url)
+            } else {
+                resolvedEndpoint = endpoint
+            }
+        } else {
+            resolvedEndpoint = endpoint
+        }
+        let conn = NWConnection(to: resolvedEndpoint, using: params)
         self.connection = conn
         let ready = AsyncStream<Result<Void, Error>> { cont in
             conn.stateUpdateHandler = { state in
