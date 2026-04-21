@@ -207,6 +207,12 @@ final class InspectorSession {
     func exitPickMode() async {
         _ = try? await client?.send(.exitPickMode)
         state.pickModeActive = false
+        await clearSelection()
+    }
+
+    func clearSelection() async {
+        state.selectedViewID = nil
+        _ = try? await client?.send(.clearSelection)
     }
 
     func listUserDefaults(suite: String? = nil) async {
