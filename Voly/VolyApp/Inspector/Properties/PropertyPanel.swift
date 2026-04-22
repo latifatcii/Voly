@@ -80,13 +80,6 @@ struct PropertyPanel: View {
     }
 }
 
-private struct SectionHeader: View {
-    let title: String
-    var body: some View {
-        Text(title).font(.headline).foregroundStyle(.secondary)
-    }
-}
-
 struct PropertyRow: View {
     let name: String
     let value: PropValue

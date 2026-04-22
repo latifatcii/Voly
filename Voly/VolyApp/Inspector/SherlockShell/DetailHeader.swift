@@ -26,8 +26,7 @@ struct DetailHeader: View {
             Text(node.className)
                 .font(.system(size: 18, weight: .semibold))
                 .fontDesign(.default)
-            if node.classInheritance != nil,
-               let chain = node.classInheritance, chain.count > 1 {
+            if let chain = node.classInheritance, chain.count > 1 {
                 Button {
                     pane.toggleInheritance(node.id)
                 } label: {

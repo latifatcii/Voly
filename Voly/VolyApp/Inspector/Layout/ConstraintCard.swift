@@ -34,6 +34,16 @@ struct ConstraintCard: View {
         .background(Color(nsColor: .controlBackgroundColor),
                     in: RoundedRectangle(cornerRadius: 8))
         .opacity(constraint.isActive ? 1.0 : 0.6)
+        .onChange(of: constraint.constant) { _, newValue in
+            if !isEditing { constantText = Self.format(newValue) }
+        }
+        .onChange(of: constraint.priority) { _, newValue in
+            if !isEditing { priorityText = Self.format(Double(newValue)) }
+        }
+        .onChange(of: constraint.isActive) { _, newValue in
+            // Active toggle syncs externally even mid-edit; server-acked.
+            active = newValue
+        }
     }
 
     private var header: some View {
