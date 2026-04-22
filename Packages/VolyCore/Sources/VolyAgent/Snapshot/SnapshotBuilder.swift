@@ -83,7 +83,8 @@ public final class SnapshotBuilder {
             constraintIDs: view.constraints.map { registry.id(for: $0) },
             childIDs: childIDs,
             childrenInline: inline,
-            classInheritance: Self.inheritanceChain(of: view)
+            classInheritance: Self.inheritanceChain(of: view),
+            hasNonIdentityTransform: !CATransform3DIsIdentity(view.layer.transform)
         )
     }
 
