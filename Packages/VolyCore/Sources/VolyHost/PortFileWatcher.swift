@@ -58,7 +58,12 @@ public final class PortFileWatcher {
                 do {
                     let rec = try decoder.decode(Record.self, from: data)
                     guard isPidAlive(rec.pid) else {
+                        // Clean up the file on disk so subsequent scans don't
+                        // re-log the same stale record every tick. willTerminate
+                        // on the agent side doesn't fire for SIGKILL, hard stops
+                        // from Xcode, or simulator shutdowns, so these linger.
                         log.info("pruning dead port file for pid \(rec.pid) (\(rec.bundleIdentifier, privacy: .public))")
+                        try? fm.removeItem(at: fileURL)
                         continue
                     }
                     results.append(DiscoveredAgent(

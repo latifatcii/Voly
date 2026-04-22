@@ -315,7 +315,20 @@ final class InspectorSession {
             guard let self else { return }
             self.state.connectionStatus = .disconnected
             self.hasAutoConnected = false
+            self.lastError = nil
             self.client = nil
+            // A new peer may have already been announced while we were still
+            // connected (race: new app's port file appears before the old
+            // connection's TCP reset arrives). In that case onPeerAppeared
+            // won't re-fire, so reach into the current peer list and pick up
+            // whatever's there.
+            if self.autoConnectEnabled, let peer = self.connections.peers.first {
+                self.hasAutoConnected = true
+                log.notice("pumpEvents: reconnecting to known peer \(peer.displayName, privacy: .public)")
+                Task { [weak self] in
+                    await self?.connect(to: peer)
+                }
+            }
         }
     }
 }

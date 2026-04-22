@@ -1,21 +1,22 @@
-//
-//  AppDelegate.swift
-//  Voly
-//
-//  Created by Latif Atci on 21.04.2026.
-//
+import AppKit
+import Foundation
 
-import Cocoa
-
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ aNotification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-    func applicationWillTerminate(_ aNotification: Notification) {}
-    // Return false so SwiftUI always opens a fresh window on launch, instead of
-    // trying to restore a (possibly stale / off-screen) saved window frame.
-    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { false }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
-}
+    private let session = InspectorSession()
+    private var coordinator: AppCoordinator?
 
+    func applicationDidFinishLaunching(_ aNotification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        FirstRunAccessibilityPrompt.runIfNeeded()
+
+        coordinator = AppCoordinator(session: session)
+        coordinator?.start()
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { false }
+
+    // Never terminate when the inspector window closes — the menu-bar icon
+    // keeps the process alive.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+}

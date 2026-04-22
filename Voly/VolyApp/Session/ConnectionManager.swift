@@ -84,8 +84,12 @@ final class ConnectionManager {
     func updateFileDiscoveredPeers(_ agents: [DiscoveredAgent]) {
         filePeers = agents.map { agent in
             let port = NWEndpoint.Port(rawValue: agent.port) ?? .any
+            // pid is part of the id so a relaunch of the same bundle produces
+            // a new peer and re-fires onPeerAppeared. Without this, the
+            // announcedPeers dedup set considers the old and new pid the same
+            // peer and auto-reconnect never happens.
             return Peer(
-                id: "file:\(agent.deviceUDID):\(agent.bundleIdentifier)",
+                id: "file:\(agent.deviceUDID):\(agent.bundleIdentifier):\(agent.pid)",
                 displayName: "\(agent.processName) (injected)",
                 endpoint: .hostPort(host: .ipv4(.loopback), port: port),
                 source: .portFile(deviceUDID: agent.deviceUDID)
