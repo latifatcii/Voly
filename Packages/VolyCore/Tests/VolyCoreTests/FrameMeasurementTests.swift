@@ -124,4 +124,58 @@ final class FrameMeasurementTests: XCTestCase {
         XCTAssertEqual(result?.summary.kind, .containment)
         XCTAssertEqual(result?.guides.count, 4)
     }
+
+    // MARK: overlap, sameView, degenerate
+
+    func test_overlap_emits_center_to_center_guide() {
+        // partial overlap, neither contains the other
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let b = node(id: 2, frame: CGRect(x: 50, y: 50, width: 100, height: 100))
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.summary.kind, .overlap)
+        XCTAssertNil(result?.summary.horizontal)
+        XCTAssertNil(result?.summary.vertical)
+        // one diagonal guide; implementation detail — we only assert existence
+        XCTAssertFalse(result?.guides.isEmpty ?? true)
+    }
+
+    func test_sameView_returns_overlay_with_no_guides() {
+        let a = node(id: 1, frame: CGRect(x: 10, y: 20, width: 100, height: 200))
+        let b = node(id: 2, frame: CGRect(x: 10, y: 20, width: 100, height: 200))
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.summary.kind, .sameView)
+        XCTAssertTrue(result?.guides.isEmpty ?? false)
+    }
+
+    func test_sharedWindow_false_returns_nil() {
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let b = node(id: 2, frame: CGRect(x: 200, y: 0, width: 100, height: 100))
+        XCTAssertNil(FrameMeasurement.compute(anchor: a, other: b, sharedWindow: false))
+    }
+
+    func test_nan_anchor_returns_nil() {
+        let a = node(id: 1, frame: CGRect(x: CGFloat.nan, y: 0, width: 100, height: 100))
+        let b = node(id: 2, frame: CGRect(x: 150, y: 0, width: 100, height: 100))
+        XCTAssertNil(FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true))
+    }
+
+    func test_zero_size_other_returns_nil() {
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let b = node(id: 2, frame: CGRect(x: 150, y: 0, width: 0, height: 100))
+        XCTAssertNil(FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true))
+    }
+
+    func test_transform_flag_propagates_from_anchor() {
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 100), transformed: true)
+        let b = node(id: 2, frame: CGRect(x: 150, y: 0, width: 100, height: 100), transformed: false)
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.otherIsTransformed, true)
+    }
+
+    func test_transform_flag_propagates_from_other() {
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 100, height: 100), transformed: false)
+        let b = node(id: 2, frame: CGRect(x: 150, y: 0, width: 100, height: 100), transformed: true)
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.otherIsTransformed, true)
+    }
 }

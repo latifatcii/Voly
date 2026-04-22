@@ -25,6 +25,17 @@ public enum FrameMeasurement {
         let anchorRect = anchor.frame
         let otherRect = other.frame
 
+        // Same view: identical frames → overlay with no guides.
+        if a == b {
+            return MeasurementOverlay(
+                anchor: anchorRect,
+                other: otherRect,
+                otherIsTransformed: transformed,
+                guides: [],
+                summary: MeasurementSummary(kind: .sameView, horizontal: nil, vertical: nil)
+            )
+        }
+
         // Side-by-side: rects are disjoint on at least one axis.
         if !a.intersects(b) {
             return sideBySide(a: a, b: b,
@@ -45,8 +56,11 @@ public enum FrameMeasurement {
                                transformed: transformed)
         }
 
-        // Remaining cases (overlap, sameView) land in Task 7.
-        return nil
+        // Overlap (intersects, neither contains): L-shaped guide marking
+        // the horizontal + vertical offsets between the two centers.
+        return overlap(a: a, b: b,
+                       anchorRect: anchorRect, otherRect: otherRect,
+                       transformed: transformed)
     }
 
     // MARK: side-by-side
@@ -149,6 +163,46 @@ public enum FrameMeasurement {
                 horizontal: min(left, right),
                 vertical: min(top, bottom)
             )
+        )
+    }
+
+    // MARK: overlap
+
+    private static func overlap(
+        a: CGRect, b: CGRect,
+        anchorRect: CGRectCodable,
+        otherRect: CGRectCodable,
+        transformed: Bool
+    ) -> MeasurementOverlay {
+        let ax = Double(a.midX), ay = Double(a.midY)
+        let bx = Double(b.midX), by = Double(b.midY)
+        let dx = bx - ax
+        let dy = by - ay
+        let dist = (dx * dx + dy * dy).squareRoot()
+
+        // Two perpendicular segments from anchor center to other center form
+        // an L-shape that communicates the component offsets. Each segment is
+        // labeled with its own component distance.
+        var guides: [MeasurementGuide] = []
+        if abs(dx) > 0.5 {
+            guides.append(.horizontal(y: ay, x1: ax, x2: bx, label: labelFor(abs(dx))))
+        }
+        if abs(dy) > 0.5 {
+            guides.append(.vertical(x: bx, y1: ay, y2: by, label: labelFor(abs(dy))))
+        }
+        // When both components are under 0.5pt (near-identical centers but not
+        // a sameView), emit a degenerate zero-length horizontal so callers know
+        // a measurement exists.
+        if guides.isEmpty {
+            guides.append(.horizontal(y: ay, x1: ax, x2: ax, label: labelFor(dist)))
+        }
+
+        return MeasurementOverlay(
+            anchor: anchorRect,
+            other: otherRect,
+            otherIsTransformed: transformed,
+            guides: guides,
+            summary: MeasurementSummary(kind: .overlap, horizontal: nil, vertical: nil)
         )
     }
 
