@@ -87,4 +87,41 @@ final class FrameMeasurementTests: XCTestCase {
         XCTAssertEqual(result?.summary.horizontal, 100)
         XCTAssertNil(result?.summary.vertical)
     }
+
+    // MARK: containment
+
+    func test_containment_other_inside_anchor_emits_4_insets() {
+        // anchor [0..200, 0..200], other [20..180, 30..175]
+        // insets: top=30, right=20, bottom=25, left=20
+        let a = node(id: 1, frame: CGRect(x: 0, y: 0, width: 200, height: 200))
+        let b = node(id: 2, frame: CGRect(x: 20, y: 30, width: 160, height: 145))
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.summary.kind, .containment)
+        XCTAssertEqual(result?.guides.count, 4)
+
+        // summary takes the minimum inset per axis
+        XCTAssertEqual(result?.summary.horizontal, 20)   // min(left=20, right=20) = 20
+        XCTAssertEqual(result?.summary.vertical, 25)     // min(top=30, bottom=25) = 25
+
+        // Collect guide labels for easy assertion; order is top, right, bottom, left.
+        let labels = result!.guides.map { g -> String in
+            switch g {
+            case .horizontal(_, _, _, let l): return l
+            case .vertical(_, _, _, let l): return l
+            }
+        }
+        XCTAssertTrue(labels.contains("30"))   // top
+        XCTAssertTrue(labels.contains("20"))   // right
+        XCTAssertTrue(labels.contains("25"))   // bottom
+        XCTAssertTrue(labels.contains("20"))   // left
+    }
+
+    func test_containment_anchor_inside_other_also_emits_4_insets() {
+        // Reverse containment still produces 4 guides measuring the inner rect.
+        let a = node(id: 1, frame: CGRect(x: 20, y: 30, width: 160, height: 145))
+        let b = node(id: 2, frame: CGRect(x: 0, y: 0, width: 200, height: 200))
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.summary.kind, .containment)
+        XCTAssertEqual(result?.guides.count, 4)
+    }
 }

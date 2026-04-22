@@ -22,15 +22,30 @@ public enum FrameMeasurement {
         let transformed = (anchor.hasNonIdentityTransform ?? false)
                        || (other.hasNonIdentityTransform ?? false)
 
+        let anchorRect = anchor.frame
+        let otherRect = other.frame
+
         // Side-by-side: rects are disjoint on at least one axis.
         if !a.intersects(b) {
             return sideBySide(a: a, b: b,
-                              anchorRect: anchor.frame,
-                              otherRect: other.frame,
+                              anchorRect: anchorRect,
+                              otherRect: otherRect,
                               transformed: transformed)
         }
 
-        // Remaining cases (containment, overlap, sameView) land in later tasks.
+        // Containment: whichever rect fully contains the other.
+        if a.contains(b) {
+            return containment(outer: a, inner: b,
+                               anchorRect: anchorRect, otherRect: otherRect,
+                               transformed: transformed)
+        }
+        if b.contains(a) {
+            return containment(outer: b, inner: a,
+                               anchorRect: anchorRect, otherRect: otherRect,
+                               transformed: transformed)
+        }
+
+        // Remaining cases (overlap, sameView) land in Task 7.
         return nil
     }
 
@@ -96,6 +111,44 @@ public enum FrameMeasurement {
             summary: MeasurementSummary(kind: .sideBySide,
                                         horizontal: hGap,
                                         vertical: vGap)
+        )
+    }
+
+    // MARK: containment
+
+    private static func containment(
+        outer: CGRect,
+        inner: CGRect,
+        anchorRect: CGRectCodable,
+        otherRect: CGRectCodable,
+        transformed: Bool
+    ) -> MeasurementOverlay {
+        let top    = Double(inner.minY - outer.minY)
+        let right  = Double(outer.maxX - inner.maxX)
+        let bottom = Double(outer.maxY - inner.maxY)
+        let left   = Double(inner.minX - outer.minX)
+
+        let guides: [MeasurementGuide] = [
+            .vertical(x: Double(inner.midX), y1: Double(outer.minY), y2: Double(inner.minY),
+                      label: labelFor(top)),
+            .horizontal(y: Double(inner.midY), x1: Double(inner.maxX), x2: Double(outer.maxX),
+                        label: labelFor(right)),
+            .vertical(x: Double(inner.midX), y1: Double(inner.maxY), y2: Double(outer.maxY),
+                      label: labelFor(bottom)),
+            .horizontal(y: Double(inner.midY), x1: Double(outer.minX), x2: Double(inner.minX),
+                        label: labelFor(left)),
+        ]
+
+        return MeasurementOverlay(
+            anchor: anchorRect,
+            other: otherRect,
+            otherIsTransformed: transformed,
+            guides: guides,
+            summary: MeasurementSummary(
+                kind: .containment,
+                horizontal: min(left, right),
+                vertical: min(top, bottom)
+            )
         )
     }
 
