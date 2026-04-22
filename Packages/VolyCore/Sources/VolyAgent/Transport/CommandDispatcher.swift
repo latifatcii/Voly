@@ -147,9 +147,11 @@ public final class CommandDispatcher {
             overlay.highlight(viewID: id)
             return .ack
 
-        case .measure:
+        case .measure(let overlay):
+            self.overlay.showMeasurement(overlay)
             return .ack
         case .clearMeasure:
+            self.overlay.clearMeasurement()
             return .ack
         }
     }
