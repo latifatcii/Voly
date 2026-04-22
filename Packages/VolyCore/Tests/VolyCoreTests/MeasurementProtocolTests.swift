@@ -1,5 +1,4 @@
 import XCTest
-@testable import VolyProtocol
 @testable import VolyModels
 @testable import VolyCodables
 

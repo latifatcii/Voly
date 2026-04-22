@@ -1,6 +1,5 @@
 import XCTest
 @testable import VolyModels
-@testable import VolyProtocol
 @testable import VolyCodables
 
 final class FrameMeasurementTests: XCTestCase {

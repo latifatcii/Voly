@@ -2,7 +2,6 @@ import Foundation
 import CoreGraphics
 #if !VOLY_UNIFIED_BUILD
 import VolyCodables
-import VolyModels
 #endif
 
 /// Pure geometry for the two-view measurement overlay. Given an `anchor` view
