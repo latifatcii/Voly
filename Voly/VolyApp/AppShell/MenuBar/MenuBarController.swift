@@ -44,10 +44,11 @@ final class MenuBarController: NSObject {
                 accessibilityDescription: "Voly"
             )
             button.image?.isTemplate = true
-            button.target = self
-            button.action = #selector(statusButtonClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+        // Assigning the menu to the status item makes any click (left or right)
+        // open the dropdown. Show/hide moves to the "Show Inspector" menu item
+        // and the ⌃⌥⌘V global hotkey — standard macOS menu-bar app UX.
+        statusItem.menu = menu
 
         showHideItem.target = self
         showHideItem.action = #selector(showHideSelected)
@@ -73,17 +74,6 @@ final class MenuBarController: NSObject {
         let quitItem = NSMenuItem(title: "Quit Voly", action: #selector(quitSelected), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
-    }
-
-    @objc private func statusButtonClicked(_ sender: NSStatusBarButton) {
-        let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp {
-            statusItem.menu = menu
-            statusItem.button?.performClick(nil)
-            statusItem.menu = nil
-        } else {
-            onToggle()
-        }
     }
 
     @objc private func showHideSelected() { onToggle() }
