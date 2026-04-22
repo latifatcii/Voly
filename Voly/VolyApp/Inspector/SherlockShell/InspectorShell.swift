@@ -6,49 +6,10 @@ struct InspectorShell: View {
     @State private var pane = InspectorPane()
 
     var body: some View {
-        NavigationSplitView(columnVisibility: Binding(
-            get: { pane.sidebarVisible ? .all : .detailOnly },
-            set: { newValue in
-                pane.sidebarVisible = (newValue != .detailOnly)
-            }
-        )) {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 320)
-        } detail: {
-            detail
-                .navigationSplitViewColumnWidth(min: 380, ideal: 520)
-        }
-        .toolbar { toolbar }
-        .task { session.connections.startBrowsing() }
-        .onChange(of: session.state.selectedViewID) { _, newID in
-            pane.resetInheritance(for: newID)
-        }
-    }
-
-    // MARK: sidebar
-
-    @ViewBuilder
-    private var sidebar: some View {
         VStack(spacing: 0) {
-            PeerListView(session: session)
-            if let error = session.lastError {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .padding(8)
-                    .textSelection(.enabled)
-            }
+            topStatusBar
             Divider()
-            HierarchyBrowser(session: session)
-        }
-    }
-
-    // MARK: detail
-
-    @ViewBuilder
-    private var detail: some View {
-        VStack(spacing: 0) {
-            if let node = currentNode() {
+            if let node = currentNode(), pane.currentTab.requiresSelection {
                 DetailHeader(node: node, pane: pane)
             }
             TopTabBar(pane: pane, hasSelection: session.state.selectedViewID != nil)
@@ -56,11 +17,63 @@ struct InspectorShell: View {
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .task { session.connections.startBrowsing() }
+        .onChange(of: session.state.selectedViewID) { _, newID in
+            pane.resetInheritance(for: newID)
+            // When the user picks a view, jump to Layout so the inspection UI
+            // is front and center.
+            if newID != nil, pane.currentTab == .hierarchy {
+                pane.currentTab = .layout
+            }
+        }
     }
+
+    // MARK: top status bar
+
+    @ViewBuilder
+    private var topStatusBar: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Circle().frame(width: 8, height: 8).foregroundStyle(statusColor)
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                Task {
+                    if session.state.pickModeActive { await session.exitPickMode() }
+                    else { await session.enterPickMode() }
+                }
+            } label: {
+                Label("Pick", systemImage: session.state.pickModeActive
+                      ? "cursorarrow.click.2"
+                      : "cursorarrow.rays")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .disabled(session.state.connectionStatus != .connected)
+
+            Button {
+                Task { await session.refreshHierarchy() }
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .disabled(session.state.connectionStatus != .connected)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: tab content
 
     @ViewBuilder
     private var tabContent: some View {
         switch pane.currentTab {
+        case .hierarchy:
+            HierarchyTab(session: session)
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)
@@ -93,49 +106,7 @@ struct InspectorShell: View {
         return session.state.findNode(id: id)
     }
 
-    // MARK: toolbar
-
-    @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            Button {
-                pane.sidebarVisible.toggle()
-            } label: {
-                Label("Toggle Sidebar", systemImage: "sidebar.left")
-            }
-            .keyboardShortcut("0", modifiers: [.command])
-        }
-
-        ToolbarItem(placement: .principal) {
-            HStack(spacing: 6) {
-                Circle().frame(width: 8, height: 8).foregroundStyle(statusColor)
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-
-        ToolbarItemGroup {
-            Button {
-                Task {
-                    if session.state.pickModeActive { await session.exitPickMode() }
-                    else { await session.enterPickMode() }
-                }
-            } label: {
-                Label("Pick", systemImage: session.state.pickModeActive
-                      ? "cursorarrow.click.2"
-                      : "cursorarrow.rays")
-            }
-            .disabled(session.state.connectionStatus != .connected)
-
-            Button {
-                Task { await session.refreshHierarchy() }
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .disabled(session.state.connectionStatus != .connected)
-        }
-    }
+    // MARK: status text + color
 
     private var statusText: String {
         switch session.state.connectionStatus {

@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum DetailTab: String, CaseIterable, Identifiable, Hashable {
-    case layout, props, src, userDefaults, urlTester, preview
+    case hierarchy, layout, props, src, userDefaults, urlTester, preview
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
+        case .hierarchy: return "Tree"
         case .layout: return "Layout"
         case .props: return "Props"
         case .src: return "Src"
@@ -18,6 +19,7 @@ enum DetailTab: String, CaseIterable, Identifiable, Hashable {
 
     var symbol: String {
         switch self {
+        case .hierarchy: return "list.bullet.indent"
         case .layout: return "square.3.layers.3d.down.left"
         case .props: return "slider.horizontal.3"
         case .src: return "doc.text"
@@ -31,7 +33,7 @@ enum DetailTab: String, CaseIterable, Identifiable, Hashable {
     var requiresSelection: Bool {
         switch self {
         case .layout, .props, .src: return true
-        case .userDefaults, .urlTester, .preview: return false
+        case .hierarchy, .userDefaults, .urlTester, .preview: return false
         }
     }
 }

@@ -5,12 +5,15 @@ import VolyProtocol
 
 struct PropertyPanel: View {
     @Bindable var session: InspectorSession
+    @State private var viewExpanded = true
+    @State private var layerExpanded = true
+    @State private var customExpanded = true
 
     var body: some View {
         ScrollView {
             if let bag = session.state.propertyBag {
                 VStack(alignment: .leading, spacing: 12) {
-                    DisclosureGroup("View") {
+                    DisclosureGroup("View", isExpanded: $viewExpanded) {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(bag.view.keys.sorted(), id: \.self) { key in
                                 if let value = bag.view[key] {
@@ -30,7 +33,7 @@ struct PropertyPanel: View {
                             }
                         }
                     }
-                    DisclosureGroup("Layer") {
+                    DisclosureGroup("Layer", isExpanded: $layerExpanded) {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(bag.layer.keys.sorted(), id: \.self) { key in
                                 if let value = bag.layer[key] {
@@ -51,7 +54,7 @@ struct PropertyPanel: View {
                         }
                     }
                     if !bag.custom.isEmpty {
-                        DisclosureGroup("Custom") {
+                        DisclosureGroup("Custom", isExpanded: $customExpanded) {
                             VStack(alignment: .leading, spacing: 4) {
                                 ForEach(bag.custom) { descriptor in
                                     PropertyRow(
