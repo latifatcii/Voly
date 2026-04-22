@@ -27,7 +27,7 @@ struct InspectorRootView: View {
     @ViewBuilder
     private var sidebar: some View {
         VStack(spacing: 0) {
-            PeerListView(session: session)
+            LegacyPeerListView(session: session)
             if let error = session.lastError {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(.caption2)
@@ -136,7 +136,7 @@ struct InspectorRootView: View {
     }
 }
 
-private struct PeerListView: View {
+private struct LegacyPeerListView: View {
     @Bindable var session: InspectorSession
     @State private var manualHost: String = "127.0.0.1"
     @State private var manualPort: String = ""
