@@ -8,7 +8,10 @@ final class SampleRootViewController: UIViewController {
         let tabs = UITabBarController()
         tabs.viewControllers = [
             nav(AutoLayoutDemoVC(), title: "Layout", symbol: "rectangle.3.group"),
-            nav(IBInspectableDemoVC(), title: "Inspectable", symbol: "slider.horizontal.3"),
+            nav(FormControlsDemoVC(), title: "Form", symbol: "rectangle.and.pencil.and.ellipsis"),
+            nav(CollectionGalleryDemoVC(), title: "Gallery", symbol: "square.grid.2x2"),
+            nav(AnimationLabDemoVC(), title: "Motion", symbol: "wand.and.stars"),
+            nav(IBInspectableDemoVC(), title: "Inspect", symbol: "slider.horizontal.3"),
             nav(SettingsDemoVC(), title: "Defaults", symbol: "gearshape"),
         ]
         addChild(tabs)
