@@ -18,6 +18,18 @@ public final class SnapshotBuilder {
         self.registry = registry
     }
 
+    /// Walks `class_getSuperclass` from the view's dynamic class up through
+    /// NSObject and returns the chain as class names.
+    static func inheritanceChain(of object: AnyObject) -> [String] {
+        var chain: [String] = []
+        var cls: AnyClass? = type(of: object)
+        while let c = cls {
+            chain.append(String(describing: c))
+            cls = class_getSuperclass(c)
+        }
+        return chain
+    }
+
     /// Default depth is large enough to include the full hierarchy of a
     /// typical iOS app (UIKit chrome alone can be 10+ levels). The inspector
     /// needs the whole chain to reveal a picked view in the tree; lazy
@@ -70,7 +82,8 @@ public final class SnapshotBuilder {
             contentMode: view.contentMode.rawValue,
             constraintIDs: view.constraints.map { registry.id(for: $0) },
             childIDs: childIDs,
-            childrenInline: inline
+            childrenInline: inline,
+            classInheritance: Self.inheritanceChain(of: view)
         )
     }
 
