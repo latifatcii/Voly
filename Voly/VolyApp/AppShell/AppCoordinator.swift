@@ -14,9 +14,13 @@ final class AppCoordinator {
     private let attachment: SimulatorAttachment
     private let locator: SimulatorLocator
     private let autoAttach: AutoAttachInstaller
+    private let runningApps = RunningAppsLocator()
+    private let launcher = SimctlLauncher()
+    private let inventory = SimInventory()
     private var hotkey: GlobalHotkey?
     private var attachmentObservation: Task<Void, Never>?
     private var toggleInFlight = false
+    private var attachInFlight = false
 
     init(session: InspectorSession) {
         self.session = session
@@ -33,7 +37,7 @@ final class AppCoordinator {
             bundledDylibPath: Self.bundledDylibPath()
         )
         self.menuBar = MenuBarController(
-            onToggle: {}, onQuit: {}, onAbout: {}, onToggleAutoAttach: {}
+            onToggle: {}, onQuit: {}, onAbout: {}, onToggleAutoAttach: {}, onAttachRunningApp: {}
         )
 
         wireCallbacks()
@@ -179,6 +183,58 @@ final class AppCoordinator {
         menuBar.onQuit = { [weak self] in self?.quit() }
         menuBar.onAbout = { NSApp.orderFrontStandardAboutPanel(nil) }
         menuBar.onToggleAutoAttach = { [weak self] in self?.toggleAutoAttach() }
+        menuBar.onAttachRunningApp = { [weak self] in self?.attachRunningApp() }
+    }
+
+    /// Find the user's running sim app and relaunch it via direct simctl with
+    /// SIMCTL_CHILD_DYLD_INSERT_LIBRARIES set to VolyAgent.dylib. Xcode's debug
+    /// launch replaces DYLD_INSERT_LIBRARIES wholesale and ignores our
+    /// launchctl setenv value, so we need this manual re-launch path.
+    func attachRunningApp() {
+        guard !attachInFlight else { return }
+        attachInFlight = true
+        Task { @MainActor [weak self] in
+            defer { self?.attachInFlight = false }
+            guard let self else { return }
+            do {
+                let devices = try await self.inventory.listDevices(bootedOnly: true)
+                guard let device = devices.first else {
+                    self.showAlert(
+                        title: "No booted simulator",
+                        info: "Boot a simulator and launch your app, then try again."
+                    )
+                    return
+                }
+                let apps = try await self.runningApps.listRunningUserApps(deviceUDID: device.udid)
+                guard let target = apps.first else {
+                    self.showAlert(
+                        title: "No running app found",
+                        info: "Run your app in the simulator, then try Attach again."
+                    )
+                    return
+                }
+                log.notice("relaunching \(target.bundleIdentifier, privacy: .public) with VolyAgent injected")
+                _ = try await self.launcher.launch(
+                    deviceUDID: device.udid,
+                    bundleIdentifier: target.bundleIdentifier,
+                    dylibPath: URL(fileURLWithPath: Self.bundledDylibPath())
+                )
+            } catch {
+                log.error("attachRunningApp failed: \(String(describing: error), privacy: .public)")
+                self.showAlert(
+                    title: "Attach failed",
+                    info: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func showAlert(title: String, info: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = info
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func startObservingAttachment() {
