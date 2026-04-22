@@ -9,64 +9,72 @@ struct PropertyPanel: View {
     var body: some View {
         ScrollView {
             if let bag = session.state.propertyBag {
-                VStack(alignment: .leading, spacing: 16) {
-                    SectionHeader(title: "View")
-                    ForEach(bag.view.keys.sorted(), id: \.self) { key in
-                        if let value = bag.view[key] {
-                            PropertyRow(
-                                name: key,
-                                value: value,
-                                readOnly: false,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .view,
-                                            change: PropertyChange(property: key, value: newValue)))
-                                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    DisclosureGroup("View") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(bag.view.keys.sorted(), id: \.self) { key in
+                                if let value = bag.view[key] {
+                                    PropertyRow(
+                                        name: key,
+                                        value: value,
+                                        readOnly: false,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .view,
+                                                    change: PropertyChange(property: key, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-
-                    SectionHeader(title: "Layer")
-                    ForEach(bag.layer.keys.sorted(), id: \.self) { key in
-                        if let value = bag.layer[key] {
-                            PropertyRow(
-                                name: key,
-                                value: value,
-                                readOnly: false,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .layer,
-                                            change: PropertyChange(property: key, value: newValue)))
-                                    }
+                    DisclosureGroup("Layer") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(bag.layer.keys.sorted(), id: \.self) { key in
+                                if let value = bag.layer[key] {
+                                    PropertyRow(
+                                        name: key,
+                                        value: value,
+                                        readOnly: false,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .layer,
+                                                    change: PropertyChange(property: key, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-
                     if !bag.custom.isEmpty {
-                        SectionHeader(title: "Custom")
-                        ForEach(bag.custom) { descriptor in
-                            PropertyRow(
-                                name: descriptor.name,
-                                value: descriptor.currentValue,
-                                readOnly: descriptor.isReadOnly,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .custom,
-                                            change: PropertyChange(property: descriptor.name, value: newValue)))
-                                    }
+                        DisclosureGroup("Custom") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(bag.custom) { descriptor in
+                                    PropertyRow(
+                                        name: descriptor.name,
+                                        value: descriptor.currentValue,
+                                        readOnly: descriptor.isReadOnly,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .custom,
+                                                    change: PropertyChange(property: descriptor.name, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             } else {
-                Text("Loading properties…").foregroundStyle(.secondary).padding()
+                EmptyView()
             }
         }
     }
