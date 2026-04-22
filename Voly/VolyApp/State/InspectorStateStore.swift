@@ -91,6 +91,13 @@ final class InspectorStateStore {
         return nil
     }
 
+    /// Which window's subtree contains `id`, per the cached snapshot.
+    /// Used to decide whether two views can be measured against each other
+    /// (cross-window measurements are meaningless in window coords).
+    func containingWindowID(of id: ObjectID) -> ObjectID? {
+        hierarchy?.containingWindowID(of: id)
+    }
+
     /// Walk the cached hierarchy and insert every ancestor of `id` into
     /// `expandedNodeIDs`. No-op if `id` is not in the cached tree.
     func expandAncestors(of id: ObjectID) {
