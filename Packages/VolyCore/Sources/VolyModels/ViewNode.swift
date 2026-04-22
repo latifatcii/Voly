@@ -21,6 +21,7 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
     public let constraintIDs: [ObjectID]
     public let childIDs: [ObjectID]
     public let childrenInline: [ViewNode]?
+    public let classInheritance: [String]?
 
     public init(
         id: ObjectID,
@@ -39,7 +40,8 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
         contentMode: Int,
         constraintIDs: [ObjectID],
         childIDs: [ObjectID],
-        childrenInline: [ViewNode]?
+        childrenInline: [ViewNode]?,
+        classInheritance: [String]? = nil
     ) {
         self.id = id
         self.className = className
@@ -58,6 +60,7 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
         self.constraintIDs = constraintIDs
         self.childIDs = childIDs
         self.childrenInline = childrenInline
+        self.classInheritance = classInheritance
     }
 }
 

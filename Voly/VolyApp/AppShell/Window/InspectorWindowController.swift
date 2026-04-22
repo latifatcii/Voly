@@ -12,7 +12,7 @@ final class InspectorWindowController: NSObject, NSWindowDelegate {
     private(set) var userHasDetached = false
 
     init(session: InspectorSession) {
-        let content = NSHostingView(rootView: InspectorRootView(session: session))
+        let content = NSHostingView(rootView: InspectorShell(session: session))
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 700),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .fullSizeContentView],

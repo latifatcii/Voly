@@ -5,77 +5,81 @@ import VolyProtocol
 
 struct PropertyPanel: View {
     @Bindable var session: InspectorSession
+    @State private var viewExpanded = true
+    @State private var layerExpanded = true
+    @State private var customExpanded = true
 
     var body: some View {
         ScrollView {
             if let bag = session.state.propertyBag {
-                VStack(alignment: .leading, spacing: 16) {
-                    SectionHeader(title: "View")
-                    ForEach(bag.view.keys.sorted(), id: \.self) { key in
-                        if let value = bag.view[key] {
-                            PropertyRow(
-                                name: key,
-                                value: value,
-                                readOnly: false,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .view,
-                                            change: PropertyChange(property: key, value: newValue)))
-                                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    DisclosureGroup("View", isExpanded: $viewExpanded) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(bag.view.keys.sorted(), id: \.self) { key in
+                                if let value = bag.view[key] {
+                                    PropertyRow(
+                                        name: key,
+                                        value: value,
+                                        readOnly: false,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .view,
+                                                    change: PropertyChange(property: key, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-
-                    SectionHeader(title: "Layer")
-                    ForEach(bag.layer.keys.sorted(), id: \.self) { key in
-                        if let value = bag.layer[key] {
-                            PropertyRow(
-                                name: key,
-                                value: value,
-                                readOnly: false,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .layer,
-                                            change: PropertyChange(property: key, value: newValue)))
-                                    }
+                    DisclosureGroup("Layer", isExpanded: $layerExpanded) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(bag.layer.keys.sorted(), id: \.self) { key in
+                                if let value = bag.layer[key] {
+                                    PropertyRow(
+                                        name: key,
+                                        value: value,
+                                        readOnly: false,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .layer,
+                                                    change: PropertyChange(property: key, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
-
                     if !bag.custom.isEmpty {
-                        SectionHeader(title: "Custom")
-                        ForEach(bag.custom) { descriptor in
-                            PropertyRow(
-                                name: descriptor.name,
-                                value: descriptor.currentValue,
-                                readOnly: descriptor.isReadOnly,
-                                onChange: { newValue in
-                                    Task {
-                                        await session.setProperty(SetPropertyRequest(
-                                            objectID: bag.objectID, scope: .custom,
-                                            change: PropertyChange(property: descriptor.name, value: newValue)))
-                                    }
+                        DisclosureGroup("Custom", isExpanded: $customExpanded) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(bag.custom) { descriptor in
+                                    PropertyRow(
+                                        name: descriptor.name,
+                                        value: descriptor.currentValue,
+                                        readOnly: descriptor.isReadOnly,
+                                        onChange: { newValue in
+                                            Task {
+                                                await session.setProperty(SetPropertyRequest(
+                                                    objectID: bag.objectID, scope: .custom,
+                                                    change: PropertyChange(property: descriptor.name, value: newValue)))
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            }
                         }
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             } else {
-                Text("Loading properties…").foregroundStyle(.secondary).padding()
+                EmptyView()
             }
         }
-    }
-}
-
-private struct SectionHeader: View {
-    let title: String
-    var body: some View {
-        Text(title).font(.headline).foregroundStyle(.secondary)
     }
 }
 
@@ -87,8 +91,7 @@ struct PropertyRow: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            Text(name)
-                .fontDesign(.monospaced)
+            Text(PropertyNameFormatter.humanize(name))
                 .font(.caption)
                 .frame(width: 150, alignment: .leading)
                 .foregroundStyle(.primary)
@@ -105,7 +108,14 @@ struct PropertyRow: View {
                 .labelsHidden()
                 .disabled(readOnly)
         case .int(let v):
-            IntField(value: v, readOnly: readOnly) { onChange(.int($0)) }
+            HStack(spacing: 6) {
+                IntField(value: v, readOnly: readOnly) { onChange(.int($0)) }
+                if let label = PropertyValueFormatter.label(forProperty: name, intValue: v) {
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         case .double(let v):
             DoubleField(value: v, readOnly: readOnly) { onChange(.double($0)) }
         case .string(let v):
@@ -198,6 +208,14 @@ private struct ColorPickerField: View {
                 .disabled(readOnly)
             Text(color.hex).font(.caption2).foregroundStyle(.secondary).fontDesign(.monospaced)
         }
+        .onAppear {
+            // Voly's inspector is an NSPanel at .floating level. The system
+            // NSColorPanel defaults to .normal and opens hidden behind us.
+            // Raise it above so clicking the color swatch actually reveals
+            // the picker.
+            NSColorPanel.shared.level = .popUpMenu
+            NSColorPanel.shared.hidesOnDeactivate = false
+        }
         .onChange(of: picked) { _, newValue in
             let ns = NSColor(newValue).usingColorSpace(.sRGB) ?? NSColor(newValue)
             onCommit(CGColorCodable(red: Double(ns.redComponent),
@@ -205,5 +223,17 @@ private struct ColorPickerField: View {
                                     blue: Double(ns.blueComponent),
                                     alpha: Double(ns.alphaComponent)))
         }
+        .onChange(of: colorIdentity) { _, _ in
+            // Re-seed local state if the color is updated externally (e.g. the
+            // server clamped / replaced the value after we committed).
+            picked = Color(red: color.red, green: color.green,
+                           blue: color.blue, opacity: color.alpha)
+        }
+    }
+
+    /// Tuple used as the observation key so SwiftUI detects external color
+    /// changes on the incoming `color` value.
+    private var colorIdentity: String {
+        "\(color.red),\(color.green),\(color.blue),\(color.alpha)"
     }
 }
