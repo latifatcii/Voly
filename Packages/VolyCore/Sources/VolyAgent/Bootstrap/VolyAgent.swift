@@ -19,6 +19,7 @@ public final class VolyAgentRuntime: PreviewHostProvider {
     public private(set) var snapshots: SnapshotBuilder!
     public private(set) var mutations: MutationExecutor!
     public private(set) var pick: PickEngine!
+    public private(set) var hover: HoverEngine!
     public private(set) var overlay: OverlayHost!
     public private(set) var defaults: UserDefaultsProvider!
     public private(set) var urls: URLExecutor!
@@ -47,6 +48,7 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         self.mutations = MutationExecutor(registry: registry)
         self.overlay = OverlayHost(registry: registry)
         self.pick = PickEngine(registry: registry, overlay: overlay)
+        self.hover = HoverEngine(registry: registry)
         self.defaults = UserDefaultsProvider()
         self.urls = URLExecutor()
         self.source = DefaultSourceInfoProvider()
@@ -55,6 +57,7 @@ public final class VolyAgentRuntime: PreviewHostProvider {
             snapshots: snapshots,
             mutations: mutations,
             pick: pick,
+            hover: hover,
             overlay: overlay,
             defaults: defaults,
             urls: urls,
