@@ -32,7 +32,10 @@ public final class HoverEngine {
     }
 
     public func enter() {
-        guard hoverWindow == nil else { return }
+        guard hoverWindow == nil else {
+            log.notice("enter: already active, no-op")
+            return
+        }
         guard let scene = UIApplication.shared.connectedScenes
             .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
         else {
@@ -48,8 +51,8 @@ public final class HoverEngine {
         // and dispatcher-side — but defensive positioning is cheap).
         w.windowLevel = UIWindow.Level.alert + 2
         w.frame = scene.coordinateSpace.bounds
-        // Very faint orange tint so the user knows measure mode is on.
-        w.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.04)
+        // Bumped from 0.04 to 0.10 so it's visibly obvious measure mode is on.
+        w.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.10)
 
         let root = HoverRootVC(
             onHover: { [weak self] point in self?.handleHover(at: point, in: scene) },
@@ -65,6 +68,7 @@ public final class HoverEngine {
             suspendedWindowInteraction[other] = other.isUserInteractionEnabled
             other.isUserInteractionEnabled = false
         }
+        log.notice("enter: overlay window up at level \(w.windowLevel.rawValue, privacy: .public), scene=\(self.currentSceneID)")
     }
 
     public func exit() {
@@ -90,6 +94,7 @@ public final class HoverEngine {
 
     private func handleHover(at point: CGPoint, in scene: UIWindowScene) {
         let id = SelectionHitTest.hitTest(in: scene, at: point, registry: registry)
+        log.debug("handleHover: point=\(String(describing: point), privacy: .public) → id=\(id)")
         scheduleEmit(id: id == 0 ? nil : id)
     }
 
@@ -113,6 +118,7 @@ public final class HoverEngine {
             let toEmit = self.pendingHoverID
             if toEmit != self.lastEmittedID {
                 self.lastEmittedID = toEmit
+                log.notice("emit didHover: id=\(toEmit.map(String.init) ?? "nil", privacy: .public)")
                 let payload: Any = toEmit.map(NSNumber.init(value:)) ?? NSNull()
                 NotificationCenter.default.post(
                     name: Notification.didHover,
@@ -123,7 +129,7 @@ public final class HoverEngine {
     }
 }
 
-private final class HoverRootVC: UIViewController {
+private final class HoverRootVC: UIViewController, UIPointerInteractionDelegate {
     private let onHover: (CGPoint) -> Void
     private let onClick: (CGPoint) -> Void
     init(onHover: @escaping (CGPoint) -> Void,
@@ -139,8 +145,16 @@ private final class HoverRootVC: UIViewController {
         v.backgroundColor = .clear
         v.isUserInteractionEnabled = true
 
+        // UIHoverGestureRecognizer — primary path on iPad / devices with
+        // pointer support natively enabled.
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(hovered(_:)))
         v.addGestureRecognizer(hover)
+
+        // UIPointerInteraction — more reliable on iPhone iOS Simulator where
+        // the simulator often forwards Mac mouse as pointer events but not as
+        // hover-gesture events. `regionFor:` fires on every pointer move.
+        let pointer = UIPointerInteraction(delegate: self)
+        v.addInteraction(pointer)
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
         tap.cancelsTouchesInView = true
@@ -154,6 +168,23 @@ private final class HoverRootVC: UIViewController {
     }
     @objc private func tapped(_ g: UITapGestureRecognizer) {
         onClick(g.location(in: view))
+    }
+
+    // MARK: UIPointerInteractionDelegate
+
+    func pointerInteraction(_ interaction: UIPointerInteraction,
+                            regionFor request: UIPointerRegionRequest,
+                            defaultRegion: UIPointerRegion) -> UIPointerRegion? {
+        // request.location is in the interaction view's coord space, which is
+        // our greedy HoverRootView == scene bounds.
+        onHover(request.location)
+        return defaultRegion
+    }
+
+    func pointerInteraction(_ interaction: UIPointerInteraction,
+                            styleFor region: UIPointerRegion) -> UIPointerStyle? {
+        // Keep the system cursor — we're just tracking location.
+        return nil
     }
 }
 
