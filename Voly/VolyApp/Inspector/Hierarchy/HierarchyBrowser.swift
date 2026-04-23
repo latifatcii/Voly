@@ -128,11 +128,11 @@ private struct NodeRow: View {
                     measurement.hoverID = nil
                 }
             }
-            .onTapGesture {
-                if NSEvent.modifierFlags.contains(.option) {
+            .simultaneousGesture(
+                TapGesture().modifiers(.option).onEnded {
                     measurement.togglePin(node.id)
                 }
-            }
+            )
     }
 
     private func filtered(_ nodes: [ViewNode]) -> [ViewNode] {
