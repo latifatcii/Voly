@@ -13,6 +13,7 @@ final class InspectorStateStore {
     var hierarchy: HierarchySnapshot?
     var selectedViewID: ObjectID?
     var pickModeActive = false
+    var measureModeActive = false
     /// IDs whose DisclosureGroup in the hierarchy browser is open. Owned here
     /// (rather than on each NodeRow's @State) so `expandAncestors(of:)` can
     /// open the chain when a new selection arrives via pick or programmatic select.
