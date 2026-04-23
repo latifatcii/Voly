@@ -381,8 +381,8 @@ final class InspectorSession {
                     await self.loadSubtree(for: id)
                 case .connectionWarning(let message):
                     self.lastError = message
-                case .hoverTarget:
-                    break   // TODO Task 9: route to measurement.hoverID
+                case .hoverTarget(let id):
+                    self.measurement.hoverID = id
                 case .measureClick(let id):
                     await self.select(id)
                 }
