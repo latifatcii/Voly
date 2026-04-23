@@ -9,6 +9,13 @@ struct InspectorShell: View {
         VStack(spacing: 0) {
             topStatusBar
             Divider()
+            if session.state.measureModeActive && session.state.selectedViewID == nil {
+                Label("Click a view on the simulator to anchor", systemImage: "cursorarrow.click")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+            }
             if let node = currentNode(), pane.currentTab.requiresSelection {
                 DetailHeader(node: node, pane: pane, measurement: session.measurement,
                              lastSummary: session.lastMeasurementSummary)
