@@ -17,6 +17,11 @@ final class InspectorSession {
     private var client: WebSocketClient?
     private var selectedPeer: ConnectionManager.Peer?
     var lastError: String?
+    var lastMeasurementSummary: MeasurementSummary?
+
+    /// Trailing-debounce handle for measurement updates. Fast mouse movement
+    /// over the hierarchy would otherwise send a `.measure` command per frame.
+    private var pendingMeasurementTask: Task<Void, Never>?
     /// When true, the first peer discovered over Bonjour is connected to
     /// automatically. Reset to false if the user explicitly disconnects.
     var autoConnectEnabled: Bool = true
@@ -275,6 +280,60 @@ final class InspectorSession {
 
     func clearPreview() async {
         _ = try? await client?.send(.clearPreview)
+    }
+
+    /// Schedule a measurement-overlay update after a short debounce. Cancels
+    /// any in-flight update. Pass `other == nil` to clear the overlay.
+    func scheduleMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) {
+        pendingMeasurementTask?.cancel()
+        pendingMeasurementTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(16))
+            if Task.isCancelled { return }
+            await self?.performMeasurementUpdate(anchor: anchor, other: other)
+        }
+    }
+
+    private func performMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) async {
+        guard let client else { return }
+
+        // No anchor or no "other" → clear everything.
+        guard let anchor, let other else {
+            lastMeasurementSummary = nil
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        guard let anchorNode = state.findNode(id: anchor),
+              let otherNode  = state.findNode(id: other) else {
+            lastMeasurementSummary = nil
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        let sharedWindow = state.containingWindowID(of: anchor)
+            == state.containingWindowID(of: other)
+
+        guard let overlay = FrameMeasurement.compute(
+            anchor: anchorNode, other: otherNode, sharedWindow: sharedWindow)
+        else {
+            // Cross-window or degenerate — surface the "different windows"
+            // status to the badge by synthesizing a crossWindow summary.
+            lastMeasurementSummary = MeasurementSummary(kind: .crossWindow,
+                                                        horizontal: nil,
+                                                        vertical: nil)
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        // sameView → header shows "same view", no on-simulator guides needed.
+        if overlay.summary.kind == .sameView {
+            lastMeasurementSummary = overlay.summary
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        lastMeasurementSummary = overlay.summary
+        _ = try? await client.send(.measure(overlay: overlay))
     }
 
     func resolveSource(for id: ObjectID) async -> SourceInfo? {
