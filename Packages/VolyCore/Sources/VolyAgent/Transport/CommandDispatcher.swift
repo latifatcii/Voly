@@ -153,6 +153,10 @@ public final class CommandDispatcher {
         case .clearMeasure:
             self.overlay.clearMeasurement()
             return .ack
+        case .enterMeasureMode:
+            return .measureModeChanged(true)
+        case .exitMeasureMode:
+            return .measureModeChanged(false)
         }
     }
 }

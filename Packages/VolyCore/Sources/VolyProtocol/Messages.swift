@@ -133,6 +133,8 @@ public enum Command: Codable, Sendable {
     case highlight(objectID: ObjectID)
     case measure(overlay: MeasurementOverlay)
     case clearMeasure
+    case enterMeasureMode
+    case exitMeasureMode
 }
 
 public enum Response: Codable, Sendable {
@@ -142,6 +144,7 @@ public enum Response: Codable, Sendable {
     case properties(PropertyBag)
     case constraints([ConstraintNode])
     case pickModeChanged(Bool)
+    case measureModeChanged(Bool)
     case selection(ObjectID)
     case userDefaults([UserDefaultsItem])
     case urlResult(success: Bool, error: String?)
@@ -157,4 +160,6 @@ public enum Event: Codable, Sendable {
     case viewInvalidated(ObjectID)
     case selectionChanged(ObjectID)
     case connectionWarning(String)
+    case hoverTarget(ObjectID?)
+    case measureClick(ObjectID)
 }
