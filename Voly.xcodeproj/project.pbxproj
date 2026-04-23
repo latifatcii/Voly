@@ -25,6 +25,9 @@
 		80062E0C332A2A675333647B /* ObjectRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4736ACE6E71AB4889998E3E /* ObjectRegistry.swift */; };
 		9DF924CBE44BC47F877277B6 /* VolyHost in Frameworks */ = {isa = PBXBuildFile; productRef = D3A352E6DB13E632E88428C7 /* VolyHost */; };
 		9F922403DFB2794C9303B73C /* ViewNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78A333E379AFBEAC081EAA0 /* ViewNode.swift */; };
+		17A135DCDDB34BCAA1E4A291 /* MeasurementOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */; };
+		AFC096A0C55849C6B582BEDE /* FrameMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */; };
+		E8376DDF96B4427AABC16EEE /* HierarchySnapshot+WindowLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */; };
 		B04A9501C0474D941BE00E6B /* Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A86BDE7BE375DBA7601BC8 /* Messages.swift */; };
 		BD31DD54C76270290858C2F3 /* AgentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC6E782E10338FDA5CC9698 /* AgentGate.swift */; };
 		C345597C2A27833DFF5270F8 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6303CDA5BFD2BDCB46C112 /* WebSocketServer.swift */; };
@@ -88,6 +91,9 @@
 		EDB09255AAFB6781CDE9D5A7 /* ConstraintNode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConstraintNode.swift; sourceTree = "<group>"; };
 		F4736ACE6E71AB4889998E3E /* ObjectRegistry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObjectRegistry.swift; sourceTree = "<group>"; };
 		F78A333E379AFBEAC081EAA0 /* ViewNode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewNode.swift; sourceTree = "<group>"; };
+		ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeasurementOverlay.swift; sourceTree = "<group>"; };
+		9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FrameMeasurement.swift; sourceTree = "<group>"; };
+		F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "HierarchySnapshot+WindowLookup.swift"; sourceTree = "<group>"; };
 		FBC6E782E10338FDA5CC9698 /* AgentGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -307,6 +313,9 @@
 				AF87691858250B0959D27D12 /* PropValue.swift */,
 				2120DB677A5A3AD92EB1C9E7 /* UserDefaultsItem.swift */,
 				F78A333E379AFBEAC081EAA0 /* ViewNode.swift */,
+				ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */,
+				9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */,
+				F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */,
 			);
 			path = VolyModels;
 			sourceTree = "<group>";
@@ -543,6 +552,9 @@
 				09EEED0FDCB2C9E9785EBB10 /* PropValue.swift in Sources */,
 				5940E284986E2F6B3A86ABCE /* UserDefaultsItem.swift in Sources */,
 				9F922403DFB2794C9303B73C /* ViewNode.swift in Sources */,
+				17A135DCDDB34BCAA1E4A291 /* MeasurementOverlay.swift in Sources */,
+				AFC096A0C55849C6B582BEDE /* FrameMeasurement.swift in Sources */,
+				E8376DDF96B4427AABC16EEE /* HierarchySnapshot+WindowLookup.swift in Sources */,
 				38195BB429E5E25B9AE1E893 /* Framing.swift in Sources */,
 				B04A9501C0474D941BE00E6B /* Messages.swift in Sources */,
 				EE830DA32EE43254EDCD9FAF /* VolyAgentLoader.m in Sources */,
