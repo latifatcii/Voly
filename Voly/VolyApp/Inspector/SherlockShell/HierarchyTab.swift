@@ -4,6 +4,7 @@ import SwiftUI
 /// connection errors at the top, then the hierarchy browser below.
 struct HierarchyTab: View {
     @Bindable var session: InspectorSession
+    @Bindable var measurement: MeasurementPane
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,7 +17,7 @@ struct HierarchyTab: View {
                     .textSelection(.enabled)
             }
             Divider()
-            HierarchyBrowser(session: session)
+            HierarchyBrowser(session: session, measurement: measurement)
         }
     }
 }

@@ -73,7 +73,7 @@ struct InspectorShell: View {
     private var tabContent: some View {
         switch pane.currentTab {
         case .hierarchy:
-            HierarchyTab(session: session)
+            HierarchyTab(session: session, measurement: MeasurementPane())
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)
