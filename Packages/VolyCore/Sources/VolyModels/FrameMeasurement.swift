@@ -15,15 +15,15 @@ public enum FrameMeasurement {
         sharedWindow: Bool
     ) -> MeasurementOverlay? {
         guard sharedWindow else { return nil }
-        let a = anchor.frame.cg
-        let b = other.frame.cg
+        let a = (anchor.windowFrame ?? anchor.frame).cg
+        let b = (other.windowFrame ?? other.frame).cg
         guard finiteAndNonEmpty(a), finiteAndNonEmpty(b) else { return nil }
 
         let transformed = (anchor.hasNonIdentityTransform ?? false)
                        || (other.hasNonIdentityTransform ?? false)
 
-        let anchorRect = anchor.frame
-        let otherRect = other.frame
+        let anchorRect = anchor.windowFrame ?? anchor.frame
+        let otherRect = other.windowFrame ?? other.frame
 
         // Same view: identical frames → overlay with no guides.
         if a == b {

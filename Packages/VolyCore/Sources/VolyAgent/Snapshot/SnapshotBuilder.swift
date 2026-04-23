@@ -84,7 +84,8 @@ public final class SnapshotBuilder {
             childIDs: childIDs,
             childrenInline: inline,
             classInheritance: Self.inheritanceChain(of: view),
-            hasNonIdentityTransform: !CATransform3DIsIdentity(view.layer.transform)
+            hasNonIdentityTransform: !CATransform3DIsIdentity(view.layer.transform),
+            windowFrame: CGRectCodable(view.convert(view.bounds, to: nil))
         )
     }
 

@@ -23,6 +23,7 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
     public let childrenInline: [ViewNode]?
     public let classInheritance: [String]?
     public let hasNonIdentityTransform: Bool?
+    public let windowFrame: CGRectCodable?
 
     public init(
         id: ObjectID,
@@ -43,7 +44,8 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
         childIDs: [ObjectID],
         childrenInline: [ViewNode]?,
         classInheritance: [String]? = nil,
-        hasNonIdentityTransform: Bool? = nil
+        hasNonIdentityTransform: Bool? = nil,
+        windowFrame: CGRectCodable? = nil
     ) {
         self.id = id
         self.className = className
@@ -64,6 +66,7 @@ public struct ViewNode: Codable, Sendable, Identifiable, Hashable {
         self.childrenInline = childrenInline
         self.classInheritance = classInheritance
         self.hasNonIdentityTransform = hasNonIdentityTransform
+        self.windowFrame = windowFrame
     }
 }
 

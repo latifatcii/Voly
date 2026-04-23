@@ -178,4 +178,36 @@ final class FrameMeasurementTests: XCTestCase {
         let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
         XCTAssertEqual(result?.otherIsTransformed, true)
     }
+
+    func test_compute_prefers_windowFrame_over_superview_frame_when_available() {
+        // Build a node whose `frame` (superview-relative) says (0,0,100,100)
+        // but `windowFrame` says (200,200,100,100). The measurement should
+        // use the windowFrame.
+        let aSuperview = CGRect(x: 0,   y: 0, width: 100, height: 100)
+        let aWindow    = CGRect(x: 200, y: 200, width: 100, height: 100)
+        let a = ViewNode(
+            id: 1, className: "UIView", moduleName: nil,
+            accessibilityIdentifier: nil, owningViewControllerID: nil,
+            frame: CGRectCodable(aSuperview),
+            bounds: CGRectCodable(CGRect(origin: .zero, size: aSuperview.size)),
+            center: CGPointCodable(CGPoint(x: aSuperview.midX, y: aSuperview.midY)),
+            isHidden: false, alpha: 1,
+            layer: LayerProps(cornerRadius: 0, borderWidth: 0, borderColor: nil,
+                              shadowColor: nil, shadowOpacity: 0, shadowRadius: 0,
+                              shadowOffset: CGSizeCodable(.zero), masksToBounds: false,
+                              shouldRasterize: false, rasterizationScale: 1,
+                              opacity: 1, isOpaque: false,
+                              backgroundColor: nil, contentsScale: 1),
+            tintColor: nil, clipsToBounds: false, contentMode: 0,
+            constraintIDs: [], childIDs: [], childrenInline: nil,
+            classInheritance: nil, hasNonIdentityTransform: false,
+            windowFrame: CGRectCodable(aWindow)
+        )
+        let b = node(id: 2, frame: CGRect(x: 400, y: 200, width: 100, height: 100))
+        // b has only superview-relative frame (windowFrame defaults to nil → fallback to frame)
+        // Using windowFrame for a: gap should be 100pt (400 - 300 = 100).
+        // Using raw frame for a: gap would be 300pt (400 - 100 = 300).
+        let result = FrameMeasurement.compute(anchor: a, other: b, sharedWindow: true)
+        XCTAssertEqual(result?.summary.horizontal, 100)   // (400-300 via windowFrame)
+    }
 }
