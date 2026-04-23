@@ -316,11 +316,9 @@ final class InspectorSession {
         guard let overlay = FrameMeasurement.compute(
             anchor: anchorNode, other: otherNode, sharedWindow: sharedWindow)
         else {
-            // Cross-window or degenerate — surface the "different windows"
-            // status to the badge by synthesizing a crossWindow summary.
-            lastMeasurementSummary = MeasurementSummary(kind: .crossWindow,
-                                                        horizontal: nil,
-                                                        vertical: nil)
+            lastMeasurementSummary = sharedWindow
+                ? nil  // NaN / zero-size / other degenerate — hide the badge
+                : MeasurementSummary(kind: .crossWindow, horizontal: nil, vertical: nil)
             _ = try? await client.send(.clearMeasure)
             return
         }

@@ -68,7 +68,9 @@ final class InspectorStateStore {
             contentMode: target.contentMode,
             constraintIDs: target.constraintIDs,
             childIDs: target.childIDs,
-            childrenInline: newChildren
+            childrenInline: newChildren,
+            classInheritance: target.classInheritance,
+            hasNonIdentityTransform: target.hasNonIdentityTransform
         )
     }
 

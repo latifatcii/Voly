@@ -108,7 +108,10 @@ public final class OverlayHost {
             tl.cornerRadius = 3
             tl.alignmentMode = .center
             tl.contentsScale = UIScreen.main.scale
-            let size = CGSize(width: 36, height: 14)
+            // 6pt per character + 10pt padding — enough headroom for 4-digit pt + " pt" suffix
+            let labelText = tl.string as? String ?? ""
+            let width = max(36, CGFloat(labelText.count) * 6 + 10)
+            let size = CGSize(width: width, height: 14)
             tl.frame = CGRect(x: center.x - size.width / 2,
                               y: center.y - size.height / 2,
                               width: size.width,
