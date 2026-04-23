@@ -14,6 +14,7 @@ nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", ca
 final class InspectorSession {
     let connections = ConnectionManager()
     let state = InspectorStateStore()
+    let measurement = MeasurementPane()
     private var client: WebSocketClient?
     private var selectedPeer: ConnectionManager.Peer?
     var lastError: String?

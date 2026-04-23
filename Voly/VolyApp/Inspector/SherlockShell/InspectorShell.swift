@@ -4,14 +4,13 @@ import VolyModels
 struct InspectorShell: View {
     @Bindable var session: InspectorSession
     @State private var pane = InspectorPane()
-    @State private var measurement = MeasurementPane()
 
     var body: some View {
         VStack(spacing: 0) {
             topStatusBar
             Divider()
             if let node = currentNode(), pane.currentTab.requiresSelection {
-                DetailHeader(node: node, pane: pane, measurement: measurement,
+                DetailHeader(node: node, pane: pane, measurement: session.measurement,
                              lastSummary: session.lastMeasurementSummary)
             }
             TopTabBar(pane: pane, hasSelection: session.state.selectedViewID != nil)
@@ -22,16 +21,16 @@ struct InspectorShell: View {
         .task { session.connections.startBrowsing() }
         .onChange(of: session.state.selectedViewID) { _, newID in
             pane.resetInheritance(for: newID)
-            measurement.reset()
+            session.measurement.reset()
             if newID != nil, pane.currentTab == .hierarchy {
                 pane.currentTab = .layout
             }
             session.scheduleMeasurementUpdate(
                 anchor: newID,
-                other: measurement.effectiveOtherID
+                other: session.measurement.effectiveOtherID
             )
         }
-        .onChange(of: measurement.effectiveOtherID) { _, newOther in
+        .onChange(of: session.measurement.effectiveOtherID) { _, newOther in
             session.scheduleMeasurementUpdate(
                 anchor: session.state.selectedViewID,
                 other: newOther
@@ -84,7 +83,7 @@ struct InspectorShell: View {
     private var tabContent: some View {
         switch pane.currentTab {
         case .hierarchy:
-            HierarchyTab(session: session, measurement: measurement)
+            HierarchyTab(session: session, measurement: session.measurement)
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)
