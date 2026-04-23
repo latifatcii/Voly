@@ -36,6 +36,14 @@ struct InspectorShell: View {
                 other: newOther
             )
         }
+        .focusable()
+        .onKeyPress(.escape) {
+            if session.state.measureModeActive {
+                Task { await session.exitMeasureMode() }
+                return .handled
+            }
+            return .ignored
+        }
     }
 
     // MARK: top status bar
@@ -63,6 +71,22 @@ struct InspectorShell: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
             .disabled(session.state.connectionStatus != .connected)
+
+            Button {
+                Task {
+                    if session.state.measureModeActive { await session.exitMeasureMode() }
+                    else { await session.enterMeasureMode() }
+                }
+            } label: {
+                Label("Measure", systemImage: session.state.measureModeActive
+                      ? "ruler.fill"
+                      : "ruler")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .keyboardShortcut("m", modifiers: [.control, .option, .command])
+            .disabled(session.state.connectionStatus != .connected)
+            .help(session.state.measureModeActive ? "Exit measure mode (⌃⌥⌘M / Esc)" : "Measure (⌃⌥⌘M)")
 
             Button {
                 Task { await session.refreshHierarchy() }
