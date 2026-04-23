@@ -92,6 +92,9 @@ final class InspectorSession {
         await client?.disconnect()
         client = nil
         state.connectionStatus = .disconnected
+        state.pickModeActive = false
+        state.measureModeActive = false
+        measurement.reset()
         // Explicit disconnect disables auto-connect until next launch/toggle.
         autoConnectEnabled = false
         hasAutoConnected = false
@@ -218,6 +221,7 @@ final class InspectorSession {
     }
 
     func enterPickMode() async {
+        if state.measureModeActive { await exitMeasureMode() }
         _ = try? await client?.send(.enterPickMode)
         state.pickModeActive = true
     }
@@ -226,6 +230,19 @@ final class InspectorSession {
         _ = try? await client?.send(.exitPickMode)
         state.pickModeActive = false
         await clearSelection()
+    }
+
+    func enterMeasureMode() async {
+        if state.pickModeActive { await exitPickMode() }
+        _ = try? await client?.send(.enterMeasureMode)
+        state.measureModeActive = true
+    }
+
+    func exitMeasureMode() async {
+        _ = try? await client?.send(.exitMeasureMode)
+        state.measureModeActive = false
+        // Clear any ghost hover — cursor may have been off-window when exit fired.
+        measurement.hoverID = nil
     }
 
     func clearSelection() async {
