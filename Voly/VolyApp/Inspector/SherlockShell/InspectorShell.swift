@@ -4,13 +4,15 @@ import VolyModels
 struct InspectorShell: View {
     @Bindable var session: InspectorSession
     @State private var pane = InspectorPane()
+    @State private var measurement = MeasurementPane()
 
     var body: some View {
         VStack(spacing: 0) {
             topStatusBar
             Divider()
             if let node = currentNode(), pane.currentTab.requiresSelection {
-                DetailHeader(node: node, pane: pane)
+                DetailHeader(node: node, pane: pane, measurement: measurement,
+                             lastSummary: session.lastMeasurementSummary)
             }
             TopTabBar(pane: pane, hasSelection: session.state.selectedViewID != nil)
             Divider()
@@ -20,11 +22,20 @@ struct InspectorShell: View {
         .task { session.connections.startBrowsing() }
         .onChange(of: session.state.selectedViewID) { _, newID in
             pane.resetInheritance(for: newID)
-            // When the user picks a view, jump to Layout so the inspection UI
-            // is front and center.
+            measurement.reset()
             if newID != nil, pane.currentTab == .hierarchy {
                 pane.currentTab = .layout
             }
+            session.scheduleMeasurementUpdate(
+                anchor: newID,
+                other: measurement.effectiveOtherID
+            )
+        }
+        .onChange(of: measurement.effectiveOtherID) { _, newOther in
+            session.scheduleMeasurementUpdate(
+                anchor: session.state.selectedViewID,
+                other: newOther
+            )
         }
     }
 
@@ -73,7 +84,7 @@ struct InspectorShell: View {
     private var tabContent: some View {
         switch pane.currentTab {
         case .hierarchy:
-            HierarchyTab(session: session, measurement: MeasurementPane())
+            HierarchyTab(session: session, measurement: measurement)
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)
