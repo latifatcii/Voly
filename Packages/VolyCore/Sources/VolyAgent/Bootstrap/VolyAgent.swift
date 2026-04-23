@@ -66,6 +66,7 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         )
         startServer()
         observePickNotifications()
+        observeHoverNotifications()
     }
 
     private func startServer() {
@@ -158,6 +159,46 @@ public final class VolyAgentRuntime: PreviewHostProvider {
                             log.error("failed to send selectionChanged event: \(String(describing: error), privacy: .public)")
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private func observeHoverNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: HoverEngine.Notification.didHover,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let id: ObjectID?
+            if let num = note.object as? NSNumber {
+                id = num.uint64Value
+            } else {
+                id = nil  // NSNull / unexpected → treat as "no target"
+            }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard let server = self.server else { return }
+                let event = Event.hoverTarget(id)
+                if let envelope = try? Framing.encodeEvent(event, id: 0) {
+                    try? await server.send(envelope)
+                }
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: HoverEngine.Notification.didClick,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let id = (note.object as? NSNumber)?.uint64Value
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard let id, id != 0 else { return }
+                guard let server = self.server else { return }
+                let event = Event.measureClick(id)
+                if let envelope = try? Framing.encodeEvent(event, id: 0) {
+                    try? await server.send(envelope)
                 }
             }
         }
