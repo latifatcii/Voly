@@ -99,31 +99,7 @@ public final class PickEngine {
     }
 
     private func hit(at point: CGPoint, in scene: UIWindowScene) -> ObjectID {
-        let candidates = scene.windows
-            .filter { !$0.isVolyOverlay }
-            .sorted { $0.windowLevel.rawValue > $1.windowLevel.rawValue }
-        for w in candidates {
-            let local = w.convert(point, from: nil)
-            if let found = deepest(in: w, at: local) {
-                return registry.id(for: found)
-            }
-        }
-        return 0
-    }
-
-    private func deepest(in view: UIView, at point: CGPoint) -> UIView? {
-        // Note: we intentionally do NOT check isUserInteractionEnabled. We are
-        // identifying the topmost visible view for inspection, not delivering
-        // gestures — UILabel defaults to false and must still be selectable.
-        guard !view.isHidden,
-              view.alpha > 0.01,
-              view.point(inside: point, with: nil)
-        else { return nil }
-        for child in view.subviews.reversed() where !child.isVolyOverlay {
-            let cp = view.convert(point, to: child)
-            if let deeper = deepest(in: child, at: cp) { return deeper }
-        }
-        return view
+        SelectionHitTest.hitTest(in: scene, at: point, registry: registry)
     }
 }
 

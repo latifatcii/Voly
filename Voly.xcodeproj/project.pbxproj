@@ -31,6 +31,7 @@
 		B04A9501C0474D941BE00E6B /* Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A86BDE7BE375DBA7601BC8 /* Messages.swift */; };
 		BD31DD54C76270290858C2F3 /* AgentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC6E782E10338FDA5CC9698 /* AgentGate.swift */; };
 		C345597C2A27833DFF5270F8 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6303CDA5BFD2BDCB46C112 /* WebSocketServer.swift */; };
+		A1F3C8E52B7D4901C6320F84 /* SelectionHitTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4E9F63C8E5A12D7431095 /* SelectionHitTest.swift */; };
 		C5029C3D7FF79997B4411D7C /* PickEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A8B11EBF80E11FEB34E0F08 /* PickEngine.swift */; };
 		C9822D54218BDB046E0BE82B /* URLExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4A290CB66FFF5DE195A2D6 /* URLExecutor.swift */; };
 		CC3E024B9687E46F9E3CB015 /* RuntimeScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C44277A0D21FDDE43857235 /* RuntimeScanner.swift */; };
@@ -62,6 +63,7 @@
 		2120DB677A5A3AD92EB1C9E7 /* UserDefaultsItem.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsItem.swift; sourceTree = "<group>"; };
 		220DCB948C91BD5F58BC0331 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
 		2A8B11EBF80E11FEB34E0F08 /* PickEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PickEngine.swift; sourceTree = "<group>"; };
+		B2D4E9F63C8E5A12D7431095 /* SelectionHitTest.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SelectionHitTest.swift; sourceTree = "<group>"; };
 		4C44277A0D21FDDE43857235 /* RuntimeScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RuntimeScanner.swift; sourceTree = "<group>"; };
 		563B4AC86FEF448212080910 /* PortFilePublisher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PortFilePublisher.swift; sourceTree = "<group>"; };
 		5849A6DAAF79B57ECE61060E /* CGCodables.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CGCodables.swift; sourceTree = "<group>"; };
@@ -243,6 +245,7 @@
 			children = (
 				585151A81D22151E6502C052 /* OverlayHost.swift */,
 				2A8B11EBF80E11FEB34E0F08 /* PickEngine.swift */,
+				B2D4E9F63C8E5A12D7431095 /* SelectionHitTest.swift */,
 			);
 			path = Selection;
 			sourceTree = "<group>";
@@ -538,6 +541,7 @@
 				CC3E024B9687E46F9E3CB015 /* RuntimeScanner.swift in Sources */,
 				E821B2D523591B4480E5283F /* OverlayHost.swift in Sources */,
 				C5029C3D7FF79997B4411D7C /* PickEngine.swift in Sources */,
+				A1F3C8E52B7D4901C6320F84 /* SelectionHitTest.swift in Sources */,
 				0675F2B37E34617616E57BF4 /* LayerProps+CALayer.swift in Sources */,
 				45691C91017BD9B350292581 /* SnapshotBuilder.swift in Sources */,
 				EF747D9443DEC0558E17FB25 /* CommandDispatcher.swift in Sources */,

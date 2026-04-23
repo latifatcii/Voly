@@ -363,6 +363,10 @@ final class InspectorSession {
                     await self.loadSubtree(for: id)
                 case .connectionWarning(let message):
                     self.lastError = message
+                case .hoverTarget:
+                    break   // TODO Task 9: route to measurement.hoverID
+                case .measureClick(let id):
+                    await self.select(id)
                 }
             }
             log.info("pumpEvents: stream ended")
