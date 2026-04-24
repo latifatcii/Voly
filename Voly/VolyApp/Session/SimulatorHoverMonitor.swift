@@ -180,6 +180,31 @@ final class SimulatorHoverMonitor {
         if emitCount == 1 || emitCount % 20 == 0 {
             log.notice("emitHover #\(self.emitCount): loc=\(String(describing: loc), privacy: .public) → iosPt=\(String(describing: iosPoint), privacy: .public) → id=\(id.map(String.init) ?? "nil", privacy: .public)")
         }
+        // When id changes, dump the path the hit-test walked + info about
+        // children of the terminal node. Helps diagnose why we're stopping
+        // at a big container instead of the label beneath the cursor.
+        if id != lastLoggedHitID {
+            lastLoggedHitID = id
+            if let snapshot = session?.state.hierarchy {
+                let path = snapshot.hitTestPath(at: iosPoint, sceneID: region.sceneID)
+                let summary = path.map { node -> String in
+                    let wf = node.windowFrame?.cg ?? node.frame.cg
+                    return "\(node.id)(\(node.className):\(Int(wf.minX)),\(Int(wf.minY)),\(Int(wf.width))x\(Int(wf.height)))"
+                }.joined(separator: " > ")
+                log.notice("hitTest path for iosPt=\(String(describing: iosPoint), privacy: .public): \(summary, privacy: .public)")
+                if let terminal = path.last {
+                    let kids = terminal.childrenInline ?? []
+                    let kidsInfo = kids.prefix(8).map { k -> String in
+                        let wf = k.windowFrame?.cg
+                        let wfStr = wf.map { "(\(Int($0.minX)),\(Int($0.minY)),\(Int($0.width))x\(Int($0.height)))" } ?? "nil"
+                        return "\(k.id):\(k.className) wf=\(wfStr) hidden=\(k.isHidden) alpha=\(k.alpha)"
+                    }.joined(separator: ", ")
+                    log.notice("  terminal \(terminal.id) has \(kids.count) children: \(kidsInfo, privacy: .public)")
+                }
+            }
+        }
         session?.measurement.hoverID = id
     }
+
+    private var lastLoggedHitID: ObjectID?
 }
