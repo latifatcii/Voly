@@ -136,6 +136,11 @@ public enum Command: Codable, Sendable {
     case enterMeasureMode
     case exitMeasureMode
     case hoverAt(x: Double, y: Double, sceneID: ObjectID)
+    /// Hit-test at cursor + compute measurement against anchor + draw overlay,
+    /// all live on the agent. Replaces the `.hoverAt` + client-side
+    /// `FrameMeasurement.compute` + `.measure(overlay:)` sequence, which fed
+    /// stale snapshot windowFrames into the overlay.
+    case measureHover(anchorID: ObjectID, x: Double, y: Double, sceneID: ObjectID)
 }
 
 public enum Response: Codable, Sendable {
@@ -148,6 +153,7 @@ public enum Response: Codable, Sendable {
     case measureModeChanged(Bool)
     case selection(ObjectID)
     case hoverResult(ObjectID?)
+    case measureHoverResult(otherID: ObjectID?, summary: MeasurementSummary?)
     case userDefaults([UserDefaultsItem])
     case urlResult(success: Bool, error: String?)
     case previewApplied(PreviewConfig.Applied)

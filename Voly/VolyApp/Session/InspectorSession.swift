@@ -237,21 +237,32 @@ final class InspectorSession {
         await clearSelection()
     }
 
-    /// Live hit-test via the agent. Respects `point(inside:with:)` overrides
-    /// and iOS 26 passthrough containers (floating tab bar). Used by
-    /// `SimulatorHoverMonitor` per mouse-move settle — client-side snapshot
-    /// hit-test can't see passthrough behavior.
-    func liveHitTest(x: Double, y: Double, sceneID: ObjectID) async -> ObjectID? {
-        guard let client else { return nil }
+    /// Live hit-test + measurement + draw on the agent, in one round-trip.
+    /// The agent resolves anchor + cursor-hit views, computes the overlay
+    /// using fresh window-coord frames, draws it, and returns the summary
+    /// for the header badge + the hovered view's id for the UI hoverID state.
+    ///
+    /// Chosen over a client-side approach because snapshot `windowFrame`
+    /// data can be stale, and views like iOS 26's floating-bar passthrough
+    /// container override `point(inside:with:)` in ways the snapshot can't
+    /// represent.
+    func liveMeasureHover(
+        anchor: ObjectID,
+        x: Double,
+        y: Double,
+        sceneID: ObjectID
+    ) async -> (otherID: ObjectID?, summary: MeasurementSummary?) {
+        guard let client else { return (nil, nil) }
         do {
-            let response = try await client.send(.hoverAt(x: x, y: y, sceneID: sceneID))
-            if case .hoverResult(let id) = response {
-                return id
+            let response = try await client.send(.measureHover(
+                anchorID: anchor, x: x, y: y, sceneID: sceneID))
+            if case .measureHoverResult(let otherID, let summary) = response {
+                return (otherID, summary)
             }
         } catch {
             // Silently drop — hover errors are cosmetic; next move will retry.
         }
-        return nil
+        return (nil, nil)
     }
 
     func enterMeasureMode() async {
@@ -330,7 +341,13 @@ final class InspectorSession {
 
     /// Schedule a measurement-overlay update after a short debounce. Cancels
     /// any in-flight update. Pass `other == nil` to clear the overlay.
+    ///
+    /// No-op when `measureModeActive` — the simulator-hover path
+    /// (`liveMeasureHover`) already does hit-test + compute + draw on the
+    /// agent with live frames, so double-running this would redraw using
+    /// stale snapshot frames.
     func scheduleMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) {
+        if state.measureModeActive { return }
         pendingMeasurementTask?.cancel()
         pendingMeasurementTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(16))

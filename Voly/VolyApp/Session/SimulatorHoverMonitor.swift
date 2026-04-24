@@ -175,18 +175,27 @@ final class SimulatorHoverMonitor {
         let scaleY = region.iosPointSize.height / region.screenFrame.height
         let iosPoint = CGPoint(x: relX * scaleX, y: relY * scaleY)
 
-        // Live hit-test on the agent (respects point(inside:) overrides —
-        // snapshot-based walk can't see iOS 26 floating-bar passthrough).
-        let id = await session?.liveHitTest(
+        // Live end-to-end measurement on the agent. Bypasses client-side
+        // FrameMeasurement + snapshot frames (stale / wrong for views in
+        // reused collection cells, orthogonal scroll sections, etc.).
+        guard let session = self.session,
+              let anchor = session.state.selectedViewID
+        else {
+            session?.measurement.hoverID = nil
+            return
+        }
+        let result = await session.liveMeasureHover(
+            anchor: anchor,
             x: iosPoint.x,
             y: iosPoint.y,
             sceneID: region.sceneID
         )
         emitCount += 1
         if emitCount == 1 || emitCount % 20 == 0 {
-            log.notice("emitHover #\(self.emitCount): loc=\(String(describing: loc), privacy: .public) → iosPt=\(String(describing: iosPoint), privacy: .public) → id=\(id.map(String.init) ?? "nil", privacy: .public)")
+            log.notice("emitHover #\(self.emitCount): loc=\(String(describing: loc), privacy: .public) → iosPt=\(String(describing: iosPoint), privacy: .public) → other=\(result.otherID.map(String.init) ?? "nil", privacy: .public) kind=\(result.summary.map { String(describing: $0.kind) } ?? "nil", privacy: .public)")
         }
-        session?.measurement.hoverID = id
+        session.measurement.hoverID = result.otherID
+        session.lastMeasurementSummary = result.summary
     }
 
     private var lastLoggedHitID: ObjectID?

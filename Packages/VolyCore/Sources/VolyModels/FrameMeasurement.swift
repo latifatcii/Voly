@@ -14,16 +14,32 @@ public enum FrameMeasurement {
         other: ViewNode,
         sharedWindow: Bool
     ) -> MeasurementOverlay? {
+        return compute(
+            anchorFrame: (anchor.windowFrame ?? anchor.frame).cg,
+            otherFrame: (other.windowFrame ?? other.frame).cg,
+            anchorTransformed: anchor.hasNonIdentityTransform ?? false,
+            otherTransformed: other.hasNonIdentityTransform ?? false,
+            sharedWindow: sharedWindow
+        )
+    }
+
+    /// Agent-facing overload: takes live window-space `CGRect`s directly,
+    /// avoiding dependence on (possibly stale) snapshot `ViewNode.windowFrame`
+    /// data. Used when the agent does live hit-testing + measurement in one
+    /// shot.
+    public static func compute(
+        anchorFrame a: CGRect,
+        otherFrame b: CGRect,
+        anchorTransformed: Bool,
+        otherTransformed: Bool,
+        sharedWindow: Bool
+    ) -> MeasurementOverlay? {
         guard sharedWindow else { return nil }
-        let a = (anchor.windowFrame ?? anchor.frame).cg
-        let b = (other.windowFrame ?? other.frame).cg
         guard finiteAndNonEmpty(a), finiteAndNonEmpty(b) else { return nil }
 
-        let transformed = (anchor.hasNonIdentityTransform ?? false)
-                       || (other.hasNonIdentityTransform ?? false)
-
-        let anchorRect = anchor.windowFrame ?? anchor.frame
-        let otherRect = other.windowFrame ?? other.frame
+        let transformed = anchorTransformed || otherTransformed
+        let anchorRect = CGRectCodable(a)
+        let otherRect = CGRectCodable(b)
 
         // Same view: identical frames → overlay with no guides.
         if a == b {
