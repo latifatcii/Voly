@@ -17,6 +17,18 @@ public enum RuntimeScanner {
         var results: [String: CustomPropDescriptor] = [:]
         let excluded = Self.excludedNames
 
+        // Skip the runtime KVC probe for views whose class lives in Apple
+        // private frameworks that assert inside their own getters when
+        // `valueForKey:` is called from outside their expected context.
+        // Example: RemoteUI views crash with `_assertionFailure` deep inside
+        // RemoteUI.framework. Registered custom properties are still applied.
+        guard isSafeToProbeViaKVC(view) else {
+            for descriptor in CustomInspectableRegistry.shared.descriptors(for: view) {
+                results[descriptor.name] = descriptor
+            }
+            return results.values.sorted { $0.name < $1.name }
+        }
+
         var cls: AnyClass? = type(of: view)
         let stopClass: AnyClass = UIView.self
 
@@ -118,6 +130,23 @@ public enum RuntimeScanner {
             return .point(CGPointCodable(v.cgPointValue))
         default: return .null
         }
+    }
+
+    /// Class-bundle identifiers whose views assert inside `valueForKey:` when
+    /// probed from outside their expected context. We skip the runtime KVC
+    /// walk for any view whose class lives in one of these bundles.
+    private static let unsafeBundlePrefixes: [String] = [
+        "com.apple.RemoteUI",
+    ]
+
+    private static func isSafeToProbeViaKVC(_ view: UIView) -> Bool {
+        guard let bundleID = Bundle(for: type(of: view)).bundleIdentifier else {
+            return true
+        }
+        for prefix in unsafeBundlePrefixes where bundleID.hasPrefix(prefix) {
+            return false
+        }
+        return true
     }
 
     /// Names we never surface (too noisy / dangerous / system-only).
