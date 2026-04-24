@@ -68,24 +68,41 @@ final class SimulatorHoverMonitor {
     }
 
     private func refreshRegion() {
-        guard let state = session?.state,
-              let snapshot = state.hierarchy,
-              let firstScene = snapshot.scenes.first,
+        guard let state = session?.state else {
+            if cachedRegion != nil { log.info("refreshRegion: no session") }
+            cachedRegion = nil
+            return
+        }
+        guard let snapshot = state.hierarchy else {
+            if cachedRegion != nil { log.info("refreshRegion: no snapshot (not connected?)") }
+            cachedRegion = nil
+            return
+        }
+        guard let firstScene = snapshot.scenes.first,
               let firstWindow = firstScene.windowsInline.first
         else {
+            if cachedRegion != nil { log.info("refreshRegion: snapshot has no scene/window") }
             cachedRegion = nil
             return
         }
         guard let bounds = locator.iosScreenRegionInScreen() else {
+            if cachedRegion != nil { log.info("refreshRegion: AXSimulatorLocator.iosScreenRegionInScreen returned nil") }
             cachedRegion = nil
             return
         }
         let pointSize = (firstWindow.windowFrame ?? firstWindow.frame).cg.size
-        cachedRegion = Region(
+        let newRegion = Region(
             screenFrame: bounds.frame,
             iosPointSize: pointSize,
             sceneID: firstScene.id
         )
+        let changed = cachedRegion?.screenFrame != newRegion.screenFrame
+            || cachedRegion?.iosPointSize != newRegion.iosPointSize
+            || cachedRegion?.sceneID != newRegion.sceneID
+        cachedRegion = newRegion
+        if changed {
+            log.notice("refreshRegion: screen=\(String(describing: newRegion.screenFrame), privacy: .public) pt=\(String(describing: newRegion.iosPointSize), privacy: .public) scene=\(newRegion.sceneID)")
+        }
     }
 
     private func startRegionRefreshLoop() {
@@ -100,12 +117,26 @@ final class SimulatorHoverMonitor {
 
     // MARK: - Monitor
 
+    private var monitorFireCount: Int = 0
+
     private func installMonitor() {
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
             MainActor.assumeIsolated {
-                self?.pendingLocation = NSEvent.mouseLocation
-                self?.kickThrottle()
+                guard let self else { return }
+                self.pendingLocation = NSEvent.mouseLocation
+                self.monitorFireCount += 1
+                // Log the first fire, then every 50th so we know it's live
+                // without flooding.
+                if self.monitorFireCount == 1 || self.monitorFireCount % 50 == 0 {
+                    log.notice("global mouseMoved #\(self.monitorFireCount) at \(String(describing: NSEvent.mouseLocation), privacy: .public)")
+                }
+                self.kickThrottle()
             }
+        }
+        if eventMonitor == nil {
+            log.error("installMonitor: NSEvent.addGlobalMonitorForEvents returned nil (Accessibility permission denied?)")
+        } else {
+            log.notice("installMonitor: NSEvent monitor installed")
         }
     }
 
@@ -119,16 +150,25 @@ final class SimulatorHoverMonitor {
         }
     }
 
+    private var emitCount: Int = 0
+    private var lastLoggedOutOfRegion: Bool = false
+
     private func emitHover() {
         guard let loc = pendingLocation else { return }
         guard let region = cachedRegion else {
+            log.info("emitHover: no cached region (refreshRegion failed)")
             session?.measurement.hoverID = nil
             return
         }
         guard region.screenFrame.contains(loc) else {
+            if !lastLoggedOutOfRegion {
+                log.info("emitHover: cursor \(String(describing: loc), privacy: .public) outside region \(String(describing: region.screenFrame), privacy: .public)")
+                lastLoggedOutOfRegion = true
+            }
             session?.measurement.hoverID = nil
             return
         }
+        lastLoggedOutOfRegion = false
         let relX = loc.x - region.screenFrame.minX
         let relY = region.screenFrame.maxY - loc.y
         let scaleX = region.iosPointSize.width  / region.screenFrame.width
@@ -136,6 +176,10 @@ final class SimulatorHoverMonitor {
         let iosPoint = CGPoint(x: relX * scaleX, y: relY * scaleY)
 
         let id = session?.state.hierarchy?.hitTest(at: iosPoint, sceneID: region.sceneID)
+        emitCount += 1
+        if emitCount == 1 || emitCount % 20 == 0 {
+            log.notice("emitHover #\(self.emitCount): loc=\(String(describing: loc), privacy: .public) → iosPt=\(String(describing: iosPoint), privacy: .public) → id=\(id.map(String.init) ?? "nil", privacy: .public)")
+        }
         session?.measurement.hoverID = id
     }
 }

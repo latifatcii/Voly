@@ -321,10 +321,14 @@ final class InspectorSession {
     }
 
     private func performMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) async {
-        guard let client else { return }
+        guard let client else {
+            log.info("performMeasurementUpdate: no client")
+            return
+        }
 
         // No anchor or no "other" → clear everything.
         guard let anchor, let other else {
+            log.info("performMeasurementUpdate: anchor=\(anchor.map(String.init) ?? "nil") other=\(other.map(String.init) ?? "nil") → clearMeasure")
             lastMeasurementSummary = nil
             _ = try? await client.send(.clearMeasure)
             return
@@ -332,6 +336,7 @@ final class InspectorSession {
 
         guard let anchorNode = state.findNode(id: anchor),
               let otherNode  = state.findNode(id: other) else {
+            log.info("performMeasurementUpdate: findNode failed (anchor=\(anchor) other=\(other)) — snapshot stale?")
             lastMeasurementSummary = nil
             _ = try? await client.send(.clearMeasure)
             return
@@ -343,12 +348,14 @@ final class InspectorSession {
         guard let overlay = FrameMeasurement.compute(
             anchor: anchorNode, other: otherNode, sharedWindow: sharedWindow)
         else {
+            log.info("performMeasurementUpdate: FrameMeasurement.compute returned nil (anchor=\(anchor) other=\(other) sharedWindow=\(sharedWindow))")
             lastMeasurementSummary = sharedWindow
                 ? nil  // NaN / zero-size / other degenerate — hide the badge
                 : MeasurementSummary(kind: .crossWindow, horizontal: nil, vertical: nil)
             _ = try? await client.send(.clearMeasure)
             return
         }
+        log.notice("performMeasurementUpdate: anchor=\(anchor) other=\(other) kind=\(String(describing: overlay.summary.kind), privacy: .public) → sending .measure")
 
         // sameView → header shows "same view", no on-simulator guides needed.
         if overlay.summary.kind == .sameView {
