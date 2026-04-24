@@ -34,8 +34,13 @@ final class SimulatorHoverMonitor {
     /// Called by `InspectorSession.enterPickMode`. Returns false if
     /// Accessibility permission is not granted; the caller should silently
     /// proceed with click-only pick (no hover measurement).
+    ///
+    /// Uses `prompt: false` — a silent check. The initial grant is owned by
+    /// `FirstRunAccessibilityPrompt` at launch; we don't want to re-show the
+    /// system dialog every time the user toggles Pick mode if TCC is in a
+    /// weird state (common with ad-hoc-signed builds).
     func start() -> Bool {
-        guard AccessibilityTrust.isTrusted(prompt: true) else {
+        guard AccessibilityTrust.isTrusted(prompt: false) else {
             log.error("start: Accessibility not trusted — cannot monitor cursor")
             return false
         }
