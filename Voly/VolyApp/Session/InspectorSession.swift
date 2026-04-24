@@ -15,6 +15,7 @@ final class InspectorSession {
     let connections = ConnectionManager()
     let state = InspectorStateStore()
     let measurement = MeasurementPane()
+    let hoverMonitor = SimulatorHoverMonitor()
     private var client: WebSocketClient?
     private var selectedPeer: ConnectionManager.Peer?
     var lastError: String?
@@ -31,6 +32,7 @@ final class InspectorSession {
     private var fileDiscoveryTimer: Timer?
 
     init() {
+        hoverMonitor.session = self
         startFileDiscoveryLoop()
         connections.startBrowsing()
         connections.onPeerAppeared = { [weak self] peer in
@@ -89,6 +91,7 @@ final class InspectorSession {
     }
 
     func disconnect() async {
+        hoverMonitor.stop()
         await client?.disconnect()
         client = nil
         state.connectionStatus = .disconnected
@@ -234,11 +237,17 @@ final class InspectorSession {
 
     func enterMeasureMode() async {
         if state.pickModeActive { await exitPickMode() }
+        let accessibilityOK = hoverMonitor.start()
+        guard accessibilityOK else {
+            lastError = "Voly needs Accessibility access to track the cursor. Enable Voly in System Settings → Privacy & Security → Accessibility, then try again."
+            return
+        }
         _ = try? await client?.send(.enterMeasureMode)
         state.measureModeActive = true
     }
 
     func exitMeasureMode() async {
+        hoverMonitor.stop()
         _ = try? await client?.send(.exitMeasureMode)
         state.measureModeActive = false
         // Clear any ghost hover — cursor may have been off-window when exit fired.
