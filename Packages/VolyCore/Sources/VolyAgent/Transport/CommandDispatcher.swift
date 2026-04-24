@@ -146,7 +146,80 @@ public final class CommandDispatcher {
         case .highlight(let id):
             overlay.highlight(viewID: id)
             return .ack
+
+        case .measure(let overlay):
+            self.overlay.showMeasurement(overlay)
+            return .ack
+        case .clearMeasure:
+            self.overlay.clearMeasurement()
+            return .ack
+
+        case .hoverAt(let x, let y, let sceneID):
+            // Live hit-test on the agent so passthrough views (e.g. iOS 26's
+            // floating tab bar container) and hitTest overrides are respected.
+            // Snapshot-based client walk can't replicate those.
+            guard let scene = registry.object(for: sceneID) as? UIWindowScene else {
+                return .hoverResult(nil)
+            }
+            let id = SelectionHitTest.hitTest(in: scene, at: CGPoint(x: x, y: y), registry: registry)
+            return .hoverResult(id == 0 ? nil : id)
+
+        case .measureHover(let anchorID, let x, let y, let sceneID):
+            return measureHover(anchorID: anchorID, x: x, y: y, sceneID: sceneID)
         }
+    }
+
+    /// Live hit-test + measurement + draw, in one round-trip.
+    /// Uses live `view.convert(bounds, to: nil)` for both views so the drawn
+    /// overlay always matches what's visible on the simulator, regardless of
+    /// snapshot staleness.
+    private func measureHover(anchorID: ObjectID, x: Double, y: Double, sceneID: ObjectID) -> Response {
+        guard let scene = registry.object(for: sceneID) as? UIWindowScene else {
+            overlay.clearMeasurement()
+            return .measureHoverResult(otherID: nil, summary: nil)
+        }
+        guard let anchorView = registry.object(for: anchorID) as? UIView else {
+            overlay.clearMeasurement()
+            return .measureHoverResult(otherID: nil, summary: nil)
+        }
+        let otherID = SelectionHitTest.hitTest(in: scene, at: CGPoint(x: x, y: y), registry: registry)
+        guard otherID != 0,
+              let otherView = registry.object(for: otherID) as? UIView
+        else {
+            overlay.clearMeasurement()
+            return .measureHoverResult(otherID: nil, summary: nil)
+        }
+
+        // Fresh window-coord frames — the whole point of routing through the
+        // agent is to avoid stale snapshot frames.
+        let anchorFrame = anchorView.convert(anchorView.bounds, to: nil)
+        let otherFrame = otherView.convert(otherView.bounds, to: nil)
+        let anchorTransformed = !CATransform3DIsIdentity(anchorView.layer.transform)
+        let otherTransformed = !CATransform3DIsIdentity(otherView.layer.transform)
+        let sharedWindow = anchorView.window === otherView.window
+
+        guard let result = FrameMeasurement.compute(
+            anchorFrame: anchorFrame,
+            otherFrame: otherFrame,
+            anchorTransformed: anchorTransformed,
+            otherTransformed: otherTransformed,
+            sharedWindow: sharedWindow
+        ) else {
+            overlay.clearMeasurement()
+            let summary = sharedWindow
+                ? nil
+                : MeasurementSummary(kind: .crossWindow, horizontal: nil, vertical: nil)
+            return .measureHoverResult(otherID: otherID, summary: summary)
+        }
+
+        // sameView: clear on-sim guides, surface summary for header badge.
+        if result.summary.kind == .sameView {
+            overlay.clearMeasurement()
+            return .measureHoverResult(otherID: otherID, summary: result.summary)
+        }
+
+        overlay.showMeasurement(result)
+        return .measureHoverResult(otherID: otherID, summary: result.summary)
     }
 }
 

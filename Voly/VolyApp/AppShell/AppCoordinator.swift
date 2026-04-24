@@ -17,10 +17,15 @@ final class AppCoordinator {
     private let runningApps = RunningAppsLocator()
     private let launcher = SimctlLauncher()
     private let inventory = SimInventory()
+    private let portFileWatcher = PortFileWatcher()
     private var hotkey: GlobalHotkey?
     private var attachmentObservation: Task<Void, Never>?
     private var toggleInFlight = false
     private var attachInFlight = false
+    /// Cooldown per bundle id — don't rip-relaunch the same app faster than this.
+    private static let autoReattachCooldown: TimeInterval = 5
+    private var autoReattachTimer: Timer?
+    private var lastReattachAttempt: [String: Date] = [:]
 
     init(session: InspectorSession) {
         self.session = session
@@ -105,10 +110,24 @@ final class AppCoordinator {
     }
 
     func hideInspector() {
+        exitInteractiveModes()
         attachment.stop()
         window.hide()
         menuBar.isInspectorVisible = false
         stopObservingAttachment()
+    }
+
+    /// Ensure Pick mode can't stay active while Voly is hidden or closed —
+    /// otherwise the on-simulator overlay window and the Mac-side global
+    /// NSEvent monitor would keep running with no way for the user to toggle
+    /// them off.
+    private func exitInteractiveModes() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.session.state.pickModeActive {
+                await self.session.exitPickMode()
+            }
+        }
     }
 
     func quit() {
@@ -130,9 +149,11 @@ final class AppCoordinator {
                 case .enabled:
                     try await self.autoAttach.uninstall()
                     StaleProcessNudge.resetEpoch()
+                    self.stopAutoReattachPolling()
                 case .disabled, .foreign:
                     try await self.autoAttach.ensureInstalled()
                     StaleProcessNudge.runIfNeeded()
+                    self.startAutoReattachPolling()
                 }
                 await self.refreshAutoAttachMenuState()
             } catch {
@@ -150,10 +171,69 @@ final class AppCoordinator {
             let state = try await autoAttach.currentState()
             if case .enabled = state {
                 StaleProcessNudge.runIfNeeded()
+                startAutoReattachPolling()
             }
         } catch {
             log.error("autoAttach install on start failed: \(String(describing: error), privacy: .public)")
             menuBar.isAutoAttachEnabled = false
+        }
+    }
+
+    // MARK: - Auto-reattach poll
+    //
+    // Xcode's debug launch (⌘R) speaks directly to CoreSimulator's XPC service
+    // and doesn't inherit `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES`, so our
+    // launchctl-based auto-attach is a no-op for Xcode-launched apps. This
+    // timer closes that gap: if a user app is running in the booted sim but
+    // doesn't have a Voly port file, relaunch it via simctl (with the env
+    // var) so the dylib gets injected. Kills the Xcode debug session —
+    // expected tradeoff; user can toggle auto-attach off for debug sessions.
+
+    private func startAutoReattachPolling() {
+        guard autoReattachTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.pollAndReattach()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        autoReattachTimer = timer
+        log.notice("auto-reattach polling started")
+    }
+
+    private func stopAutoReattachPolling() {
+        autoReattachTimer?.invalidate()
+        autoReattachTimer = nil
+        lastReattachAttempt.removeAll(keepingCapacity: true)
+        log.notice("auto-reattach polling stopped")
+    }
+
+    private func pollAndReattach() async {
+        guard menuBar.isAutoAttachEnabled else { return }
+        let dylibURL = URL(fileURLWithPath: Self.bundledDylibPath())
+        do {
+            let devices = try await inventory.listDevices(bootedOnly: true)
+            guard let device = devices.first else { return }
+            let running = try await runningApps.listRunningUserApps(deviceUDID: device.udid)
+            guard !running.isEmpty else { return }
+            let attached = portFileWatcher.scan(deviceUDIDs: [device.udid])
+            let attachedPids = Set(attached.map(\.pid))
+            let now = Date()
+            for app in running where !attachedPids.contains(app.pid) {
+                if let last = lastReattachAttempt[app.bundleIdentifier],
+                   now.timeIntervalSince(last) < Self.autoReattachCooldown {
+                    continue
+                }
+                lastReattachAttempt[app.bundleIdentifier] = now
+                log.notice("auto-reattach: \(app.bundleIdentifier, privacy: .public) (pid=\(app.pid)) unattached — relaunching via simctl")
+                _ = try? await launcher.launch(
+                    deviceUDID: device.udid,
+                    bundleIdentifier: app.bundleIdentifier,
+                    dylibPath: dylibURL
+                )
+            }
+        } catch {
+            log.info("auto-reattach poll failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -175,6 +255,7 @@ final class AppCoordinator {
 
     private func wireCallbacks() {
         window.onClose = { [weak self] in
+            self?.exitInteractiveModes()
             self?.menuBar.isInspectorVisible = false
             self?.attachment.stop()
             self?.stopObservingAttachment()

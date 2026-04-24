@@ -3,6 +3,7 @@ import VolyModels
 
 struct HierarchyBrowser: View {
     @Bindable var session: InspectorSession
+    @Bindable var measurement: MeasurementPane
     @State private var searchText = ""
 
     var body: some View {
@@ -24,7 +25,7 @@ struct HierarchyBrowser: View {
                         ForEach(snapshot.scenes) { scene in
                             Section(header: Text(scene.title ?? scene.role).font(.caption).bold()) {
                                 ForEach(scene.windowsInline) { window in
-                                    NodeRow(node: window, searchText: searchText, session: session)
+                                    NodeRow(node: window, searchText: searchText, session: session, measurement: measurement)
                                 }
                             }
                         }
@@ -48,6 +49,11 @@ struct HierarchyBrowser: View {
                 )
             }
         }
+        .focusable()
+        .onKeyPress(.escape) {
+            measurement.pinnedID = nil
+            return .handled
+        }
     }
 
     private func revealSelection(id: ObjectID?, proxy: ScrollViewProxy) {
@@ -68,6 +74,7 @@ private struct NodeRow: View {
     let node: ViewNode
     let searchText: String
     @Bindable var session: InspectorSession
+    @Bindable var measurement: MeasurementPane
 
     var body: some View {
         // Read the Set here (not only inside the Binding closure) so SwiftUI
@@ -91,7 +98,7 @@ private struct NodeRow: View {
             )) {
                 if let children = node.childrenInline {
                     ForEach(filtered(children)) { child in
-                        NodeRow(node: child, searchText: searchText, session: session)
+                        NodeRow(node: child, searchText: searchText, session: session, measurement: measurement)
                     }
                 } else {
                     Label("Loading…", systemImage: "hourglass")
@@ -99,15 +106,33 @@ private struct NodeRow: View {
                         .foregroundStyle(.tertiary)
                 }
             } label: {
-                NodeLabel(node: node)
+                rowLabel
             }
             .tag(node.id)
             .id(node.id)
         } else {
-            NodeLabel(node: node)
+            rowLabel
                 .tag(node.id)
                 .id(node.id)
         }
+    }
+
+    @ViewBuilder
+    private var rowLabel: some View {
+        NodeLabel(node: node, isPinned: measurement.pinnedID == node.id)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    measurement.hoverID = node.id
+                } else if measurement.hoverID == node.id {
+                    measurement.hoverID = nil
+                }
+            }
+            .simultaneousGesture(
+                TapGesture().modifiers(.option).onEnded {
+                    measurement.togglePin(node.id)
+                }
+            )
     }
 
     private func filtered(_ nodes: [ViewNode]) -> [ViewNode] {
@@ -129,6 +154,8 @@ private struct NodeRow: View {
 
 private struct NodeLabel: View {
     let node: ViewNode
+    let isPinned: Bool
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: iconName)
@@ -141,7 +168,16 @@ private struct NodeLabel: View {
                 Text("#\(aid)").font(.caption2).foregroundStyle(.tertiary)
             }
             Spacer(minLength: 0)
-            if node.isHidden { Image(systemName: "eye.slash").font(.caption2).foregroundStyle(.tertiary) }
+            if isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+            if node.isHidden {
+                Image(systemName: "eye.slash")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 

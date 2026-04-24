@@ -1,6 +1,7 @@
 #if canImport(UIKit)
 import UIKit
 import ObjectiveC.runtime
+import Darwin   // dladdr / Dl_info
 #if !VOLY_UNIFIED_BUILD
 import VolyModels
 #endif
@@ -16,6 +17,18 @@ public enum RuntimeScanner {
     public static func scan(view: UIView) -> [CustomPropDescriptor] {
         var results: [String: CustomPropDescriptor] = [:]
         let excluded = Self.excludedNames
+
+        // Skip the runtime KVC probe for views whose class lives in Apple
+        // private frameworks that assert inside their own getters when
+        // `valueForKey:` is called from outside their expected context.
+        // Example: RemoteUI views crash with `_assertionFailure` deep inside
+        // RemoteUI.framework. Registered custom properties are still applied.
+        guard isSafeToProbeViaKVC(view) else {
+            for descriptor in CustomInspectableRegistry.shared.descriptors(for: view) {
+                results[descriptor.name] = descriptor
+            }
+            return results.values.sorted { $0.name < $1.name }
+        }
 
         var cls: AnyClass? = type(of: view)
         let stopClass: AnyClass = UIView.self
@@ -76,7 +89,14 @@ public enum RuntimeScanner {
             }
         }
 
-        guard view.responds(to: NSSelectorFromString(name)) else { return nil }
+        let selector = NSSelectorFromString(name)
+        guard view.responds(to: selector) else { return nil }
+        // The property's class might be safe, but its accessor IMP can live in
+        // a bundle we know crashes inside `valueForKey:` (e.g. RemoteUI asserts
+        // when its internal getters are invoked from outside its context).
+        guard Self.isAccessorSafe(type(of: view), selector: selector) else {
+            return nil
+        }
         let raw = view.value(forKey: name)
         let value = Self.toPropValue(raw, declaredType: declaredType)
         guard case .null = value, declaredType == .unknown else {
@@ -118,6 +138,51 @@ public enum RuntimeScanner {
             return .point(CGPointCodable(v.cgPointValue))
         default: return .null
         }
+    }
+
+    /// Class-bundle identifiers whose views assert inside `valueForKey:` when
+    /// probed from outside their expected context. We skip the runtime KVC
+    /// walk for any view whose class lives in one of these bundles.
+    private static let unsafeBundlePrefixes: [String] = [
+        "com.apple.RemoteUI",
+    ]
+
+    /// Path fragments that identify a binary image we don't want to invoke
+    /// property accessors from. Used to skip properties whose implementation
+    /// lives in a crash-prone framework even when the declaring class is safe.
+    private static let unsafeImagePathFragments: [String] = [
+        "/RemoteUI.framework/",
+    ]
+
+    private static func isSafeToProbeViaKVC(_ view: UIView) -> Bool {
+        guard let bundleID = Bundle(for: type(of: view)).bundleIdentifier else {
+            return true
+        }
+        for prefix in unsafeBundlePrefixes where bundleID.hasPrefix(prefix) {
+            return false
+        }
+        return true
+    }
+
+    /// Returns false when the method implementation for `selector` on `cls`
+    /// lives in a framework known to crash inside KVC (e.g. RemoteUI asserts
+    /// on getter dispatch). Uses `dladdr` to resolve the IMP's binary image.
+    private static func isAccessorSafe(_ cls: AnyClass, selector: Selector) -> Bool {
+        guard let imp = class_getMethodImplementation(cls, selector) else {
+            return true
+        }
+        var info = Dl_info()
+        let impPtr = unsafeBitCast(imp, to: UnsafeMutableRawPointer.self)
+        guard dladdr(impPtr, &info) != 0, let fname = info.dli_fname else {
+            // Couldn't resolve — play it safe and allow. The bundle check in
+            // `isSafeToProbeViaKVC` already skipped the view-level cases.
+            return true
+        }
+        let path = String(cString: fname)
+        for fragment in unsafeImagePathFragments where path.contains(fragment) {
+            return false
+        }
+        return true
     }
 
     /// Names we never surface (too noisy / dangerous / system-only).

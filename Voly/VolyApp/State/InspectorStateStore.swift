@@ -1,6 +1,5 @@
 import Foundation
 import VolyModels
-import VolyCodables
 
 enum ConnectionStatus: String, Sendable {
     case disconnected, connecting, connected
@@ -21,8 +20,6 @@ final class InspectorStateStore {
     var constraints: [ConstraintNode] = []
     var userDefaults: [UserDefaultsItem] = []
     var urlHistory: [URL] = []
-    var previewApplied: PreviewConfig.Applied?
-    var previewConfig = PreviewConfig(size: .init(width: 390, height: 844))
 
     /// Merge a refreshed subtree into our cached hierarchy so the UI reflects new values.
     func merge(subtree: ViewNode) {
@@ -68,7 +65,9 @@ final class InspectorStateStore {
             contentMode: target.contentMode,
             constraintIDs: target.constraintIDs,
             childIDs: target.childIDs,
-            childrenInline: newChildren
+            childrenInline: newChildren,
+            classInheritance: target.classInheritance,
+            hasNonIdentityTransform: target.hasNonIdentityTransform
         )
     }
 
@@ -89,6 +88,13 @@ final class InspectorStateStore {
             if let found = findNode(id: id, in: child) { return found }
         }
         return nil
+    }
+
+    /// Which window's subtree contains `id`, per the cached snapshot.
+    /// Used to decide whether two views can be measured against each other
+    /// (cross-window measurements are meaningless in window coords).
+    func containingWindowID(of id: ObjectID) -> ObjectID? {
+        hierarchy?.containingWindowID(of: id)
     }
 
     /// Walk the cached hierarchy and insert every ancestor of `id` into

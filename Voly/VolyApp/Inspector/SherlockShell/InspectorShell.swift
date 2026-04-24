@@ -9,8 +9,17 @@ struct InspectorShell: View {
         VStack(spacing: 0) {
             topStatusBar
             Divider()
+            if session.state.pickModeActive && session.state.selectedViewID == nil {
+                Label("Click a view on the simulator to select; hover others to measure",
+                      systemImage: "cursorarrow.click")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+            }
             if let node = currentNode(), pane.currentTab.requiresSelection {
-                DetailHeader(node: node, pane: pane)
+                DetailHeader(node: node, pane: pane, measurement: session.measurement,
+                             lastSummary: session.lastMeasurementSummary)
             }
             TopTabBar(pane: pane, hasSelection: session.state.selectedViewID != nil)
             Divider()
@@ -20,11 +29,25 @@ struct InspectorShell: View {
         .task { session.connections.startBrowsing() }
         .onChange(of: session.state.selectedViewID) { _, newID in
             pane.resetInheritance(for: newID)
-            // When the user picks a view, jump to Layout so the inspection UI
-            // is front and center.
-            if newID != nil, pane.currentTab == .hierarchy {
-                pane.currentTab = .layout
+            session.measurement.reset()
+            session.scheduleMeasurementUpdate(
+                anchor: newID,
+                other: session.measurement.effectiveOtherID
+            )
+        }
+        .onChange(of: session.measurement.effectiveOtherID) { _, newOther in
+            session.scheduleMeasurementUpdate(
+                anchor: session.state.selectedViewID,
+                other: newOther
+            )
+        }
+        .focusable()
+        .onKeyPress(.escape) {
+            if session.state.pickModeActive {
+                Task { await session.exitPickMode() }
+                return .handled
             }
+            return .ignored
         }
     }
 
@@ -52,7 +75,9 @@ struct InspectorShell: View {
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
+            .keyboardShortcut("m", modifiers: [.control, .option, .command])
             .disabled(session.state.connectionStatus != .connected)
+            .help(session.state.pickModeActive ? "Exit pick mode (⌃⌥⌘M / Esc)" : "Pick + measure (⌃⌥⌘M)")
 
             Button {
                 Task { await session.refreshHierarchy() }
@@ -73,7 +98,7 @@ struct InspectorShell: View {
     private var tabContent: some View {
         switch pane.currentTab {
         case .hierarchy:
-            HierarchyTab(session: session)
+            HierarchyTab(session: session, measurement: session.measurement)
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)
@@ -86,18 +111,10 @@ struct InspectorShell: View {
             } else {
                 NoSelectionView()
             }
-        case .src:
-            if session.state.selectedViewID != nil {
-                SourceNavigationPanel(session: session)
-            } else {
-                NoSelectionView()
-            }
         case .userDefaults:
             UserDefaultsPanel(session: session)
         case .urlTester:
             URLTesterPanel(session: session)
-        case .preview:
-            PreviewControlPanel(session: session)
         }
     }
 

@@ -1,6 +1,8 @@
+import CoreGraphics
 import Foundation
 import Network
 import OSLog
+import VolyCodables
 import VolyProtocol
 import VolyModels
 import VolyHost
@@ -14,9 +16,16 @@ nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", ca
 final class InspectorSession {
     let connections = ConnectionManager()
     let state = InspectorStateStore()
+    let measurement = MeasurementPane()
+    let hoverMonitor = SimulatorHoverMonitor()
     private var client: WebSocketClient?
     private var selectedPeer: ConnectionManager.Peer?
     var lastError: String?
+    var lastMeasurementSummary: MeasurementSummary?
+
+    /// Trailing-debounce handle for measurement updates. Fast mouse movement
+    /// over the hierarchy would otherwise send a `.measure` command per frame.
+    private var pendingMeasurementTask: Task<Void, Never>?
     /// When true, the first peer discovered over Bonjour is connected to
     /// automatically. Reset to false if the user explicitly disconnects.
     var autoConnectEnabled: Bool = true
@@ -25,6 +34,7 @@ final class InspectorSession {
     private var fileDiscoveryTimer: Timer?
 
     init() {
+        hoverMonitor.session = self
         startFileDiscoveryLoop()
         connections.startBrowsing()
         connections.onPeerAppeared = { [weak self] peer in
@@ -83,9 +93,12 @@ final class InspectorSession {
     }
 
     func disconnect() async {
+        hoverMonitor.stop()
         await client?.disconnect()
         client = nil
         state.connectionStatus = .disconnected
+        state.pickModeActive = false
+        measurement.reset()
         // Explicit disconnect disables auto-connect until next launch/toggle.
         autoConnectEnabled = false
         hasAutoConnected = false
@@ -211,15 +224,52 @@ final class InspectorSession {
         }
     }
 
+    /// Enter Pick mode: the agent puts up the greedy blue overlay on the sim,
+    /// and the Mac-side hover monitor starts driving live measurements against
+    /// whatever view is selected. If Accessibility isn't granted, the hover
+    /// monitor fails silently — clicking still works, just no hover measure.
     func enterPickMode() async {
+        _ = hoverMonitor.start()
         _ = try? await client?.send(.enterPickMode)
         state.pickModeActive = true
     }
 
     func exitPickMode() async {
+        hoverMonitor.stop()
         _ = try? await client?.send(.exitPickMode)
+        _ = try? await client?.send(.clearMeasure)
         state.pickModeActive = false
+        measurement.reset()
+        lastMeasurementSummary = nil
         await clearSelection()
+    }
+
+    /// Live hit-test + measurement + draw on the agent, in one round-trip.
+    /// The agent resolves anchor + cursor-hit views, computes the overlay
+    /// using fresh window-coord frames, draws it, and returns the summary
+    /// for the header badge + the hovered view's id for the UI hoverID state.
+    ///
+    /// Chosen over a client-side approach because snapshot `windowFrame`
+    /// data can be stale, and views like iOS 26's floating-bar passthrough
+    /// container override `point(inside:with:)` in ways the snapshot can't
+    /// represent.
+    func liveMeasureHover(
+        anchor: ObjectID,
+        x: Double,
+        y: Double,
+        sceneID: ObjectID
+    ) async -> (otherID: ObjectID?, summary: MeasurementSummary?) {
+        guard let client else { return (nil, nil) }
+        do {
+            let response = try await client.send(.measureHover(
+                anchorID: anchor, x: x, y: y, sceneID: sceneID))
+            if case .measureHoverResult(let otherID, let summary) = response {
+                return (otherID, summary)
+            }
+        } catch {
+            // Silently drop — hover errors are cosmetic; next move will retry.
+        }
+        return (nil, nil)
     }
 
     func clearSelection() async {
@@ -261,32 +311,71 @@ final class InspectorSession {
         return (false, nil)
     }
 
-    func applyPreview(_ config: PreviewConfig) async -> PreviewConfig.Applied? {
-        do {
-            if let response = try await client?.send(.setPreviewConfig(config)),
-               case .previewApplied(let applied) = response {
-                return applied
-            }
-        } catch {
-            lastError = error.localizedDescription
+    /// Schedule a measurement-overlay update after a short debounce. Cancels
+    /// any in-flight update. Pass `other == nil` to clear the overlay.
+    ///
+    /// No-op when `pickModeActive` — the simulator-hover path
+    /// (`liveMeasureHover`) already does hit-test + compute + draw on the
+    /// agent with live frames, so double-running this would redraw using
+    /// stale snapshot frames.
+    func scheduleMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) {
+        if state.pickModeActive { return }
+        pendingMeasurementTask?.cancel()
+        pendingMeasurementTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(16))
+            if Task.isCancelled { return }
+            await self?.performMeasurementUpdate(anchor: anchor, other: other)
         }
-        return nil
     }
 
-    func clearPreview() async {
-        _ = try? await client?.send(.clearPreview)
-    }
-
-    func resolveSource(for id: ObjectID) async -> SourceInfo? {
-        do {
-            if let response = try await client?.send(.resolveSource(objectID: id)),
-               case .sourceInfo(let info) = response {
-                return info
-            }
-        } catch {
-            lastError = error.localizedDescription
+    private func performMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) async {
+        guard let client else {
+            log.info("performMeasurementUpdate: no client")
+            return
         }
-        return nil
+
+        // No anchor or no "other" → clear everything.
+        guard let anchor, let other else {
+            log.info("performMeasurementUpdate: anchor=\(anchor.map(String.init) ?? "nil") other=\(other.map(String.init) ?? "nil") → clearMeasure")
+            lastMeasurementSummary = nil
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        guard let anchorNode = state.findNode(id: anchor),
+              let otherNode  = state.findNode(id: other) else {
+            log.info("performMeasurementUpdate: findNode failed (anchor=\(anchor) other=\(other)) — snapshot stale?")
+            lastMeasurementSummary = nil
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        let sharedWindow = state.containingWindowID(of: anchor)
+            == state.containingWindowID(of: other)
+
+        guard let overlay = FrameMeasurement.compute(
+            anchor: anchorNode, other: otherNode, sharedWindow: sharedWindow)
+        else {
+            log.info("performMeasurementUpdate: FrameMeasurement.compute returned nil (anchor=\(anchor) other=\(other) sharedWindow=\(sharedWindow))")
+            lastMeasurementSummary = sharedWindow
+                ? nil  // NaN / zero-size / other degenerate — hide the badge
+                : MeasurementSummary(kind: .crossWindow, horizontal: nil, vertical: nil)
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+        let aFrame = (anchorNode.windowFrame ?? anchorNode.frame).cg
+        let oFrame = (otherNode.windowFrame ?? otherNode.frame).cg
+        log.notice("performMeasurementUpdate: anchor=\(anchor)(\(anchorNode.className, privacy: .public) wf=\(Int(aFrame.minX)),\(Int(aFrame.minY)),\(Int(aFrame.width))x\(Int(aFrame.height))) other=\(other)(\(otherNode.className, privacy: .public) wf=\(Int(oFrame.minX)),\(Int(oFrame.minY)),\(Int(oFrame.width))x\(Int(oFrame.height))) kind=\(String(describing: overlay.summary.kind), privacy: .public) → sending .measure")
+
+        // sameView → header shows "same view", no on-simulator guides needed.
+        if overlay.summary.kind == .sameView {
+            lastMeasurementSummary = overlay.summary
+            _ = try? await client.send(.clearMeasure)
+            return
+        }
+
+        lastMeasurementSummary = overlay.summary
+        _ = try? await client.send(.measure(overlay: overlay))
     }
 
     // MARK: - Events
@@ -299,13 +388,19 @@ final class InspectorSession {
                 guard let self else { return }
                 switch event {
                 case .selectionChanged(let id):
-                    await self.select(id)
+                    if self.state.selectedViewID == id {
+                        await self.clearSelection()
+                    } else {
+                        await self.select(id)
+                    }
                 case .hierarchyChanged:
                     await self.refreshHierarchy()
                 case .viewInvalidated(let id):
                     await self.loadSubtree(for: id)
                 case .connectionWarning(let message):
                     self.lastError = message
+                case .hoverTarget(let id):
+                    self.measurement.hoverID = id
                 }
             }
             log.info("pumpEvents: stream ended")
