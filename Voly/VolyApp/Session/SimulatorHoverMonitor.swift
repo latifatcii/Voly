@@ -31,9 +31,9 @@ final class SimulatorHoverMonitor {
         self.locator = locator
     }
 
-    /// Called by `InspectorSession.enterMeasureMode`. Returns false if
-    /// Accessibility permission is not granted (caller should auto-exit
-    /// measure mode and surface an error).
+    /// Called by `InspectorSession.enterPickMode`. Returns false if
+    /// Accessibility permission is not granted; the caller should silently
+    /// proceed with click-only pick (no hover measurement).
     func start() -> Bool {
         guard AccessibilityTrust.isTrusted(prompt: true) else {
             log.error("start: Accessibility not trusted — cannot monitor cursor")
@@ -117,19 +117,11 @@ final class SimulatorHoverMonitor {
 
     // MARK: - Monitor
 
-    private var monitorFireCount: Int = 0
-
     private func installMonitor() {
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.pendingLocation = NSEvent.mouseLocation
-                self.monitorFireCount += 1
-                // Log the first fire, then every 50th so we know it's live
-                // without flooding.
-                if self.monitorFireCount == 1 || self.monitorFireCount % 50 == 0 {
-                    log.notice("global mouseMoved #\(self.monitorFireCount) at \(String(describing: NSEvent.mouseLocation), privacy: .public)")
-                }
                 self.kickThrottle()
             }
         }

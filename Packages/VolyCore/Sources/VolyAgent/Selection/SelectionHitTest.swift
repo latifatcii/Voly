@@ -4,8 +4,9 @@ import UIKit
 import VolyModels
 #endif
 
-/// Shared depth-first "deepest visible view under a point" walk. Used by both
-/// PickEngine (taps) and HoverEngine (pointer moves). Deliberately ignores
+/// Shared depth-first "deepest visible view under a point" walk. Used by
+/// PickEngine (taps) and the client-side Mac hover monitor via `.measureHover`.
+/// Deliberately ignores
 /// `isUserInteractionEnabled` — UILabel defaults to false and must still be
 /// inspectable.
 @MainActor

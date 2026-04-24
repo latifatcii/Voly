@@ -14,7 +14,6 @@ public final class CommandDispatcher {
     public let mutations: MutationExecutor
     public let registry: ObjectRegistry
     public let pick: PickEngine
-    public let hover: HoverEngine
     public let overlay: OverlayHost
     public let defaults: UserDefaultsProvider
     public let urls: URLExecutor
@@ -26,7 +25,6 @@ public final class CommandDispatcher {
         snapshots: SnapshotBuilder,
         mutations: MutationExecutor,
         pick: PickEngine,
-        hover: HoverEngine,
         overlay: OverlayHost,
         defaults: UserDefaultsProvider,
         urls: URLExecutor,
@@ -37,7 +35,6 @@ public final class CommandDispatcher {
         self.snapshots = snapshots
         self.mutations = mutations
         self.pick = pick
-        self.hover = hover
         self.overlay = overlay
         self.defaults = defaults
         self.urls = urls
@@ -99,7 +96,6 @@ public final class CommandDispatcher {
             return .subtree(refreshed)
 
         case .enterPickMode:
-            hover.exit()
             pick.enter()
             return .pickModeChanged(true)
 
@@ -157,13 +153,6 @@ public final class CommandDispatcher {
         case .clearMeasure:
             self.overlay.clearMeasurement()
             return .ack
-        case .enterMeasureMode:
-            pick.exit()   // mutual exclusion — no-op if already off
-            hover.enter()
-            return .measureModeChanged(true)
-        case .exitMeasureMode:
-            hover.exit()
-            return .measureModeChanged(false)
 
         case .hoverAt(let x, let y, let sceneID):
             // Live hit-test on the agent so passthrough views (e.g. iOS 26's

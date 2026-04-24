@@ -9,8 +9,9 @@ struct InspectorShell: View {
         VStack(spacing: 0) {
             topStatusBar
             Divider()
-            if session.state.measureModeActive && session.state.selectedViewID == nil {
-                Label("Click a view on the simulator to anchor", systemImage: "cursorarrow.click")
+            if session.state.pickModeActive && session.state.selectedViewID == nil {
+                Label("Click a view on the simulator to select; hover others to measure",
+                      systemImage: "cursorarrow.click")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
@@ -29,9 +30,6 @@ struct InspectorShell: View {
         .onChange(of: session.state.selectedViewID) { _, newID in
             pane.resetInheritance(for: newID)
             session.measurement.reset()
-            if newID != nil, pane.currentTab == .hierarchy {
-                pane.currentTab = .layout
-            }
             session.scheduleMeasurementUpdate(
                 anchor: newID,
                 other: session.measurement.effectiveOtherID
@@ -45,8 +43,8 @@ struct InspectorShell: View {
         }
         .focusable()
         .onKeyPress(.escape) {
-            if session.state.measureModeActive {
-                Task { await session.exitMeasureMode() }
+            if session.state.pickModeActive {
+                Task { await session.exitPickMode() }
                 return .handled
             }
             return .ignored
@@ -77,23 +75,9 @@ struct InspectorShell: View {
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
-            .disabled(session.state.connectionStatus != .connected)
-
-            Button {
-                Task {
-                    if session.state.measureModeActive { await session.exitMeasureMode() }
-                    else { await session.enterMeasureMode() }
-                }
-            } label: {
-                Label("Measure", systemImage: session.state.measureModeActive
-                      ? "ruler.fill"
-                      : "ruler")
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
             .keyboardShortcut("m", modifiers: [.control, .option, .command])
             .disabled(session.state.connectionStatus != .connected)
-            .help(session.state.measureModeActive ? "Exit measure mode (⌃⌥⌘M / Esc)" : "Measure (⌃⌥⌘M)")
+            .help(session.state.pickModeActive ? "Exit pick mode (⌃⌥⌘M / Esc)" : "Pick + measure (⌃⌥⌘M)")
 
             Button {
                 Task { await session.refreshHierarchy() }
@@ -127,18 +111,10 @@ struct InspectorShell: View {
             } else {
                 NoSelectionView()
             }
-        case .src:
-            if session.state.selectedViewID != nil {
-                SourceNavigationPanel(session: session)
-            } else {
-                NoSelectionView()
-            }
         case .userDefaults:
             UserDefaultsPanel(session: session)
         case .urlTester:
             URLTesterPanel(session: session)
-        case .preview:
-            PreviewControlPanel(session: session)
         }
     }
 

@@ -133,8 +133,6 @@ public enum Command: Codable, Sendable {
     case highlight(objectID: ObjectID)
     case measure(overlay: MeasurementOverlay)
     case clearMeasure
-    case enterMeasureMode
-    case exitMeasureMode
     case hoverAt(x: Double, y: Double, sceneID: ObjectID)
     /// Hit-test at cursor + compute measurement against anchor + draw overlay,
     /// all live on the agent. Replaces the `.hoverAt` + client-side
@@ -150,7 +148,6 @@ public enum Response: Codable, Sendable {
     case properties(PropertyBag)
     case constraints([ConstraintNode])
     case pickModeChanged(Bool)
-    case measureModeChanged(Bool)
     case selection(ObjectID)
     case hoverResult(ObjectID?)
     case measureHoverResult(otherID: ObjectID?, summary: MeasurementSummary?)
@@ -169,5 +166,4 @@ public enum Event: Codable, Sendable {
     case selectionChanged(ObjectID)
     case connectionWarning(String)
     case hoverTarget(ObjectID?)
-    case measureClick(ObjectID)
 }

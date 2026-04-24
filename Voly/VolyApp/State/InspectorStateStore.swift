@@ -1,6 +1,5 @@
 import Foundation
 import VolyModels
-import VolyCodables
 
 enum ConnectionStatus: String, Sendable {
     case disconnected, connecting, connected
@@ -13,7 +12,6 @@ final class InspectorStateStore {
     var hierarchy: HierarchySnapshot?
     var selectedViewID: ObjectID?
     var pickModeActive = false
-    var measureModeActive = false
     /// IDs whose DisclosureGroup in the hierarchy browser is open. Owned here
     /// (rather than on each NodeRow's @State) so `expandAncestors(of:)` can
     /// open the chain when a new selection arrives via pick or programmatic select.
@@ -22,8 +20,6 @@ final class InspectorStateStore {
     var constraints: [ConstraintNode] = []
     var userDefaults: [UserDefaultsItem] = []
     var urlHistory: [URL] = []
-    var previewApplied: PreviewConfig.Applied?
-    var previewConfig = PreviewConfig(size: .init(width: 390, height: 844))
 
     /// Merge a refreshed subtree into our cached hierarchy so the UI reflects new values.
     func merge(subtree: ViewNode) {

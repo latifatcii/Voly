@@ -98,7 +98,6 @@ final class InspectorSession {
         client = nil
         state.connectionStatus = .disconnected
         state.pickModeActive = false
-        state.measureModeActive = false
         measurement.reset()
         // Explicit disconnect disables auto-connect until next launch/toggle.
         autoConnectEnabled = false
@@ -225,15 +224,23 @@ final class InspectorSession {
         }
     }
 
+    /// Enter Pick mode: the agent puts up the greedy blue overlay on the sim,
+    /// and the Mac-side hover monitor starts driving live measurements against
+    /// whatever view is selected. If Accessibility isn't granted, the hover
+    /// monitor fails silently — clicking still works, just no hover measure.
     func enterPickMode() async {
-        if state.measureModeActive { await exitMeasureMode() }
+        _ = hoverMonitor.start()
         _ = try? await client?.send(.enterPickMode)
         state.pickModeActive = true
     }
 
     func exitPickMode() async {
+        hoverMonitor.stop()
         _ = try? await client?.send(.exitPickMode)
+        _ = try? await client?.send(.clearMeasure)
         state.pickModeActive = false
+        measurement.reset()
+        lastMeasurementSummary = nil
         await clearSelection()
     }
 
@@ -263,25 +270,6 @@ final class InspectorSession {
             // Silently drop — hover errors are cosmetic; next move will retry.
         }
         return (nil, nil)
-    }
-
-    func enterMeasureMode() async {
-        if state.pickModeActive { await exitPickMode() }
-        let accessibilityOK = hoverMonitor.start()
-        guard accessibilityOK else {
-            lastError = "Voly needs Accessibility access to track the cursor. Enable Voly in System Settings → Privacy & Security → Accessibility, then try again."
-            return
-        }
-        _ = try? await client?.send(.enterMeasureMode)
-        state.measureModeActive = true
-    }
-
-    func exitMeasureMode() async {
-        hoverMonitor.stop()
-        _ = try? await client?.send(.exitMeasureMode)
-        state.measureModeActive = false
-        // Clear any ghost hover — cursor may have been off-window when exit fired.
-        measurement.hoverID = nil
     }
 
     func clearSelection() async {
@@ -323,31 +311,15 @@ final class InspectorSession {
         return (false, nil)
     }
 
-    func applyPreview(_ config: PreviewConfig) async -> PreviewConfig.Applied? {
-        do {
-            if let response = try await client?.send(.setPreviewConfig(config)),
-               case .previewApplied(let applied) = response {
-                return applied
-            }
-        } catch {
-            lastError = error.localizedDescription
-        }
-        return nil
-    }
-
-    func clearPreview() async {
-        _ = try? await client?.send(.clearPreview)
-    }
-
     /// Schedule a measurement-overlay update after a short debounce. Cancels
     /// any in-flight update. Pass `other == nil` to clear the overlay.
     ///
-    /// No-op when `measureModeActive` — the simulator-hover path
+    /// No-op when `pickModeActive` — the simulator-hover path
     /// (`liveMeasureHover`) already does hit-test + compute + draw on the
     /// agent with live frames, so double-running this would redraw using
     /// stale snapshot frames.
     func scheduleMeasurementUpdate(anchor: ObjectID?, other: ObjectID?) {
-        if state.measureModeActive { return }
+        if state.pickModeActive { return }
         pendingMeasurementTask?.cancel()
         pendingMeasurementTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(16))
@@ -406,18 +378,6 @@ final class InspectorSession {
         _ = try? await client.send(.measure(overlay: overlay))
     }
 
-    func resolveSource(for id: ObjectID) async -> SourceInfo? {
-        do {
-            if let response = try await client?.send(.resolveSource(objectID: id)),
-               case .sourceInfo(let info) = response {
-                return info
-            }
-        } catch {
-            lastError = error.localizedDescription
-        }
-        return nil
-    }
-
     // MARK: - Events
 
     private func pumpEvents(client: WebSocketClient) {
@@ -428,7 +388,11 @@ final class InspectorSession {
                 guard let self else { return }
                 switch event {
                 case .selectionChanged(let id):
-                    await self.select(id)
+                    if self.state.selectedViewID == id {
+                        await self.clearSelection()
+                    } else {
+                        await self.select(id)
+                    }
                 case .hierarchyChanged:
                     await self.refreshHierarchy()
                 case .viewInvalidated(let id):
@@ -437,8 +401,6 @@ final class InspectorSession {
                     self.lastError = message
                 case .hoverTarget(let id):
                     self.measurement.hoverID = id
-                case .measureClick(let id):
-                    await self.select(id)
                 }
             }
             log.info("pumpEvents: stream ended")

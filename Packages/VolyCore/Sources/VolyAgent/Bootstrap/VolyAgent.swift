@@ -19,7 +19,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
     public private(set) var snapshots: SnapshotBuilder!
     public private(set) var mutations: MutationExecutor!
     public private(set) var pick: PickEngine!
-    public private(set) var hover: HoverEngine!
     public private(set) var overlay: OverlayHost!
     public private(set) var defaults: UserDefaultsProvider!
     public private(set) var urls: URLExecutor!
@@ -48,7 +47,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         self.mutations = MutationExecutor(registry: registry)
         self.overlay = OverlayHost(registry: registry)
         self.pick = PickEngine(registry: registry, overlay: overlay)
-        self.hover = HoverEngine(registry: registry)
         self.defaults = UserDefaultsProvider()
         self.urls = URLExecutor()
         self.source = DefaultSourceInfoProvider()
@@ -57,7 +55,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
             snapshots: snapshots,
             mutations: mutations,
             pick: pick,
-            hover: hover,
             overlay: overlay,
             defaults: defaults,
             urls: urls,
@@ -66,7 +63,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         )
         startServer()
         observePickNotifications()
-        observeHoverNotifications()
     }
 
     private func startServer() {
@@ -164,24 +160,6 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         }
     }
 
-    private func observeHoverNotifications() {
-        NotificationCenter.default.addObserver(
-            forName: HoverEngine.Notification.didClick,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            let id = (note.object as? NSNumber)?.uint64Value
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard let id, id != 0 else { return }
-                guard let server = self.server else { return }
-                let event = Event.measureClick(id)
-                if let envelope = try? Framing.encodeEvent(event, id: 0) {
-                    try? await server.send(envelope)
-                }
-            }
-        }
-    }
 }
 
 public enum VolyAgent {
