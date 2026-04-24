@@ -1,6 +1,8 @@
+import CoreGraphics
 import Foundation
 import Network
 import OSLog
+import VolyCodables
 import VolyProtocol
 import VolyModels
 import VolyHost
@@ -372,7 +374,9 @@ final class InspectorSession {
             _ = try? await client.send(.clearMeasure)
             return
         }
-        log.notice("performMeasurementUpdate: anchor=\(anchor) other=\(other) kind=\(String(describing: overlay.summary.kind), privacy: .public) → sending .measure")
+        let aFrame = (anchorNode.windowFrame ?? anchorNode.frame).cg
+        let oFrame = (otherNode.windowFrame ?? otherNode.frame).cg
+        log.notice("performMeasurementUpdate: anchor=\(anchor)(\(anchorNode.className, privacy: .public) wf=\(Int(aFrame.minX)),\(Int(aFrame.minY)),\(Int(aFrame.width))x\(Int(aFrame.height))) other=\(other)(\(otherNode.className, privacy: .public) wf=\(Int(oFrame.minX)),\(Int(oFrame.minY)),\(Int(oFrame.width))x\(Int(oFrame.height))) kind=\(String(describing: overlay.summary.kind), privacy: .public) → sending .measure")
 
         // sameView → header shows "same view", no on-simulator guides needed.
         if overlay.summary.kind == .sameView {
