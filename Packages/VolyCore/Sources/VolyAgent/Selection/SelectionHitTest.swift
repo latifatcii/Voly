@@ -1,5 +1,8 @@
 #if canImport(UIKit)
 import UIKit
+#if !VOLY_UNIFIED_BUILD
+import VolyModels
+#endif
 
 /// Shared depth-first "deepest visible view under a point" walk. Used by both
 /// PickEngine (taps) and HoverEngine (pointer moves). Deliberately ignores
