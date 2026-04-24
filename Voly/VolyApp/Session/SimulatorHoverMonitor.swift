@@ -26,6 +26,11 @@ final class SimulatorHoverMonitor {
     private var pendingLocation: NSPoint?
     private var cachedRegion: Region?
     private var regionRefreshTask: Task<Void, Never>?
+    /// Reset on every Voly launch. We prompt at most once per session — if the
+    /// user dismisses the dialog we don't re-spam them when they toggle Pick
+    /// again, but we still guide them the first time hover is needed after a
+    /// fresh install where TCC hasn't been granted yet.
+    private var hasPromptedThisSession = false
 
     init(locator: SimulatorLocator = AXSimulatorLocator()) {
         self.locator = locator
@@ -34,14 +39,17 @@ final class SimulatorHoverMonitor {
     /// Called by `InspectorSession.enterPickMode`. Returns false if
     /// Accessibility permission is not granted; the caller should silently
     /// proceed with click-only pick (no hover measurement).
-    ///
-    /// Uses `prompt: false` — a silent check. The initial grant is owned by
-    /// `FirstRunAccessibilityPrompt` at launch; we don't want to re-show the
-    /// system dialog every time the user toggles Pick mode if TCC is in a
-    /// weird state (common with ad-hoc-signed builds).
     func start() -> Bool {
-        guard AccessibilityTrust.isTrusted(prompt: false) else {
+        if !AccessibilityTrust.isTrusted(prompt: false) {
             log.error("start: Accessibility not trusted — cannot monitor cursor")
+            session?.lastError = "Voly needs Accessibility to track the cursor for live measurements. Grant Voly in System Settings → Privacy & Security → Accessibility, then restart Voly. Clicks still work without it."
+            if !hasPromptedThisSession {
+                hasPromptedThisSession = true
+                // `prompt: true` shows the system dialog + deep-links into
+                // Privacy settings. One nudge per session keeps it helpful
+                // without being spammy if the grant isn't sticking.
+                _ = AccessibilityTrust.isTrusted(prompt: true)
+            }
             return false
         }
         refreshRegion()

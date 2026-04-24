@@ -4,14 +4,13 @@ import VolyHost
 
 @MainActor
 enum FirstRunAccessibilityPrompt {
-    private static let shownKey = "voly.accessibility.firstPromptShown"
-
-    /// Shows a one-time NSAlert if Accessibility isn't granted AND we haven't
-    /// already nudged the user once.
+    /// Shows an NSAlert at launch whenever Accessibility isn't granted. No
+    /// UserDefaults dedup — a previous "shown" flag would silence us across
+    /// TCC resets and re-installs (common with ad-hoc-signed DMG builds),
+    /// leaving the user with no obvious path back. The alert dedupes itself
+    /// naturally: once granted, the trust check above returns true.
     static func runIfNeeded() {
         if AccessibilityTrust.isTrusted(prompt: false) { return }
-        if UserDefaults.standard.bool(forKey: shownKey) { return }
-        UserDefaults.standard.set(true, forKey: shownKey)
 
         let alert = NSAlert()
         alert.messageText = "Let Voly follow the Simulator"
