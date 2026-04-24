@@ -46,6 +46,11 @@ public final class AXSimulatorLocator: SimulatorLocator, @unchecked Sendable {
         return CGRect(x: position.x, y: cocoaY, width: size.width, height: size.height)
     }
 
+    public func iosScreenRegionInScreen() -> IosScreenBoundsOnScreen? {
+        // Implementation comes in Task 3.
+        return nil
+    }
+
     private func isWindowUsable(_ window: AXUIElement) -> Bool {
         var minimizedRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimizedRef) == .success,
