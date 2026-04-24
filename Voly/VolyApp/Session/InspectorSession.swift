@@ -235,6 +235,23 @@ final class InspectorSession {
         await clearSelection()
     }
 
+    /// Live hit-test via the agent. Respects `point(inside:with:)` overrides
+    /// and iOS 26 passthrough containers (floating tab bar). Used by
+    /// `SimulatorHoverMonitor` per mouse-move settle — client-side snapshot
+    /// hit-test can't see passthrough behavior.
+    func liveHitTest(x: Double, y: Double, sceneID: ObjectID) async -> ObjectID? {
+        guard let client else { return nil }
+        do {
+            let response = try await client.send(.hoverAt(x: x, y: y, sceneID: sceneID))
+            if case .hoverResult(let id) = response {
+                return id
+            }
+        } catch {
+            // Silently drop — hover errors are cosmetic; next move will retry.
+        }
+        return nil
+    }
+
     func enterMeasureMode() async {
         if state.pickModeActive { await exitPickMode() }
         let accessibilityOK = hoverMonitor.start()

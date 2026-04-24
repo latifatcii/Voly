@@ -8,3 +8,5 @@ xcuserdata/
 Pods/
 .swiftpm/
 .superpowers/
+.vscode/
+*.pbxproj.bak*

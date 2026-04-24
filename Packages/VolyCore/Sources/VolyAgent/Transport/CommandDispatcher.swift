@@ -164,6 +164,16 @@ public final class CommandDispatcher {
         case .exitMeasureMode:
             hover.exit()
             return .measureModeChanged(false)
+
+        case .hoverAt(let x, let y, let sceneID):
+            // Live hit-test on the agent so passthrough views (e.g. iOS 26's
+            // floating tab bar container) and hitTest overrides are respected.
+            // Snapshot-based client walk can't replicate those.
+            guard let scene = registry.object(for: sceneID) as? UIWindowScene else {
+                return .hoverResult(nil)
+            }
+            let id = SelectionHitTest.hitTest(in: scene, at: CGPoint(x: x, y: y), registry: registry)
+            return .hoverResult(id == 0 ? nil : id)
         }
     }
 }

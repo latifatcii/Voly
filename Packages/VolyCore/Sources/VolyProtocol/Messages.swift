@@ -135,6 +135,7 @@ public enum Command: Codable, Sendable {
     case clearMeasure
     case enterMeasureMode
     case exitMeasureMode
+    case hoverAt(x: Double, y: Double, sceneID: ObjectID)
 }
 
 public enum Response: Codable, Sendable {
@@ -146,6 +147,7 @@ public enum Response: Codable, Sendable {
     case pickModeChanged(Bool)
     case measureModeChanged(Bool)
     case selection(ObjectID)
+    case hoverResult(ObjectID?)
     case userDefaults([UserDefaultsItem])
     case urlResult(success: Bool, error: String?)
     case previewApplied(PreviewConfig.Applied)

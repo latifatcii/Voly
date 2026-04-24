@@ -1,7 +1,9 @@
 #if canImport(UIKit)
 import UIKit
 import OSLog
-
+#if !VOLY_UNIFIED_BUILD
+import VolyModels
+#endif
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.VolyAgent", category: "HoverEngine")
 
 /// Measurement-mode overlay on the simulator side. Draws the orange tint
