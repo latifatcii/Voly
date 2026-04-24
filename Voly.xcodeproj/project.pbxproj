@@ -28,6 +28,7 @@
 		17A135DCDDB34BCAA1E4A291 /* MeasurementOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */; };
 		AFC096A0C55849C6B582BEDE /* FrameMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */; };
 		E8376DDF96B4427AABC16EEE /* HierarchySnapshot+WindowLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */; };
+		A1C3F9D2E84B56F07A2B1C3D /* HierarchySnapshot+HitTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */; };
 		B04A9501C0474D941BE00E6B /* Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07A86BDE7BE375DBA7601BC8 /* Messages.swift */; };
 		BD31DD54C76270290858C2F3 /* AgentGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC6E782E10338FDA5CC9698 /* AgentGate.swift */; };
 		C345597C2A27833DFF5270F8 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6303CDA5BFD2BDCB46C112 /* WebSocketServer.swift */; };
@@ -98,6 +99,7 @@
 		ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeasurementOverlay.swift; sourceTree = "<group>"; };
 		9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FrameMeasurement.swift; sourceTree = "<group>"; };
 		F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "HierarchySnapshot+WindowLookup.swift"; sourceTree = "<group>"; };
+		B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "HierarchySnapshot+HitTest.swift"; sourceTree = "<group>"; };
 		FBC6E782E10338FDA5CC9698 /* AgentGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -322,6 +324,7 @@
 				ED4B3EE82A0F4660A5208043 /* MeasurementOverlay.swift */,
 				9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */,
 				F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */,
+				B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */,
 			);
 			path = VolyModels;
 			sourceTree = "<group>";
@@ -563,6 +566,7 @@
 				17A135DCDDB34BCAA1E4A291 /* MeasurementOverlay.swift in Sources */,
 				AFC096A0C55849C6B582BEDE /* FrameMeasurement.swift in Sources */,
 				E8376DDF96B4427AABC16EEE /* HierarchySnapshot+WindowLookup.swift in Sources */,
+				A1C3F9D2E84B56F07A2B1C3D /* HierarchySnapshot+HitTest.swift in Sources */,
 				38195BB429E5E25B9AE1E893 /* Framing.swift in Sources */,
 				B04A9501C0474D941BE00E6B /* Messages.swift in Sources */,
 				EE830DA32EE43254EDCD9FAF /* VolyAgentLoader.m in Sources */,
