@@ -46,6 +46,15 @@
 		EE830DA32EE43254EDCD9FAF /* VolyAgentLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = D413493B7B60C203D58DD5E8 /* VolyAgentLoader.m */; };
 		EF747D9443DEC0558E17FB25 /* CommandDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 886232C60EC15895E7D5B13D /* CommandDispatcher.swift */; };
 		F635107CA68E92A86F4E189F /* CustomPropDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDEBA35C4F05BE6DD86D344 /* CustomPropDescriptor.swift */; };
+		EE22020A84CC8BF2084A23BF /* LocalizationOverrideStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF8DBF60BBA3B15F58910F14 /* LocalizationOverrideStore.swift */; };
+		B8B26A599D9505E0244CEDDC /* LocalizedStringIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB8E47009C68ADBB93EF26F /* LocalizedStringIndex.swift */; };
+		B61685CA516054EB8F903619 /* VolyLocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21C413D684DC454EC01B4E5C /* VolyLocalizationManager.swift */; };
+		DACD14D1A81B10D1FE18066F /* VolyNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE4094748F331F3E782D7DA /* VolyNavigationController.swift */; };
+		E4DF655999BF4E0681FB9588 /* ScreenshotRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1C6C1FF210A37D90B94D89 /* ScreenshotRenderer.swift */; };
+		B6B41EDCB0C707925B5603D5 /* SourceCandidateResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CD5EA9123D34D9EA6451B85 /* SourceCandidateResolver.swift */; };
+		0C5C04EF39AE4AD570F53A32 /* RuntimeFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A3383E4DD47E8FC99E34510 /* RuntimeFeatures.swift */; };
+		5BB846A44F879B5622A00FF5 /* VolyLaunchBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7922C017394C2E32ABB7E01C /* VolyLaunchBridge.m */; };
+		30C3E969F9A2AA7587E4D39A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F6B712C5AA0932CAF210A72 /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +64,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = CF5AAFD42F97BB5200B39BA0;
 			remoteInfo = VolyAgentDylib;
+		};
+		0DF88D3D9E2C19307E7BD8A6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CF5AAE772F97772C00B39BA0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E754C1B99B618A1A0A391740;
+			remoteInfo = VolyLaunchBridge;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -99,6 +115,15 @@
 		F78A333E379AFBEAC081EAA0 /* ViewNode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewNode.swift; sourceTree = "<group>"; };
 		F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "HierarchySnapshot+WindowLookup.swift"; sourceTree = "<group>"; };
 		FBC6E782E10338FDA5CC9698 /* AgentGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentGate.swift; sourceTree = "<group>"; };
+		CF8DBF60BBA3B15F58910F14 /* LocalizationOverrideStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalizationOverrideStore.swift; sourceTree = "<group>"; };
+		ACB8E47009C68ADBB93EF26F /* LocalizedStringIndex.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalizedStringIndex.swift; sourceTree = "<group>"; };
+		21C413D684DC454EC01B4E5C /* VolyLocalizationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VolyLocalizationManager.swift; sourceTree = "<group>"; };
+		0CE4094748F331F3E782D7DA /* VolyNavigationController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VolyNavigationController.swift; sourceTree = "<group>"; };
+		AB1C6C1FF210A37D90B94D89 /* ScreenshotRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenshotRenderer.swift; sourceTree = "<group>"; };
+		1CD5EA9123D34D9EA6451B85 /* SourceCandidateResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SourceCandidateResolver.swift; sourceTree = "<group>"; };
+		4A3383E4DD47E8FC99E34510 /* RuntimeFeatures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RuntimeFeatures.swift; sourceTree = "<group>"; };
+		7922C017394C2E32ABB7E01C /* VolyLaunchBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = VolyLaunchBridge.m; sourceTree = "<group>"; };
+		67C7A0C1463E05EA065E98EF /* VolyLaunchBridge.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = VolyLaunchBridge.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -152,6 +177,14 @@
 				0008F6D0BF588E4CCA9A2946 /* UIKit.framework in Frameworks */,
 				354DFA267B3218A4C3AC44F1 /* Foundation.framework in Frameworks */,
 				764E53BDBB9992277CBD6842 /* Network.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		69CD69B1C0858CABABC84C81 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				30C3E969F9A2AA7587E4D39A /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,6 +292,7 @@
 				CF5A0100000000000000000B /* SampleApp */,
 				CF5AAE802F97772C00B39BA0 /* Products */,
 				F2726EBF4C97D8C5E120DA2A /* VolyAgentDylib */,
+				AD718BAFFFEFDB09DAAE36CE /* LaunchBridge */,
 				3CB32F05F290FCEE70CB5428 /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -269,6 +303,7 @@
 				CF5AAE7F2F97772C00B39BA0 /* Voly.app */,
 				CF5A0100000000000000000A /* SampleApp.app */,
 				D0AC88A16F5009C45CADCC28 /* VolyAgent.dylib */,
+				67C7A0C1463E05EA065E98EF /* VolyLaunchBridge.dylib */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -303,6 +338,10 @@
 				0C696429EFE3F9AF6E1321E4 /* Snapshot */,
 				D0DEC95E60C23B00055E3F41 /* Transport */,
 				DA47E668A9DD2254E359A2B2 /* URL */,
+				C86758AA5D118428BB82DDC2 /* Localization */,
+				A7A41378F41FFDEE9482A39B /* Navigation */,
+				4F5F7B8EF0C036F23D168C0F /* Screenshot */,
+				CAF7A49D32603DC9817E4CE5 /* Source */,
 			);
 			path = VolyAgent;
 			sourceTree = "<group>";
@@ -322,6 +361,7 @@
 				9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */,
 				F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */,
 				B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */,
+				4A3383E4DD47E8FC99E34510 /* RuntimeFeatures.swift */,
 			);
 			path = VolyModels;
 			sourceTree = "<group>";
@@ -359,6 +399,48 @@
 			path = Registry;
 			sourceTree = "<group>";
 		};
+		C86758AA5D118428BB82DDC2 /* Localization */ = {
+			isa = PBXGroup;
+			children = (
+				CF8DBF60BBA3B15F58910F14 /* LocalizationOverrideStore.swift */,
+				ACB8E47009C68ADBB93EF26F /* LocalizedStringIndex.swift */,
+				21C413D684DC454EC01B4E5C /* VolyLocalizationManager.swift */,
+			);
+			path = Localization;
+			sourceTree = "<group>";
+		};
+		A7A41378F41FFDEE9482A39B /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				0CE4094748F331F3E782D7DA /* VolyNavigationController.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		4F5F7B8EF0C036F23D168C0F /* Screenshot */ = {
+			isa = PBXGroup;
+			children = (
+				AB1C6C1FF210A37D90B94D89 /* ScreenshotRenderer.swift */,
+			);
+			path = Screenshot;
+			sourceTree = "<group>";
+		};
+		CAF7A49D32603DC9817E4CE5 /* Source */ = {
+			isa = PBXGroup;
+			children = (
+				1CD5EA9123D34D9EA6451B85 /* SourceCandidateResolver.swift */,
+			);
+			path = Source;
+			sourceTree = "<group>";
+		};
+		AD718BAFFFEFDB09DAAE36CE /* LaunchBridge */ = {
+			isa = PBXGroup;
+			children = (
+				7922C017394C2E32ABB7E01C /* VolyLaunchBridge.m */,
+			);
+			path = LaunchBridge;
+			sourceTree = SOURCE_ROOT;
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -392,12 +474,13 @@
 				CF5AAE7B2F97772C00B39BA0 /* Sources */,
 				CF5AAE7C2F97772C00B39BA0 /* Frameworks */,
 				CF5AAE7D2F97772C00B39BA0 /* Resources */,
-				2340FA76E828723C6DB5540D /* Embed VolyAgent.dylib */,
+				2340FA76E828723C6DB5540D /* Embed Simulator Dylibs */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				D0BA62FE3B20518ECA53D1BE /* PBXTargetDependency */,
+				66DD5B1DA4BCEE60D80FF5AD /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CF5AAE812F97772C00B39BA0 /* Voly */,
@@ -427,6 +510,22 @@
 			productReference = D0AC88A16F5009C45CADCC28 /* VolyAgent.dylib */;
 			productType = "com.apple.product-type.library.dynamic";
 		};
+		E754C1B99B618A1A0A391740 /* VolyLaunchBridge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3019BF3DEDCD981DA7FA9759 /* Build configuration list for PBXNativeTarget "VolyLaunchBridge" */;
+			buildPhases = (
+				21CDEC330E5293DB1C42B21E /* Sources */,
+				69CD69B1C0858CABABC84C81 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VolyLaunchBridge;
+			productName = VolyLaunchBridge;
+			productReference = 67C7A0C1463E05EA065E98EF /* VolyLaunchBridge.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -446,6 +545,9 @@
 					CF5AAFD42F97BB5200B39BA0 = {
 						CreatedOnToolsVersion = 26.2;
 					};
+					E754C1B99B618A1A0A391740 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = CF5AAE7A2F97772C00B39BA0 /* Build configuration list for PBXProject "Voly" */;
@@ -454,6 +556,9 @@
 			knownRegions = (
 				en,
 				Base,
+				ar,
+				fr,
+				"pt-BR",
 			);
 			mainGroup = CF5AAE762F97772C00B39BA0;
 			minimizedProjectReferenceProxies = 1;
@@ -468,6 +573,7 @@
 				CF5AAE7E2F97772C00B39BA0 /* Voly */,
 				CF5A0100000000000000000F /* SampleApp */,
 				CF5AAFD42F97BB5200B39BA0 /* VolyAgentDylib */,
+				E754C1B99B618A1A0A391740 /* VolyLaunchBridge */,
 			);
 		};
 /* End PBXProject section */
@@ -490,7 +596,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		2340FA76E828723C6DB5540D /* Embed VolyAgent.dylib */ = {
+		2340FA76E828723C6DB5540D /* Embed Simulator Dylibs */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -501,16 +607,19 @@
 			inputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/../Debug-iphonesimulator/VolyAgent.dylib",
 				"$(BUILT_PRODUCTS_DIR)/../Release-iphonesimulator/VolyAgent.dylib",
+				"$(BUILT_PRODUCTS_DIR)/../Debug-iphonesimulator/VolyLaunchBridge.dylib",
+				"$(BUILT_PRODUCTS_DIR)/../Release-iphonesimulator/VolyLaunchBridge.dylib",
 			);
-			name = "Embed VolyAgent.dylib";
+			name = "Embed Simulator Dylibs";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/VolyAgent.dylib",
+				"$(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/VolyLaunchBridge.dylib",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nPARENT=\"$(dirname \"$BUILT_PRODUCTS_DIR\")\"\nCANDIDATES=\"$PARENT/Debug-iphonesimulator/VolyAgent.dylib $PARENT/Release-iphonesimulator/VolyAgent.dylib\"\nSRC=\"\"\nfor c in $CANDIDATES; do\n  if [ -f \"$c\" ]; then SRC=\"$c\"; break; fi\ndone\nif [ -z \"$SRC\" ]; then\n  echo \"error: VolyAgent.dylib not found. Build VolyAgentDylib first.\"\n  echo \"Searched: $CANDIDATES\"\n  exit 1\nfi\nDST_DIR=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DST_DIR\"\ncp -f \"$SRC\" \"$DST_DIR/VolyAgent.dylib\"\necho \"Embedded $SRC -> $DST_DIR/VolyAgent.dylib\"\n";
+			shellScript = "set -e\n# Voly.app carries two iOS Simulator dylibs in Resources:\n#   VolyAgent.dylib        - the inspection agent loaded into apps\n#   VolyLaunchBridge.dylib - loaded into the simulator's runningboardd\nPARENT=\"$(dirname \"$BUILT_PRODUCTS_DIR\")\"\nDST_DIR=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DST_DIR\"\nfor NAME in VolyAgent.dylib VolyLaunchBridge.dylib; do\n  SRC=\"\"\n  for CONFIG in Debug Release; do\n    CANDIDATE=\"$PARENT/$CONFIG-iphonesimulator/$NAME\"\n    if [ -f \"$CANDIDATE\" ]; then SRC=\"$CANDIDATE\"; break; fi\n  done\n  if [ -z \"$SRC\" ]; then\n    echo \"error: $NAME not found under $PARENT/{Debug,Release}-iphonesimulator. Build its target first.\"\n    exit 1\n  fi\n  cp -f \"$SRC\" \"$DST_DIR/$NAME\"\n  echo \"Embedded $SRC -> $DST_DIR/$NAME\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -566,6 +675,21 @@
 				38195BB429E5E25B9AE1E893 /* Framing.swift in Sources */,
 				B04A9501C0474D941BE00E6B /* Messages.swift in Sources */,
 				EE830DA32EE43254EDCD9FAF /* VolyAgentLoader.m in Sources */,
+				EE22020A84CC8BF2084A23BF /* LocalizationOverrideStore.swift in Sources */,
+				B8B26A599D9505E0244CEDDC /* LocalizedStringIndex.swift in Sources */,
+				B61685CA516054EB8F903619 /* VolyLocalizationManager.swift in Sources */,
+				DACD14D1A81B10D1FE18066F /* VolyNavigationController.swift in Sources */,
+				E4DF655999BF4E0681FB9588 /* ScreenshotRenderer.swift in Sources */,
+				B6B41EDCB0C707925B5603D5 /* SourceCandidateResolver.swift in Sources */,
+				0C5C04EF39AE4AD570F53A32 /* RuntimeFeatures.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21CDEC330E5293DB1C42B21E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5BB846A44F879B5622A00FF5 /* VolyLaunchBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -577,6 +701,12 @@
 			name = VolyAgentDylib;
 			target = CF5AAFD42F97BB5200B39BA0 /* VolyAgentDylib */;
 			targetProxy = A16CC7CDDCB30E0E14690F02 /* PBXContainerItemProxy */;
+		};
+		66DD5B1DA4BCEE60D80FF5AD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = VolyLaunchBridge;
+			target = E754C1B99B618A1A0A391740 /* VolyLaunchBridge */;
+			targetProxy = 0DF88D3D9E2C19307E7BD8A6 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -923,6 +1053,78 @@
 			};
 			name = Release;
 		};
+		912D54840774C903AD3DE302 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				EXECUTABLE_PREFIX = "";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "@rpath";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_DYLIB_INSTALL_NAME = "@rpath/VolyLaunchBridge.dylib";
+				MACH_O_TYPE = mh_dylib;
+				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyLaunchBridge;
+				PRODUCT_NAME = VolyLaunchBridge;
+				SDKROOT = iphonesimulator;
+				SKIP_INSTALL = NO;
+				STRIP_INSTALLED_PRODUCT = NO;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		F571D9CA6613764D48968B16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				EXECUTABLE_PREFIX = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "@rpath";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_DYLIB_INSTALL_NAME = "@rpath/VolyLaunchBridge.dylib";
+				MACH_O_TYPE = mh_dylib;
+				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyLaunchBridge;
+				PRODUCT_NAME = VolyLaunchBridge;
+				SDKROOT = iphonesimulator;
+				SKIP_INSTALL = NO;
+				STRIP_INSTALLED_PRODUCT = NO;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -958,6 +1160,15 @@
 			buildConfigurations = (
 				CF5AAFDB2F97BB5200B39BA0 /* Debug */,
 				CF5AAFDC2F97BB5200B39BA0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3019BF3DEDCD981DA7FA9759 /* Build configuration list for PBXNativeTarget "VolyLaunchBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				912D54840774C903AD3DE302 /* Debug */,
+				F571D9CA6613764D48968B16 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -26,6 +26,15 @@ static void VolyAgentLoader_Install(void) {
         return;
     }
 
+    // The app opted into the agent it links itself (VolyAgent.start/wrap).
+    // Two agents in one process would fight over overlays and ports, so the
+    // injected copy stays dormant and the SDK one serves this process.
+    const char *sdk = getenv("VOLY_AGENT_ENABLED");
+    if (sdk != NULL && strcmp(sdk, "1") == 0) {
+        NSLog(@"[VolyAgent] VOLY_AGENT_ENABLED=1 — injected agent standing down for the SDK agent");
+        return;
+    }
+
     NSLog(@"[VolyAgent] loader installed in pid %d", getpid());
 
     gVolyDidFinishLaunchingObserver = [[NSNotificationCenter defaultCenter]

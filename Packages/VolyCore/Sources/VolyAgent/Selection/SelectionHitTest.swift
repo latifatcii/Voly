@@ -52,7 +52,7 @@ public enum SelectionHitTest {
     /// Blocklist of UIKit-internal UIWindow subclasses we don't want to
     /// accept clicks against. Class-name match (string) avoids a compile-time
     /// dependency on private headers.
-    private static func isSystemWindow(_ window: UIWindow) -> Bool {
+    static func isSystemWindow(_ window: UIWindow) -> Bool {
         let name = String(describing: type(of: window))
         if name == "UITextEffectsWindow" { return true }
         if name == "UIRemoteKeyboardWindow" { return true }

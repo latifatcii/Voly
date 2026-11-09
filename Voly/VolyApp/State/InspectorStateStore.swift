@@ -1,8 +1,22 @@
 import Foundation
+import VolyHost
 import VolyModels
+import VolyProtocol
 
 enum ConnectionStatus: String, Sendable {
     case disconnected, connecting, connected
+}
+
+/// Progress of Jump to Source for one selection.
+enum SourceLookupState: Equatable {
+    case idle
+    case resolving(ObjectID)
+    case resolved(ObjectID, SourceLookup)
+}
+
+struct ActionStatus: Equatable {
+    let message: String
+    let isError: Bool
 }
 
 @MainActor
@@ -20,6 +34,34 @@ final class InspectorStateStore {
     var constraints: [ConstraintNode] = []
     var userDefaults: [UserDefaultsItem] = []
     var urlHistory: [URL] = []
+
+    /// Identity + capabilities of the agent the inspector is driving.
+    var agent: HandshakeAccepted?
+    /// Peer the inspector is driving, and every peer with a live connection.
+    var activePeerID: String?
+    var connectedPeerIDs: Set<String> = []
+
+    var localization: LocalizationState?
+    var navigation: NavigationState = .unavailable
+    var sourceLookup: SourceLookupState = .idle
+    /// Outcome of the last screenshot / navigation / localization action.
+    var actionStatus: ActionStatus?
+
+    /// Drop everything that belongs to one app when switching to another.
+    func resetForNewAgent() {
+        hierarchy = nil
+        selectedViewID = nil
+        pickModeActive = false
+        expandedNodeIDs = []
+        propertyBag = nil
+        constraints = []
+        userDefaults = []
+        agent = nil
+        localization = nil
+        navigation = .unavailable
+        sourceLookup = .idle
+        actionStatus = nil
+    }
 
     /// Merge a refreshed subtree into our cached hierarchy so the UI reflects new values.
     func merge(subtree: ViewNode) {

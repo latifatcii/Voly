@@ -16,6 +16,7 @@ actor WebSocketClient {
         case agentError(InspectorError)
         case unexpectedResponse
         case connectionFailed(String)
+        case wrongProcess(expected: String, actual: String)
 
         var errorDescription: String? {
             switch self {
@@ -24,6 +25,8 @@ actor WebSocketClient {
             case .agentError(let e): return e.humanDescription
             case .unexpectedResponse: return "Unexpected response shape."
             case .connectionFailed(let s): return s
+            case .wrongProcess(let expected, let actual):
+                return "Connected to \(actual) but expected \(expected); the app was probably relaunched."
             }
         }
     }
@@ -40,7 +43,20 @@ actor WebSocketClient {
         eventContinuation = cont
     }
 
-    func connect(to endpoint: NWEndpoint) async throws {
+    /// Identity the agent reported in its handshake. Every command sent on
+    /// this client goes to exactly this process.
+    private(set) var agent: HandshakeAccepted?
+
+    /// - Parameters:
+    ///   - authToken: session token from the agent's port file.
+    ///   - expectedPID: when known (port-file peers), the handshake must come
+    ///     from this pid — a reused port must not be mistaken for the app.
+    @discardableResult
+    func connect(
+        to endpoint: NWEndpoint,
+        authToken: String? = nil,
+        expectedPID: Int32? = nil
+    ) async throws -> HandshakeAccepted {
         log.info("connect to \(String(describing: endpoint), privacy: .public)")
         let params = NWParameters(tls: nil)
         let options = NWProtocolWebSocket.Options()
@@ -98,11 +114,27 @@ actor WebSocketClient {
         receiveLoop()
 
         // Handshake
-        let handshake = HandshakeRequest(clientName: "Voly.app", clientVersion: "0.1.0")
-        let response = try await send(.handshake(handshake))
-        guard case .handshakeAccepted = response else {
+        let handshake = HandshakeRequest(clientName: "Voly.app", clientVersion: "0.1.0", authToken: authToken)
+        let response: Response
+        do {
+            response = try await send(.handshake(handshake))
+        } catch {
+            disconnect()
+            throw error
+        }
+        guard case .handshakeAccepted(let accepted) = response else {
+            disconnect()
             throw ClientError.unexpectedResponse
         }
+        if let expectedPID, let actual = accepted.pid, actual != expectedPID {
+            disconnect()
+            throw ClientError.wrongProcess(
+                expected: "pid \(expectedPID)",
+                actual: "\(accepted.processName) pid \(actual)"
+            )
+        }
+        agent = accepted
+        return accepted
     }
 
     func disconnect() {
@@ -112,6 +144,7 @@ actor WebSocketClient {
             cont.resume(throwing: ClientError.notConnected)
         }
         pending.removeAll()
+        eventContinuation?.finish()
     }
 
     @discardableResult
@@ -169,6 +202,7 @@ actor WebSocketClient {
             log.error("receive error: \(String(describing: error), privacy: .public)")
             for cont in pending.values { cont.resume(throwing: error) }
             pending.removeAll()
+            eventContinuation?.finish()
             return
         }
         if let data, !data.isEmpty {
@@ -206,6 +240,11 @@ actor WebSocketClient {
         }
         if !isComplete || data != nil {
             await receiveOne()
+        } else {
+            // Peer closed: fail anything in flight and end the event stream.
+            for cont in pending.values { cont.resume(throwing: ClientError.notConnected) }
+            pending.removeAll()
+            eventContinuation?.finish()
         }
     }
 }

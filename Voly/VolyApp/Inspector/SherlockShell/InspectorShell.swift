@@ -1,5 +1,6 @@
 import SwiftUI
 import VolyModels
+import VolyProtocol
 
 struct InspectorShell: View {
     @Bindable var session: InspectorSession
@@ -8,6 +9,9 @@ struct InspectorShell: View {
     var body: some View {
         VStack(spacing: 0) {
             topStatusBar
+            if let status = session.state.actionStatus {
+                actionStatusLine(status)
+            }
             Divider()
             if session.state.pickModeActive && session.state.selectedViewID == nil {
                 Label("Click a view on the simulator to select; hover others to measure",
@@ -19,7 +23,10 @@ struct InspectorShell: View {
             }
             if let node = currentNode(), pane.currentTab.requiresSelection {
                 DetailHeader(node: node, pane: pane, measurement: session.measurement,
-                             lastSummary: session.lastMeasurementSummary)
+                             lastSummary: session.lastMeasurementSummary,
+                             source: session.state.sourceLookup,
+                             onJumpToSource: { Task { await session.jumpToSource() } },
+                             onOpenSource: { location in Task { await session.openSource(location) } })
             }
             TopTabBar(pane: pane, hasSelection: session.state.selectedViewID != nil)
             Divider()
@@ -61,8 +68,12 @@ struct InspectorShell: View {
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(statusHelp)
             }
             Spacer()
+            RuntimeActionsBar(session: session)
             Button {
                 Task {
                     if session.state.pickModeActive { await session.exitPickMode() }
@@ -129,8 +140,48 @@ struct InspectorShell: View {
         switch session.state.connectionStatus {
         case .disconnected: return "Disconnected"
         case .connecting: return "Connecting…"
-        case .connected: return "Connected"
+        case .connected:
+            return session.state.agent?.processName ?? "Connected"
         }
+    }
+
+    /// Which process the inspector is talking to, and how its agent got there.
+    private var statusHelp: String {
+        guard session.state.connectionStatus == .connected, let agent = session.state.agent else {
+            return statusText
+        }
+        var parts = [agent.bundleIdentifier ?? agent.processName]
+        if let pid = agent.pid { parts.append("pid \(pid)") }
+        if let udid = agent.simulatorUDID { parts.append("simulator \(udid)") }
+        if let capabilities = agent.capabilities {
+            parts.append(capabilities.injectionMode == .injected ? "agent loaded automatically" : "agent linked into the app")
+            if !capabilities.previewHost {
+                parts.append("resizable preview needs VolyAgent.wrap in the app")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func actionStatusLine(_ status: ActionStatus) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: status.isError ? "exclamationmark.triangle" : "checkmark.circle")
+                .foregroundStyle(status.isError ? .orange : .green)
+            Text(status.message)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .textSelection(.enabled)
+            Spacer(minLength: 0)
+            Button {
+                session.state.actionStatus = nil
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tertiary)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
     }
 
     private var statusColor: Color {

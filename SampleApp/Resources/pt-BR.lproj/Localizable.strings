@@ -1,0 +1,17 @@
+/* Deliberately incomplete: "loc.subtitle" is missing to exercise fallback. */
+"loc.title" = "Localização";
+"loc.greeting" = "Bem-vindo ao Voly";
+"loc.modern" = "Carregado com String(localized:)";
+"loc.button.details" = "Mostrar detalhes";
+"loc.button.present" = "Apresentar folha";
+"loc.placeholder.name" = "Seu nome";
+"loc.segment.first" = "Primeiro";
+"loc.segment.second" = "Segundo";
+"loc.items.format" = "Você tem %d novas mensagens";
+"loc.swiftui.greeting" = "Olá do SwiftUI";
+"loc.detail.title" = "Detalhes";
+"loc.detail.body" = "Esta tela foi empilhada.";
+"loc.sheet.title" = "Folha";
+"loc.sheet.body" = "Esta folha foi apresentada modalmente.";
+"loc.sheet.close" = "Fechar";
+"loc.sheet.more" = "Mais";

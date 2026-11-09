@@ -1,8 +1,12 @@
 import Foundation
 
-/// Installs `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES` at the user-session level
-/// via `launchctl setenv`. Every subsequent simctl-driven simulator launch
-/// inherits the var and loads `VolyAgent.dylib` before the app's main runs.
+/// Legacy mechanism, kept only so it can be cleaned up.
+///
+/// Older Voly builds set `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES` for the whole
+/// user session via `launchctl setenv`. That reached every simulator and
+/// every simctl launch on the Mac and still missed Xcode's debug launches.
+/// Per-simulator integration (`VolyInjectionCoordinator`) replaces it; Voly
+/// now only calls `removeLegacyInstall()` on start.
 public struct AutoAttachInstaller: Sendable {
     public enum State: Equatable, Sendable {
         case enabled(dylibPath: String)
@@ -44,6 +48,24 @@ public struct AutoAttachInstaller: Sendable {
             arguments: ["setenv", Self.envVarName, bundledDylibPath],
             environment: nil
         )
+    }
+
+    /// Unset the session-wide variable if (and only if) a Voly build set it.
+    /// A value some other tool put there is left alone. Returns true when
+    /// something was removed.
+    @discardableResult
+    public func removeLegacyInstall() async throws -> Bool {
+        switch try await currentState() {
+        case .enabled:
+            try await uninstall()
+            return true
+        case .foreign(let value) where value.hasSuffix("/VolyAgent.dylib"):
+            // A previous Voly.app location or build.
+            try await uninstall()
+            return true
+        case .foreign, .disabled:
+            return false
+        }
     }
 
     public func uninstall() async throws {

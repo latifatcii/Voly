@@ -21,6 +21,17 @@ final class ConnectionManager {
         let displayName: String
         let endpoint: NWEndpoint
         let source: Source
+        /// Known up front for port-file peers; used to check the handshake
+        /// really came from this app instance.
+        var bundleIdentifier: String?
+        var pid: Int32?
+        /// Session token the agent expects in the handshake.
+        var token: String?
+
+        var deviceUDID: String? {
+            if case .portFile(let udid) = source { return udid }
+            return nil
+        }
     }
 
     private(set) var peers: [Peer] = []
@@ -90,9 +101,12 @@ final class ConnectionManager {
             // peer and auto-reconnect never happens.
             return Peer(
                 id: "file:\(agent.deviceUDID):\(agent.bundleIdentifier):\(agent.pid)",
-                displayName: "\(agent.processName) (injected)",
+                displayName: agent.processName,
                 endpoint: .hostPort(host: .ipv4(.loopback), port: port),
-                source: .portFile(deviceUDID: agent.deviceUDID)
+                source: .portFile(deviceUDID: agent.deviceUDID),
+                bundleIdentifier: agent.bundleIdentifier,
+                pid: agent.pid,
+                token: agent.token
             )
         }
         recomputeAndAnnounce()

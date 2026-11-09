@@ -18,8 +18,18 @@ final class InspectorSession {
     let state = InspectorStateStore()
     let measurement = MeasurementPane()
     let hoverMonitor = SimulatorHoverMonitor()
+    /// The connection the inspector UI is driving.
     private var client: WebSocketClient?
+    /// Every live agent connection, keyed by peer id. Several apps can stay
+    /// connected at once; `client` is the one commands currently go to, and
+    /// each client is bound to the single process its handshake verified.
+    private var clients: [ConnectionManager.Peer.ID: WebSocketClient] = [:]
+    private static let maxPooledConnections = 4
     private var selectedPeer: ConnectionManager.Peer?
+    /// Booted simulators and their per-simulator runtime integration.
+    let simulators = VolySimulatorManager()
+    let sourceNavigator = VolySourceNavigator()
+    let screenshots = VolyScreenshotManager()
     var lastError: String?
     var lastMeasurementSummary: MeasurementSummary?
 
@@ -50,40 +60,80 @@ final class InspectorSession {
     }
 
     func connect(to peer: ConnectionManager.Peer) async {
-        selectedPeer = peer
-        state.connectionStatus = .connecting
         lastError = nil
+        if state.activePeerID == peer.id, client != nil { return }
+        await leaveActiveAgent()
+        selectedPeer = peer
+
+        if let pooled = clients[peer.id] {
+            await activate(pooled, peerID: peer.id)
+            return
+        }
+        state.connectionStatus = .connecting
         let client = WebSocketClient()
-        self.client = client
         do {
-            try await client.connect(to: peer.endpoint)
-            state.connectionStatus = .connected
-            pumpEvents(client: client)
-            await refreshHierarchy()
+            try await client.connect(to: peer.endpoint, authToken: peer.token, expectedPID: peer.pid)
+            await adopt(client, peerID: peer.id)
+            log.notice("connected to \(peer.displayName, privacy: .public) pid=\(peer.pid ?? -1) sim=\(peer.deviceUDID ?? "-", privacy: .public)")
         } catch {
             state.connectionStatus = .disconnected
             lastError = error.localizedDescription
+            log.error("connect to \(peer.displayName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     func connectManually(host: String, port: UInt16) async {
-        state.connectionStatus = .connecting
         lastError = nil
+        await leaveActiveAgent()
+        state.connectionStatus = .connecting
         let client = WebSocketClient()
-        self.client = client
         let endpoint = Network.NWEndpoint.hostPort(
             host: Network.NWEndpoint.Host(host),
             port: Network.NWEndpoint.Port(rawValue: port)!
         )
         do {
             try await client.connect(to: endpoint)
-            state.connectionStatus = .connected
-            pumpEvents(client: client)
-            await refreshHierarchy()
+            await adopt(client, peerID: "manual:\(host):\(port)")
         } catch {
             state.connectionStatus = .disconnected
             lastError = error.localizedDescription
         }
+    }
+
+    /// Add a freshly handshaken client to the pool and make it active.
+    private func adopt(_ client: WebSocketClient, peerID: String) async {
+        if clients.count >= Self.maxPooledConnections,
+           let evicted = clients.keys.first(where: { $0 != state.activePeerID }) {
+            await clients.removeValue(forKey: evicted)?.disconnect()
+        }
+        clients[peerID] = client
+        pumpEvents(client: client, peerID: peerID)
+        await activate(client, peerID: peerID)
+    }
+
+    private func activate(_ client: WebSocketClient, peerID: String) async {
+        self.client = client
+        state.resetForNewAgent()
+        measurement.reset()
+        lastMeasurementSummary = nil
+        state.agent = await client.agent
+        state.activePeerID = peerID
+        state.connectedPeerIDs = Set(clients.keys)
+        state.connectionStatus = .connected
+        await refreshHierarchy()
+        await refreshRuntimeState()
+    }
+
+    /// Before switching apps: don't leave pick mode or overlays behind in the
+    /// app we stop driving. Its connection stays in the pool.
+    private func leaveActiveAgent() async {
+        guard let client else { return }
+        hoverMonitor.stop()
+        if state.pickModeActive { _ = try? await client.send(.exitPickMode) }
+        _ = try? await client.send(.clearMeasure)
+        _ = try? await client.send(.clearSelection)
+        self.client = nil
+        state.activePeerID = nil
     }
 
     func reconnect() async {
@@ -94,10 +144,13 @@ final class InspectorSession {
 
     func disconnect() async {
         hoverMonitor.stop()
-        await client?.disconnect()
+        for pooled in clients.values { await pooled.disconnect() }
+        clients.removeAll()
         client = nil
         state.connectionStatus = .disconnected
-        state.pickModeActive = false
+        state.resetForNewAgent()
+        state.activePeerID = nil
+        state.connectedPeerIDs = []
         measurement.reset()
         // Explicit disconnect disables auto-connect until next launch/toggle.
         autoConnectEnabled = false
@@ -120,6 +173,9 @@ final class InspectorSession {
             let devices = try await SimInventory().listDevices(bootedOnly: true)
             let agents = portFileWatcher.scan(deviceUDIDs: devices.map(\.udid))
             connections.updateFileDiscoveredPeers(agents)
+            // The user navigates in the simulator too; keep the Dismiss/Pop
+            // buttons honest without hooking anything in the app.
+            if client != nil { await refreshNavigationState() }
         } catch {
             log.error("pollPortFiles: \(String(describing: error), privacy: .public)")
         }
@@ -167,6 +223,7 @@ final class InspectorSession {
         // handler in HierarchyBrowser can then just scroll.
         state.expandAncestors(of: id)
         log.info("select: expandedNodeIDs=\(self.state.expandedNodeIDs)")
+        if state.selectedViewID != id { state.sourceLookup = .idle }
         state.selectedViewID = id
         // Mirror the selection onto the device overlay so the user sees the
         // same view highlighted in the simulator. Fire-and-forget — the
@@ -274,6 +331,7 @@ final class InspectorSession {
 
     func clearSelection() async {
         state.selectedViewID = nil
+        state.sourceLookup = .idle
         _ = try? await client?.send(.clearSelection)
     }
 
@@ -378,14 +436,191 @@ final class InspectorSession {
         _ = try? await client.send(.measure(overlay: overlay))
     }
 
+    // MARK: - Runtime features
+
+    /// Simulator the active agent runs in, if it is a simulator app.
+    var activeSimulatorUDID: String? {
+        state.agent?.simulatorUDID ?? selectedPeer?.deviceUDID
+    }
+
+    /// Localization + navigation state for the newly active agent.
+    private func refreshRuntimeState() async {
+        await refreshLocalizationState()
+        await refreshNavigationState()
+    }
+
+    func refreshLocalizationState() async {
+        guard let client else { return }
+        if case .localization(let localization)? = try? await client.send(.localizationState),
+           client === self.client {
+            state.localization = localization
+        }
+    }
+
+    /// `language == nil` restores the app's own language behaviour.
+    func setLocalization(language: String?, layoutDirection: LayoutDirectionMode) async {
+        guard let client else { return }
+        let request = LocalizationOverrideRequest(
+            language: language, layoutDirectionMode: layoutDirection, refreshUI: true
+        )
+        do {
+            let response = try await client.send(.setLocalizationOverride(request))
+            guard case .localization(let localization) = response, client === self.client else { return }
+            state.localization = localization
+            state.actionStatus = ActionStatus(message: Self.describe(localization), isError: false)
+            log.notice("localization override: \(language ?? "system", privacy: .public)")
+            await refreshHierarchy()
+        } catch {
+            state.actionStatus = ActionStatus(message: error.localizedDescription, isError: true)
+        }
+    }
+
+    func refreshLocalizedUI() async {
+        guard let client else { return }
+        do {
+            let response = try await client.send(.refreshLocalizedUI)
+            guard case .localization(let localization) = response, client === self.client else { return }
+            state.localization = localization
+            state.actionStatus = ActionStatus(message: Self.describe(localization), isError: false)
+            await refreshHierarchy()
+        } catch {
+            state.actionStatus = ActionStatus(message: error.localizedDescription, isError: true)
+        }
+    }
+
+    private static func describe(_ localization: LocalizationState) -> String {
+        let language = localization.activeOverride.map { code in
+            localization.available.first { $0.code == code }?.displayName ?? code
+        } ?? "System language"
+        guard let refresh = localization.lastRefresh else { return language }
+        var parts = ["\(language): \(refresh.updated) updated"]
+        if refresh.unresolved > 0 { parts.append("\(refresh.unresolved) not refreshable in place") }
+        if refresh.ambiguous > 0 { parts.append("\(refresh.ambiguous) ambiguous") }
+        return parts.joined(separator: ", ")
+    }
+
+    func refreshNavigationState() async {
+        guard let client else { return }
+        if case .navigationState(let navigation)? = try? await client.send(.navigationState),
+           client === self.client, state.navigation != navigation {
+            state.navigation = navigation
+        }
+    }
+
+    func navigate(_ action: NavigationAction) async {
+        guard let client else { return }
+        do {
+            let response = try await client.send(.navigate(action))
+            guard case .navigationResult(let result) = response, client === self.client else { return }
+            state.navigation = result.state
+            log.notice("navigate \(action.rawValue, privacy: .public): performed=\(result.performed) \(result.message ?? "", privacy: .public)")
+            if result.performed {
+                state.actionStatus = nil
+                // Let the transition settle, then show the new screen.
+                try? await Task.sleep(for: .milliseconds(650))
+                guard client === self.client else { return }
+                await refreshNavigationState()
+                await refreshHierarchy()
+            } else {
+                state.actionStatus = ActionStatus(message: result.message ?? "Not available.", isError: true)
+            }
+        } catch {
+            state.actionStatus = ActionStatus(message: error.localizedDescription, isError: true)
+        }
+    }
+
+    /// Resolve the selection to source and open the best answer in Xcode.
+    /// When the same class maps to several files the choice is left to the
+    /// user, in the header.
+    func jumpToSource() async {
+        guard let client, let id = state.selectedViewID else { return }
+        if case .resolved(id, let lookup) = state.sourceLookup, let best = lookup.locations.first,
+           !lookup.isAmbiguous {
+            await openSource(best)
+            return
+        }
+        state.sourceLookup = .resolving(id)
+        do {
+            let response = try await client.send(.resolveSource(objectID: id))
+            guard case .sourceInfo(let info) = response else { throw WebSocketClient.ClientError.unexpectedResponse }
+            let lookup = await sourceNavigator.resolve(info)
+            guard state.selectedViewID == id, client === self.client else { return }
+            state.sourceLookup = .resolved(id, lookup)
+            log.notice("source lookup for \(info.className, privacy: .public): \(lookup.locations.count) location(s)")
+            if let best = lookup.locations.first, !lookup.isAmbiguous { await openSource(best) }
+        } catch {
+            guard state.selectedViewID == id else { return }
+            state.sourceLookup = .resolved(id, SourceLookup(locations: [], note: error.localizedDescription))
+        }
+    }
+
+    func openSource(_ location: SourceLocation) async {
+        do {
+            try await sourceNavigator.open(location)
+        } catch {
+            state.actionStatus = ActionStatus(message: error.localizedDescription, isError: true)
+        }
+    }
+
+    func captureScreenshot(_ mode: VolyScreenshotManager.Mode, to destination: VolyScreenshotManager.Destination) async {
+        let appName = state.agent?.processName ?? selectedPeer?.displayName
+        do {
+            let image: VolyScreenshotManager.Capture
+            switch mode {
+            case .fullSimulator:
+                guard let udid = await resolveScreenshotSimulator() else {
+                    throw VolyScreenshotManager.CaptureError.noSimulator
+                }
+                // The framebuffer is always device-upright; ask the app which
+                // way its interface is turned so the saved image matches.
+                var orientation = InterfaceOrientation.unknown
+                if let client, activeSimulatorUDID == udid,
+                   case .screenInfo(let info)? = try? await client.send(.screenInfo) {
+                    orientation = info.orientation
+                }
+                image = try await screenshots.captureSimulator(udid: udid, orientation: orientation)
+            case .application:
+                guard let client else { throw WebSocketClient.ClientError.notConnected }
+                guard case .screenshot(let shot) = try await client.send(.captureScreenshot(.application)) else {
+                    throw WebSocketClient.ClientError.unexpectedResponse
+                }
+                image = .init(png: shot.png, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
+            case .selectedView:
+                guard let client else { throw WebSocketClient.ClientError.notConnected }
+                guard let id = state.selectedViewID else { throw VolyScreenshotManager.CaptureError.noSelection }
+                guard case .screenshot(let shot) = try await client.send(.captureScreenshot(.view(id))) else {
+                    throw WebSocketClient.ClientError.unexpectedResponse
+                }
+                image = .init(png: shot.png, pixelWidth: shot.pixelWidth, pixelHeight: shot.pixelHeight)
+            }
+            let subject = mode == .selectedView
+                ? state.selectedViewID.flatMap { state.findNode(id: $0)?.className }
+                : nil
+            let message = try screenshots.deliver(image, mode: mode, appName: appName, subject: subject, to: destination)
+            state.actionStatus = ActionStatus(message: message, isError: false)
+            log.notice("screenshot \(String(describing: mode), privacy: .public): \(image.pixelWidth)x\(image.pixelHeight)")
+        } catch {
+            state.actionStatus = ActionStatus(message: error.localizedDescription, isError: true)
+            log.error("screenshot \(String(describing: mode), privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func resolveScreenshotSimulator() async -> String? {
+        if let udid = activeSimulatorUDID { return udid }
+        return try? await SimInventory().listDevices(bootedOnly: true).first?.udid
+    }
+
     // MARK: - Events
 
-    private func pumpEvents(client: WebSocketClient) {
+    private func pumpEvents(client: WebSocketClient, peerID: String) {
         Task { @MainActor [weak self] in
-            log.info("pumpEvents: started")
+            log.info("pumpEvents: started for \(peerID, privacy: .public)")
             for await event in client.events {
-                log.notice("event received: \(String(describing: event), privacy: .public)")
                 guard let self else { return }
+                // Pooled background connections stay quiet; only the app the
+                // inspector is driving may change its state.
+                guard client === self.client else { continue }
+                log.notice("event received: \(String(describing: event), privacy: .public)")
                 switch event {
                 case .selectionChanged(let id):
                     if self.state.selectedViewID == id {
@@ -403,25 +638,38 @@ final class InspectorSession {
                     self.measurement.hoverID = id
                 }
             }
-            log.info("pumpEvents: stream ended")
-            // The client's event stream ends when the connection closes. Reset
-            // state so the watcher's next scan can auto-connect to a new peer
-            // (e.g. after the injected app was relaunched with a new pid).
+            log.info("pumpEvents: stream ended for \(peerID, privacy: .public)")
+            // The stream ends when the connection closes (app terminated,
+            // relaunched, or simulator shut down).
             guard let self else { return }
+            if self.clients[peerID] === client { self.clients[peerID] = nil }
+            self.state.connectedPeerIDs = Set(self.clients.keys)
+            guard client === self.client else { return }
+            self.hoverMonitor.stop()
+            self.client = nil
             self.state.connectionStatus = .disconnected
+            self.state.resetForNewAgent()
+            self.state.activePeerID = nil
             self.hasAutoConnected = false
             self.lastError = nil
-            self.client = nil
             // A new peer may have already been announced while we were still
             // connected (race: new app's port file appears before the old
             // connection's TCP reset arrives). In that case onPeerAppeared
             // won't re-fire, so reach into the current peer list and pick up
-            // whatever's there.
-            if self.autoConnectEnabled, let peer = self.connections.peers.first {
-                self.hasAutoConnected = true
-                log.notice("pumpEvents: reconnecting to known peer \(peer.displayName, privacy: .public)")
-                Task { [weak self] in
-                    await self?.connect(to: peer)
+            // whatever's there — preferring a relaunch of the same app.
+            if self.autoConnectEnabled {
+                let previous = self.selectedPeer
+                let peers = self.connections.peers.filter { $0.id != peerID }
+                let next = peers.first {
+                    $0.bundleIdentifier != nil && $0.bundleIdentifier == previous?.bundleIdentifier
+                        && $0.deviceUDID == previous?.deviceUDID
+                } ?? peers.first
+                if let next {
+                    self.hasAutoConnected = true
+                    log.notice("pumpEvents: reconnecting to known peer \(next.displayName, privacy: .public)")
+                    Task { [weak self] in
+                        await self?.connect(to: next)
+                    }
                 }
             }
         }
