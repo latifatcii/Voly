@@ -32,6 +32,12 @@ import java.util.Map;
  * app's configuration and recreating the activities, for as long as the
  * process lives.
  *
+ * The per-app language is also what the user sets in Settings and what an
+ * app sets for itself. Only a language set from here counts as Voly's
+ * override, and undoing it puts back what was there before rather than
+ * clearing it; a note in the app's cache directory says which is which
+ * across launches.
+ *
  * A forced layout direction (left-to-right text in a right-to-left layout,
  * or the reverse) is applied to every window's root view and re-applied as
  * activities come and go.
@@ -40,6 +46,11 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
     private final Application application;
     /** Language tag set on platforms without per-app languages. */
     private String legacyOverride;
+    /** Android 13+: the per-app language Voly set, and the app's own from before (language tags). */
+    private String platformOverride;
+    private String platformBefore = "";
+    private boolean platformOverrideRead;
+    private static final String NOTE = "voly-language.json";
     private String directionMode = "system";
     private boolean lifecycleRegistered;
 
@@ -60,7 +71,7 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
             Json.put(language, "isRightToLeft", TextUtils.getLayoutDirectionFromLocale(locale) == View.LAYOUT_DIRECTION_RTL);
             available.put(language);
         }
-        Locale system = Resources.getSystem().getConfiguration().getLocales().get(0);
+        Locale system = systemLocale();
 
         JSONObject state = Json.object();
         Json.put(state, "available", available);
@@ -79,15 +90,92 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
 
     private String activeOverride() {
         if (Build.VERSION.SDK_INT >= 33) {
+            readNote();
+            if (platformOverride == null) return null;
             try {
                 android.app.LocaleManager manager = application.getSystemService(android.app.LocaleManager.class);
                 LocaleList locales = manager != null ? manager.getApplicationLocales() : null;
-                if (locales != null && !locales.isEmpty()) return locales.get(0).toLanguageTag();
+                if (locales != null && !locales.isEmpty() && locales.get(0).toLanguageTag().equals(platformOverride)) {
+                    return platformOverride;
+                }
             } catch (Throwable ignored) {
             }
+            // Changed since, in Settings or by the app: it is theirs now.
+            forgetOverride();
             return null;
         }
         return legacyOverride;
+    }
+
+    /** The device's language, whatever language the app itself is in. */
+    private Locale systemLocale() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            try {
+                android.app.LocaleManager manager = application.getSystemService(android.app.LocaleManager.class);
+                LocaleList system = manager != null ? manager.getSystemLocales() : null;
+                if (system != null && !system.isEmpty()) return system.get(0);
+            } catch (Throwable ignored) {
+            }
+        }
+        return Resources.getSystem().getConfiguration().getLocales().get(0);
+    }
+
+    // MARK: What Voly set, across launches
+
+    private java.io.File noteFile() {
+        return new java.io.File(application.getCacheDir(), NOTE);
+    }
+
+    private void readNote() {
+        if (platformOverrideRead) return;
+        platformOverrideRead = true;
+        android.os.StrictMode.ThreadPolicy policy = android.os.StrictMode.allowThreadDiskReads();
+        try {
+            java.io.File file = noteFile();
+            if (!file.isFile()) return;
+            byte[] bytes = new byte[(int) Math.min(file.length(), 4096)];
+            try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+                int read = in.read(bytes);
+                JSONObject note = new JSONObject(new String(bytes, 0, Math.max(read, 0), "UTF-8"));
+                String set = note.optString("set", "");
+                if (!set.isEmpty()) {
+                    platformOverride = set;
+                    platformBefore = note.optString("before", "");
+                }
+            }
+        } catch (Throwable e) {
+            Log.w("could not read " + NOTE + ": " + e);
+        } finally {
+            android.os.StrictMode.setThreadPolicy(policy);
+        }
+    }
+
+    private void rememberOverride(String set, String before) {
+        platformOverride = set;
+        platformBefore = before;
+        android.os.StrictMode.ThreadPolicy policy = android.os.StrictMode.allowThreadDiskWrites();
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(noteFile())) {
+            JSONObject note = Json.object();
+            Json.put(note, "set", set);
+            Json.put(note, "before", before);
+            out.write(note.toString().getBytes("UTF-8"));
+        } catch (Throwable e) {
+            Log.w("could not write " + NOTE + ": " + e);
+        } finally {
+            android.os.StrictMode.setThreadPolicy(policy);
+        }
+    }
+
+    private void forgetOverride() {
+        platformOverride = null;
+        platformBefore = "";
+        android.os.StrictMode.ThreadPolicy policy = android.os.StrictMode.allowThreadDiskWrites();
+        try {
+            noteFile().delete();
+        } catch (Throwable ignored) {
+        } finally {
+            android.os.StrictMode.setThreadPolicy(policy);
+        }
     }
 
     private boolean isLayoutRightToLeft() {
@@ -165,15 +253,28 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
         if (Build.VERSION.SDK_INT >= 33) {
             try {
                 android.app.LocaleManager manager = application.getSystemService(android.app.LocaleManager.class);
-                LocaleList wanted = locale == null ? LocaleList.getEmptyLocaleList() : new LocaleList(locale);
-                if (!wanted.equals(manager.getApplicationLocales())) manager.setApplicationLocales(wanted);
+                LocaleList current = manager.getApplicationLocales();
+                String active = activeOverride();
+                if (locale == null) {
+                    // Nothing of Voly's to undo: a language chosen in Settings or by the app stays.
+                    if (active == null) return;
+                    LocaleList before = LocaleList.forLanguageTags(platformBefore);
+                    forgetOverride();
+                    if (!before.equals(current)) manager.setApplicationLocales(before);
+                    return;
+                }
+                rememberOverride(
+                    locale.toLanguageTag(),
+                    active != null ? platformBefore : (current == null ? "" : current.toLanguageTags()));
+                LocaleList wanted = new LocaleList(locale);
+                if (!wanted.equals(current)) manager.setApplicationLocales(wanted);
                 return;
             } catch (Throwable e) {
                 throw AgentError.unavailable("The system refused the language change: " + e.getMessage());
             }
         }
         legacyOverride = locale == null ? null : locale.toLanguageTag();
-        Locale effective = locale != null ? locale : Resources.getSystem().getConfiguration().getLocales().get(0);
+        Locale effective = locale != null ? locale : systemLocale();
         Locale.setDefault(effective);
         updateConfiguration(application.getResources(), effective);
         for (Activity activity : Ui.activities()) {
@@ -202,8 +303,7 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
                 // configuration would follow the new language, so hold the
                 // direction the device's own language gives.
                 if (activeOverride() == null) return null;
-                Locale system = Resources.getSystem().getConfiguration().getLocales().get(0);
-                return TextUtils.getLayoutDirectionFromLocale(system);
+                return TextUtils.getLayoutDirectionFromLocale(systemLocale());
             }
             default: return null;
         }

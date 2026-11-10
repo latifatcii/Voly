@@ -8,6 +8,11 @@ import VolyModels
 /// to search by: fully qualified class names (a Kotlin or Java file with
 /// that name whose `package` line matches), and the view's `android:id`
 /// (the layout files, next to those sources, that declare it).
+///
+/// Kotlin lets a file hold any classes under any name. A class with no
+/// file named after it is looked for where its package says it lives, in
+/// the modules the other classes were found in, or else in the module
+/// whose Gradle file names the app.
 public struct AndroidSourceResolver: Sendable {
     public typealias FileSearch = @Sendable (_ fileName: String) async -> [String]
 
@@ -28,13 +33,23 @@ public struct AndroidSourceResolver: Sendable {
     }
 
     public func resolve(_ info: SourceInfo) async -> SourceLookup {
-        var locations: [SourceLocation] = []
-        var sourceFiles: [String] = []
-        for candidate in info.candidates ?? [] {
-            let found = await locate(candidate)
-            locations += found
-            sourceFiles += found.map(\.path)
+        let candidates = info.candidates ?? []
+        var found: [[SourceLocation]] = []
+        for candidate in candidates {
+            found.append(await locate(candidate))
         }
+        // Classes that have no file of their own name.
+        if found.contains(where: \.isEmpty), !candidates.isEmpty {
+            var modules = Self.unique(found.joined().compactMap { Self.sourceSetsDirectory(of: $0.path) })
+            if modules.isEmpty, let application = info.applicationID, !application.isEmpty {
+                modules = await modulesBuilding(application)
+            }
+            for index in candidates.indices where found[index].isEmpty {
+                found[index] = declarations(of: candidates[index], inModules: modules)
+            }
+        }
+        var locations = Array(found.joined())
+        let sourceFiles = locations.map(\.path)
 
         // The layout that declares the view's id, in the modules the classes were found in.
         if let resource = info.resourceID, !resource.isEmpty {
@@ -49,9 +64,9 @@ public struct AndroidSourceResolver: Sendable {
         if (info.candidates ?? []).isEmpty {
             note = "\(info.className) is a platform or library class and no app-defined owner was found."
         } else {
-            note = "No Kotlin or Java file for "
+            note = "No Kotlin or Java source for "
                 + (info.candidates ?? []).map(\.className).joined(separator: ", ")
-                + " was found on this Mac (searched by file name with Spotlight)."
+                + " was found on this Mac (searched with Spotlight by file name, and by the app's Gradle module)."
         }
         return SourceLookup(locations: [], note: note)
     }
@@ -72,6 +87,51 @@ public struct AndroidSourceResolver: Sendable {
                 path: path, line: line, lineOrigin: line == nil ? .fileOnly : .declaration, method: .spotlight
             )
         }
+    }
+
+    /// Files in the package's folder of `modules` (their `src` directories)
+    /// that declare the class, whatever they are called.
+    private func declarations(of candidate: SourceCandidate, inModules modules: [String]) -> [SourceLocation] {
+        guard let package = candidate.moduleName, !package.isEmpty else { return [] }
+        let folder = package.replacingOccurrences(of: ".", with: "/")
+        var result: [SourceLocation] = []
+        for module in modules {
+            for sourceSet in listDirectory(module).sorted() {
+                for language in ["java", "kotlin"] {
+                    let directory = "\(module)/\(sourceSet)/\(language)/\(folder)"
+                    for name in listDirectory(directory).sorted() where name.hasSuffix(".kt") || name.hasSuffix(".java") {
+                        let path = "\(directory)/\(name)"
+                        guard let text = readFile(path), Self.package(in: text) == package,
+                              let line = Self.declarationLine(of: candidate.className, in: text)
+                        else { continue }
+                        result.append(SourceLocation(
+                            className: candidate.className, moduleName: candidate.moduleName, role: candidate.role,
+                            path: path, line: line, lineOrigin: .declaration, method: .spotlight
+                        ))
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /// The `src` directories of the Gradle modules that build `application`
+    /// (its `applicationId` or `namespace`).
+    private func modulesBuilding(_ application: String) async -> [String] {
+        var gradleFiles: [String] = []
+        for name in ["build.gradle.kts", "build.gradle"] {
+            gradleFiles += await searchFiles(name)
+        }
+        return Self.withoutBuildProducts(gradleFiles).prefix(200).compactMap { path -> String? in
+            guard let text = readFile(path), text.contains("\"\(application)\"") || text.contains("'\(application)'")
+            else { return nil }
+            return (path as NSString).deletingLastPathComponent + "/src"
+        }
+    }
+
+    private static func unique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 
     /// `res/layout*/*.xml` files of the modules holding `sourceFiles` that declare `@+id/<resource>`.

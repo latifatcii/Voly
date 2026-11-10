@@ -127,6 +127,23 @@
                 android:text="@string/problems_card" />
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- A plain CardView paints its rounded background itself, without a Material shape. -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/problems_plain_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="@string/problems_plain_card" />
+        </androidx.cardview.widget.CardView>
+
         <!-- Overlap: the front view covers part of the back one. -->
         <FrameLayout
             android:id="@+id/problems_overlap_frame"

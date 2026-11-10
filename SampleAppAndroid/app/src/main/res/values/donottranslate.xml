@@ -48,6 +48,7 @@
     <string name="problems_gone">Gone, takes no space</string>
     <string name="problems_rounded">Rounded shape with stroke</string>
     <string name="problems_card">Card: 8dp elevation, 16dp corners</string>
+    <string name="problems_plain_card">Plain card: 16dp corners</string>
     <string name="problems_overlap_back">Back</string>
     <string name="problems_overlap_front">Front (overlaps)</string>
     <string name="problems_tiny">×</string>

@@ -29,6 +29,7 @@ struct InspectorShell: View {
                     node: node,
                     measurement: session.measurement,
                     lastSummary: session.lastMeasurementSummary,
+                    unit: session.isActiveAgentAndroid ? "dp" : "pt",
                     source: session.state.sourceLookup,
                     onOpenSource: { location in Task { await session.openSource(location) } }
                 )
@@ -242,7 +243,7 @@ struct InspectorShell: View {
             Image(systemName: "cursorarrow.click")
                 .foregroundStyle(VolyTheme.selection)
             Text(session.isActiveAgentAndroid
-                ? "Click a view in the emulator to select it. Drag from it to another to measure."
+                ? "Click a view in the emulator to select it. Hover another to measure."
                 : "Click a view in a simulator to select it. Hover another to measure.")
                 .foregroundStyle(VolyTheme.dim)
             Spacer(minLength: 0)

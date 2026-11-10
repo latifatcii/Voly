@@ -197,8 +197,12 @@ final class Style {
             view.setBackground(null);
             return;
         }
+        // A card paints its own background, rounded and shadowed; replacing
+        // the drawable would lose both.
         if (Reflect.isInstance(view, CARD_VIEW)
-            && Reflect.call(view, "setCardBackgroundColor", new Class<?>[] {int.class}, color) != null) {
+            && Reflect.method(view.getClass(), "setCardBackgroundColor", int.class) != null) {
+            Reflect.call(view, "setCardBackgroundColor", new Class<?>[] {int.class}, color);
+            view.invalidate();
             return;
         }
         Drawable shape = shapeDrawable(view.getBackground());

@@ -229,6 +229,12 @@ public struct AdbClient: AdbRunning {
         process.standardError = err
         process.standardInput = FileHandle.nullDevice
 
+        // The handler rather than `waitUntilExit` on another thread: after
+        // `terminate()` that never returns on macOS, and a command that ran
+        // into its time limit would hang for good.
+        let finished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in finished.signal() }
+
         // Started before the readers: when it can't be (adb was moved or
         // removed), nothing ever closes the pipes they would be waiting on.
         try process.run()
@@ -244,24 +250,22 @@ public struct AdbClient: AdbRunning {
             }
         }
 
-        let finished = DispatchSemaphore(value: 0)
-        DispatchQueue.global(qos: .utility).async {
-            process.waitUntilExit()
-            finished.signal()
-        }
         var timedOut = false
+        var exited = true
         if finished.wait(timeout: .now() + timeout) == .timedOut {
             timedOut = true
             process.terminate()
             if finished.wait(timeout: .now() + 2) == .timedOut {
                 kill(process.processIdentifier, SIGKILL)
-                finished.wait()
+                exited = finished.wait(timeout: .now() + 5) == .success
             }
         }
         // A grandchild that inherited the pipes could keep them open; don't wait forever.
         _ = readers.wait(timeout: .now() + 2)
         return AdbOutput(
-            exitCode: process.terminationStatus, stdout: collected.stdout, stderr: collected.stderr, timedOut: timedOut
+            // `terminationStatus` raises for a process that is still running.
+            exitCode: exited ? process.terminationStatus : -1,
+            stdout: collected.stdout, stderr: collected.stderr, timedOut: timedOut
         )
     }
 

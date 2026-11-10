@@ -13,5 +13,14 @@ nonisolated enum ScriptedRun {
         }
         return Set(list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
     }()
+
+    /// `VOLY_SCRIPTED_HOVER=<x>,<y>`: where the pointer is taken to be, in
+    /// Cocoa screen coordinates, so hover measuring can be driven without a
+    /// hand on the mouse.
+    static let hoverLocation: CGPoint? = {
+        let parts = (ProcessInfo.processInfo.environment["VOLY_SCRIPTED_HOVER"] ?? "")
+            .split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        return parts.count == 2 ? CGPoint(x: parts[0], y: parts[1]) : nil
+    }()
 }
 #endif

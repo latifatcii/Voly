@@ -172,7 +172,7 @@ public final class Bootstrap {
                 if (presented == null || !constantTimeEquals(presented, token)) {
                     respond(id, Dispatcher.errorResponse(AgentError.unauthorized()), connectionId);
                     Log.w("handshake with a wrong or missing token; dropping the connection");
-                    server.drop(connectionId);
+                    server.closeAfterSending(connectionId);
                     return;
                 }
                 authenticatedConnection = connectionId;

@@ -72,6 +72,16 @@ func runAndroid(_ arguments: [String]) async throws {
     }
     let positional = arguments.dropFirst().prefix { !$0.hasPrefix("--") }.map { $0 }
     let integration = try makeAndroidIntegration(arguments)
+    do {
+        try await runAndroid(verb, positional, integration)
+    } catch {
+        // A command that failed after attaching still gives its port back.
+        await integration.releaseAll()
+        throw error
+    }
+}
+
+private func runAndroid(_ verb: String, _ positional: [String], _ integration: AndroidIntegration) async throws {
     switch verb {
     case "devices", "apps":
         let only = positional.first.map { Set([$0]) }

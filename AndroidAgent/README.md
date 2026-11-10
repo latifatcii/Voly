@@ -42,8 +42,12 @@ with the agent loaded than without. It lasts until the app exits.
 ANDROID_HOME=~/Library/Android/sdk AndroidAgent/build.sh
 ```
 
-Needs a JDK and, from the Android SDK, a platform, build-tools and the NDK
+Needs a JDK (the one inside Android Studio is used when there is no other)
+and, from the Android SDK, a platform, build-tools and the NDK
 (`sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"`).
+The NDK only builds the small loader in `src/main/cpp`: after a change to the
+Java alone, `AndroidAgent/build.sh --java-only` rebuilds the agent and keeps
+the loaders that are checked in.
 The output in `Voly/AndroidAgentPayload` is checked in, so building Voly.app
 itself needs none of this; rebuild and commit it after changing the agent.
 `voly-agent.version` is a hash of the built files and names the copy on a

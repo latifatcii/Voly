@@ -9,7 +9,7 @@ Package: `com.example.volysample` (debug build, debuggable).
 
 ## Build and install
 
-Needs JDK 17+ and the Android SDK (`platforms;android-35`, `build-tools;35.0.0`)
+Needs JDK 17+ (the one inside Android Studio will do: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`) and the Android SDK (`platforms;android-35`, `build-tools;35.0.0`, which Gradle installs itself when the SDK's licences are accepted)
 with `ANDROID_HOME` set.
 
 ```sh

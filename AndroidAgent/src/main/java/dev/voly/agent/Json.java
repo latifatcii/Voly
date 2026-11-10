@@ -210,6 +210,11 @@ final class Json {
     }
 
     static long propLong(JSONObject value) throws AgentError {
+        // A whole number as it was sent: a double holds only 53 bits of it.
+        Object raw = caseValue(value);
+        if (caseName(value).equals("int") && (raw instanceof Long || raw instanceof Integer)) {
+            return ((Number) raw).longValue();
+        }
         double number = propDouble(value);
         if (Double.isNaN(number) || Double.isInfinite(number)) throw AgentError.unsupportedValue();
         return (long) number;

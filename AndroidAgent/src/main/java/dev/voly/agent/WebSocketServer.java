@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -21,6 +22,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * Like the iOS agent it serves one client at a time: a new connection
  * replaces the previous one. Every connection gets an id, so an answer is
  * never delivered to a client that connected afterwards.
+ *
+ * Nothing is written to the socket by whoever has something to send. That
+ * is mostly the app's main thread, and a host that reads slowly, or not at
+ * all, would hold it up for as long: frames are queued and one thread
+ * writes them.
  */
 final class WebSocketServer {
     interface Listener {
@@ -32,11 +38,35 @@ final class WebSocketServer {
 
     private static final String ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     private static final int MAX_MESSAGE_BYTES = 64 * 1024 * 1024;
+    /**
+     * Bytes waiting to be written before the host counts as not reading.
+     * One answer can be a screenshot of several megabytes, and a single
+     * frame is always taken.
+     */
+    private static final long MAX_QUEUED_BYTES = 48L * 1024 * 1024;
+
+    /** Not a WebSocket opcode: tells the writer to close the connection. */
+    private static final int CLOSE_CONNECTION = -1;
+
+    private static final class Frame {
+        final int opcode;
+        final byte[] payload;
+        final long connectionId;
+
+        Frame(int opcode, byte[] payload, long connectionId) {
+            this.opcode = opcode;
+            this.payload = payload;
+            this.connectionId = connectionId;
+        }
+    }
 
     private final String socketName;
     private final Listener listener;
     private final AtomicLong nextConnectionId = new AtomicLong(1);
+    private final LinkedBlockingQueue<Frame> outgoing = new LinkedBlockingQueue<>();
+    private final AtomicLong queuedBytes = new AtomicLong();
     private volatile LocalServerSocket serverSocket;
+    private volatile Thread writer;
     private volatile boolean stopped;
 
     private final Object connectionLock = new Object();
@@ -54,10 +84,18 @@ final class WebSocketServer {
         Thread thread = new Thread(this::acceptLoop, "VolyAgent-accept");
         thread.setDaemon(true);
         thread.start();
+        Thread writing = new Thread(this::writeLoop, "VolyAgent-write");
+        writing.setDaemon(true);
+        writing.start();
+        writer = writing;
     }
 
     void stop() {
         stopped = true;
+        Thread writing = writer;
+        if (writing != null) writing.interrupt();
+        outgoing.clear();
+        queuedBytes.set(0);
         try {
             LocalServerSocket socket = serverSocket;
             if (socket != null) socket.close();
@@ -210,10 +248,10 @@ final class WebSocketServer {
                     message.write(payload);
                     break;
                 case 0x8: // close
-                    writeFrame(0x8, payload.length >= 2 ? new byte[] {payload[0], payload[1]} : new byte[0], id);
+                    enqueue(0x8, payload.length >= 2 ? new byte[] {payload[0], payload[1]} : new byte[0], id);
                     return;
                 case 0x9: // ping
-                    writeFrame(0xA, payload, id);
+                    enqueue(0xA, payload, id);
                     continue;
                 case 0xA: // pong
                     continue;
@@ -229,17 +267,55 @@ final class WebSocketServer {
         }
     }
 
-    /** Send one text message to the given connection, if it is still the current one. */
-    boolean send(String text, long connectionId) {
-        try {
-            return writeFrame(0x1, text.getBytes(StandardCharsets.UTF_8), connectionId);
-        } catch (IOException e) {
-            return false;
+    /**
+     * Send one text message to the given connection, if it is still the
+     * current one when its turn comes. Returns at once, from any thread.
+     */
+    void send(String text, long connectionId) {
+        enqueue(0x1, text.getBytes(StandardCharsets.UTF_8), connectionId);
+    }
+
+    private void enqueue(int opcode, byte[] payload, long connectionId) {
+        if (stopped) return;
+        if (!outgoing.isEmpty() && queuedBytes.get() + payload.length > MAX_QUEUED_BYTES) {
+            // Nobody is reading. Let go of the connection rather than of the app's memory.
+            Log.w("the host stopped reading; closing connection " + connectionId);
+            outgoing.clear();
+            queuedBytes.set(0);
+            drop(connectionId);
+            return;
+        }
+        queuedBytes.addAndGet(payload.length);
+        outgoing.add(new Frame(opcode, payload, connectionId));
+    }
+
+    private void writeLoop() {
+        while (!stopped) {
+            Frame frame;
+            try {
+                frame = outgoing.take();
+            } catch (InterruptedException e) {
+                return;
+            }
+            // Never below zero: the queue may have been emptied in between.
+            queuedBytes.updateAndGet(bytes -> Math.max(0, bytes - frame.payload.length));
+            try {
+                if (frame.opcode == CLOSE_CONNECTION) drop(frame.connectionId);
+                else writeFrame(frame.opcode, frame.payload, frame.connectionId);
+            } catch (IOException e) {
+                drop(frame.connectionId);
+            } catch (RuntimeException e) {
+                Log.e("writing to connection " + frame.connectionId + " failed", e);
+            }
         }
     }
 
-    /** Close a connection, e.g. after a failed authentication. */
-    void drop(long connectionId) {
+    /** Close a connection once what was sent to it so far is written, e.g. after a failed authentication. */
+    void closeAfterSending(long connectionId) {
+        enqueue(CLOSE_CONNECTION, new byte[0], connectionId);
+    }
+
+    private void drop(long connectionId) {
         synchronized (connectionLock) {
             if (currentConnectionId != connectionId) return;
             closeQuietly(currentSocket);
@@ -248,27 +324,29 @@ final class WebSocketServer {
         }
     }
 
-    private boolean writeFrame(int opcode, byte[] payload, long connectionId) throws IOException {
+    /** Writer thread only, and not under the lock: closing the socket is what ends a write that is stuck. */
+    private void writeFrame(int opcode, byte[] payload, long connectionId) throws IOException {
+        OutputStream output;
         synchronized (connectionLock) {
-            if (currentOutput == null || currentConnectionId != connectionId) return false;
-            ByteArrayOutputStream header = new ByteArrayOutputStream(10);
-            header.write(0x80 | opcode);
-            if (payload.length < 126) {
-                header.write(payload.length);
-            } else if (payload.length <= 0xFFFF) {
-                header.write(126);
-                header.write(payload.length >>> 8);
-                header.write(payload.length);
-            } else {
-                header.write(127);
-                long length = payload.length;
-                for (int shift = 56; shift >= 0; shift -= 8) header.write((int) (length >>> shift));
-            }
-            currentOutput.write(header.toByteArray());
-            currentOutput.write(payload);
-            currentOutput.flush();
-            return true;
+            if (currentOutput == null || currentConnectionId != connectionId) return;
+            output = currentOutput;
         }
+        ByteArrayOutputStream header = new ByteArrayOutputStream(10);
+        header.write(0x80 | opcode);
+        if (payload.length < 126) {
+            header.write(payload.length);
+        } else if (payload.length <= 0xFFFF) {
+            header.write(126);
+            header.write(payload.length >>> 8);
+            header.write(payload.length);
+        } else {
+            header.write(127);
+            long length = payload.length;
+            for (int shift = 56; shift >= 0; shift -= 8) header.write((int) (length >>> shift));
+        }
+        output.write(header.toByteArray());
+        output.write(payload);
+        output.flush();
     }
 
     private static int readByte(InputStream in) throws IOException {

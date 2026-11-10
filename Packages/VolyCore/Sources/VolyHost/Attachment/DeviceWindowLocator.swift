@@ -25,6 +25,50 @@ public enum AndroidEmulatorApp {
     }
 }
 
+/// Where the device's display is inside an emulator window.
+///
+/// An emulator window without a device frame is macOS's title bar with the
+/// display filling everything under it, at whatever size the window was
+/// dragged to. That is recognised by its shape: under the title bar the
+/// window has the display's own proportions. A window that draws a phone
+/// around the display does not, and where the display sits in one can't be
+/// told from the outside.
+public enum AndroidEmulatorScreen {
+    /// What macOS gives a window's title bar.
+    static let titleBarHeight: CGFloat = 28
+    static let tolerance: CGFloat = 2
+
+    /// - Parameters:
+    ///   - window: the emulator window, in any coordinates with y growing downwards.
+    ///   - displaySize: the device's display, in any unit; only its proportions count.
+    public static func display(inWindow window: CGRect, displaySize: CGSize) -> CGRect? {
+        guard displaySize.width > 0, displaySize.height > 0, window.width > 0 else { return nil }
+        let underTitleBar = CGRect(
+            x: window.minX, y: window.minY + titleBarHeight,
+            width: window.width, height: window.height - titleBarHeight
+        )
+        // The whole window too: one without a title bar that shows only the display.
+        for content in [underTitleBar, window] where content.height > 0 {
+            let expectedHeight = content.width * displaySize.height / displaySize.width
+            if abs(expectedHeight - content.height) <= tolerance { return content }
+        }
+        return nil
+    }
+
+    /// The display of the frontmost emulator window (`windows` are front to
+    /// back), preferring the one the cursor is over when there are several.
+    static func display(
+        in windows: [OnScreenWindow], emulatorPIDs: Set<pid_t>, displaySize: CGSize, cursor: CGPoint?
+    ) -> CGRect? {
+        let displays = windows
+            .filter { emulatorPIDs.contains($0.ownerPID) && $0.layer == 0 && $0.alpha > 0 }
+            .filter { min($0.bounds.width, $0.bounds.height) >= SimulatorWindowPicker.minimumShortSide }
+            .compactMap { display(inWindow: $0.bounds, displaySize: displaySize) }
+        if let cursor, let under = displays.first(where: { $0.contains(cursor) }) { return under }
+        return displays.first
+    }
+}
+
 /// The window Voly docks next to: the device window the user focused last,
 /// whether that is an iOS simulator or an Android emulator.
 ///
@@ -55,6 +99,23 @@ public final class DeviceWindowLocator: SimulatorLocator, @unchecked Sendable {
 
     public func iosScreenRegionInScreen() -> IosScreenBoundsOnScreen? {
         simulator.iosScreenRegionInScreen()
+    }
+
+    /// Where an emulator shows its display, in Cocoa screen coordinates,
+    /// for a device whose display has `displaySize`'s proportions. Needs no
+    /// Accessibility permission: window positions are public.
+    ///
+    /// - Parameter cursor: where the pointer is (Cocoa coordinates), to
+    ///   pick the right window when several emulators are open.
+    public func androidDisplayFrame(displaySize: CGSize, cursor: CGPoint? = nil) -> CGRect? {
+        let emulators = AndroidEmulatorApp.processIDs()
+        guard !emulators.isEmpty else { return nil }
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let display = AndroidEmulatorScreen.display(
+            in: SimulatorWindowPicker.onScreenWindows(), emulatorPIDs: emulators, displaySize: displaySize,
+            cursor: cursor.map { CGPoint(x: $0.x, y: primaryHeight - $0.y) }
+        )
+        return display.map { SimulatorWindowPicker.cocoaFrame(for: $0, primaryScreenHeight: primaryHeight) }
     }
 
     /// The first device-sized window, front to back, that belongs to the

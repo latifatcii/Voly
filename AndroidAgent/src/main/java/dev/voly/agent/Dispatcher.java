@@ -56,6 +56,7 @@ final class Dispatcher {
     void reset() {
         overlay.exitPickMode();
         overlay.clear();
+        screenshots.cancelWaiting();
     }
 
     private Localization localization() throws AgentError {

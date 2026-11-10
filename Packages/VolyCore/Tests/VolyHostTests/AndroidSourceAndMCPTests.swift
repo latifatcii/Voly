@@ -89,6 +89,55 @@ final class AndroidSourceResolverTests: XCTestCase {
         XCTAssertEqual(lookup.locations.count, 2)
     }
 
+    /// The sample app in this repository, searched the way Spotlight would
+    /// be: by file name, anywhere under it.
+    private func sampleResolver() -> AndroidSourceResolver {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SampleAppAndroid").path
+        return AndroidSourceResolver(searchFiles: { name in
+            (FileManager.default.enumerator(atPath: root)?.compactMap { $0 as? String } ?? [])
+                .filter { ($0 as NSString).lastPathComponent == name }.map { "\(root)/\($0)" }
+        })
+    }
+
+    func test_a_class_in_a_file_of_another_name_is_found_next_to_the_classes_around_it() async {
+        // The sample's SampleBottomSheet is declared in DialogsFragment.kt.
+        let info = SourceInfo(
+            className: "TextView", moduleName: "android.widget", dsymUUID: nil, guessedRelativePath: nil,
+            candidates: [
+                candidate(.viewController, "SampleBottomSheet", "com.example.volysample.demo"),
+                candidate(.viewController, "MainActivity", "com.example.volysample"),
+            ],
+            platform: "android", applicationID: "com.example.volysample"
+        )
+        let lookup = await sampleResolver().resolve(info)
+        XCTAssertNil(lookup.note)
+        XCTAssertEqual(lookup.locations.map { ($0.path as NSString).lastPathComponent }, ["DialogsFragment.kt", "MainActivity.kt"])
+        XCTAssertEqual(lookup.locations.first?.className, "SampleBottomSheet")
+        XCTAssertEqual(lookup.locations.first?.lineOrigin, .declaration)
+        XCTAssertEqual(lookup.locations.first?.line, 43)
+    }
+
+    func test_with_no_class_found_by_name_the_apps_gradle_module_is_searched() async {
+        let info = SourceInfo(
+            className: "TextView", moduleName: "android.widget", dsymUUID: nil, guessedRelativePath: nil,
+            candidates: [candidate(.viewController, "SampleBottomSheet", "com.example.volysample.demo")],
+            platform: "android", applicationID: "com.example.volysample"
+        )
+        let lookup = await sampleResolver().resolve(info)
+        XCTAssertEqual(lookup.locations.map { ($0.path as NSString).lastPathComponent }, ["DialogsFragment.kt"])
+
+        // Another app's module is not this one's.
+        let elsewhere = SourceInfo(
+            className: "TextView", moduleName: "android.widget", dsymUUID: nil, guessedRelativePath: nil,
+            candidates: [candidate(.viewController, "SampleBottomSheet", "com.example.volysample.demo")],
+            platform: "android", applicationID: "com.example.other"
+        )
+        let none = await sampleResolver().resolve(elsewhere)
+        XCTAssertTrue(none.locations.isEmpty)
+    }
+
     func test_nothing_found_says_so() async {
         let info = SourceInfo(
             className: "TextView", moduleName: "android.widget", dsymUUID: nil, guessedRelativePath: nil,

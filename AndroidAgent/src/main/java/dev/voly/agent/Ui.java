@@ -321,8 +321,19 @@ final class Ui {
                 View found = deepest(child, point[0], point[1]);
                 if (found != null) return found;
             }
+            // An empty container that paints nothing can't be seen, so it is
+            // not what anybody points at: what shows through it is. (A
+            // fragment container waiting for its fragment, laid over a list.)
+            if (isEmptyAndUnpainted(group)) return null;
         }
         return view;
+    }
+
+    private static boolean isEmptyAndUnpainted(ViewGroup group) {
+        for (int index = 0; index < group.getChildCount(); index++) {
+            if (isVisible(group.getChildAt(index))) return false;
+        }
+        return group.getBackground() == null && group.getForeground() == null && group.willNotDraw();
     }
 
     /** The root view that contains `view`, or the top-most visible one. */

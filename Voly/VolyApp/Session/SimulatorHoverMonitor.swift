@@ -21,6 +21,8 @@ final class SimulatorHoverMonitor {
     weak var session: InspectorSession?
 
     private let locator: SimulatorLocator
+    /// Android emulators: their display is found from the window alone.
+    private let emulators = DeviceWindowLocator()
     private var eventMonitor: Any?
     private var throttleTask: Task<Void, Never>?
     private var pendingLocation: NSPoint?
@@ -45,24 +47,30 @@ final class SimulatorHoverMonitor {
     ///   merely showing Voly never nags about a permission that only hover
     ///   measurement needs.
     func start(announceIfUntrusted: Bool = true) -> Bool {
-        if !AccessibilityTrust.isTrusted(prompt: false) {
-            log.error("start: Accessibility not trusted — cannot monitor cursor")
-            guard announceIfUntrusted else { return false }
-            session?.lastError = "Voly needs Accessibility to track the cursor for live measurements. Grant Voly in System Settings → Privacy & Security → Accessibility, then restart Voly. Clicks still work without it."
-            if !hasPromptedThisSession {
-                hasPromptedThisSession = true
-                // `prompt: true` shows the system dialog + deep-links into
-                // Privacy settings. One nudge per session keeps it helpful
-                // without being spammy if the grant isn't sticking.
-                _ = AccessibilityTrust.isTrusted(prompt: true)
+        // Only the iOS Simulator's screen needs Accessibility to be found.
+        // An emulator's doesn't, and which app is being inspected can
+        // change while pick mode is on: without the permission the monitor
+        // still runs, for Android alone.
+        let trusted = AccessibilityTrust.isTrusted(prompt: false)
+        if !trusted, session?.isActiveAgentAndroid != true {
+            log.error("start: Accessibility not trusted — cannot find the Simulator's screen")
+            if announceIfUntrusted {
+                session?.lastError = "Voly needs Accessibility to track the cursor for live measurements. Grant Voly in System Settings → Privacy & Security → Accessibility, then restart Voly. Clicks still work without it."
+                if !hasPromptedThisSession {
+                    hasPromptedThisSession = true
+                    // `prompt: true` shows the system dialog + deep-links into
+                    // Privacy settings. One nudge per session keeps it helpful
+                    // without being spammy if the grant isn't sticking.
+                    _ = AccessibilityTrust.isTrusted(prompt: true)
+                }
             }
-            return false
         }
+        guard eventMonitor == nil else { return trusted }
         refreshRegion()
         startRegionRefreshLoop()
         installMonitor()
         log.notice("start: monitor installed, region=\(String(describing: self.cachedRegion?.screenFrame), privacy: .public)")
-        return true
+        return trusted || session?.isActiveAgentAndroid == true
     }
 
     func stop() {
@@ -92,12 +100,6 @@ final class SimulatorHoverMonitor {
             cachedRegion = nil
             return
         }
-        // The region is the iOS Simulator's screen. An Android app measures
-        // on its own, in the emulator: drag from the selection in pick mode.
-        if session?.isActiveAgentAndroid == true {
-            cachedRegion = nil
-            return
-        }
         guard let snapshot = state.hierarchy else {
             if cachedRegion != nil { log.info("refreshRegion: no snapshot (not connected?)") }
             cachedRegion = nil
@@ -110,14 +112,24 @@ final class SimulatorHoverMonitor {
             cachedRegion = nil
             return
         }
-        guard let bounds = locator.iosScreenRegionInScreen() else {
-            if cachedRegion != nil { log.info("refreshRegion: AXSimulatorLocator.iosScreenRegionInScreen returned nil") }
+        let pointSize = (firstWindow.windowFrame ?? firstWindow.frame).cg.size
+        let screenFrame: CGRect?
+        if session?.isActiveAgentAndroid == true {
+            // The app's window is the whole display, in dp; the emulator
+            // shows the display under its title bar.
+            screenFrame = emulators.androidDisplayFrame(displaySize: pointSize, cursor: currentLocation())
+        } else if AccessibilityTrust.isTrusted(prompt: false) {
+            screenFrame = locator.iosScreenRegionInScreen()?.frame
+        } else {
+            screenFrame = nil
+        }
+        guard let screenFrame else {
+            if cachedRegion != nil { log.info("refreshRegion: the device's screen was not found on this Mac's screen") }
             cachedRegion = nil
             return
         }
-        let pointSize = (firstWindow.windowFrame ?? firstWindow.frame).cg.size
         let newRegion = Region(
-            screenFrame: bounds.frame,
+            screenFrame: screenFrame,
             iosPointSize: pointSize,
             sceneID: firstScene.id
         )
@@ -136,17 +148,32 @@ final class SimulatorHoverMonitor {
                 try? await Task.sleep(nanoseconds: 500_000_000)
                 if Task.isCancelled { return }
                 self?.refreshRegion()
+                #if DEBUG
+                // A scripted run has no hand on the mouse.
+                if let self, ScriptedRun.hoverLocation != nil {
+                    self.pendingLocation = self.currentLocation()
+                    self.kickThrottle()
+                }
+                #endif
             }
         }
     }
 
     // MARK: - Monitor
 
+    /// Where the pointer is, in Cocoa screen coordinates.
+    private func currentLocation() -> NSPoint {
+        #if DEBUG
+        if let scripted = ScriptedRun.hoverLocation { return scripted }
+        #endif
+        return NSEvent.mouseLocation
+    }
+
     private func installMonitor() {
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                self.pendingLocation = NSEvent.mouseLocation
+                self.pendingLocation = self.currentLocation()
                 self.kickThrottle()
             }
         }

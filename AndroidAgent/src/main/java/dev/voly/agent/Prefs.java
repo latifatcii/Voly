@@ -122,40 +122,107 @@ final class Prefs {
         SharedPreferences preferences = app.getSharedPreferences(suite, Context.MODE_PRIVATE);
         Object existing = preferences.getAll().get(key);
         SharedPreferences.Editor editor = preferences.edit();
-        String kind = Json.caseName(value);
-        switch (kind) {
-            case "null":
-                editor.remove(key);
-                break;
+        if (Json.isNull(value)) {
+            editor.remove(key);
+        } else if (existing == null) {
+            putNew(editor, key, value);
+        } else {
+            putKeepingType(editor, key, existing, value);
+        }
+        editor.apply();
+    }
+
+    /** A key the app hasn't stored yet takes the type of the value sent. */
+    private static void putNew(SharedPreferences.Editor editor, String key, JSONObject value) throws AgentError {
+        switch (Json.caseName(value)) {
             case "bool":
                 editor.putBoolean(key, Json.propBool(value));
                 break;
             case "int": {
-                // Keep the type the app reads the key with.
                 long number = Json.propLong(value);
-                if (existing instanceof Long) editor.putLong(key, number);
-                else if (existing instanceof Float) editor.putFloat(key, number);
-                else if (existing instanceof Boolean && (number == 0 || number == 1)) editor.putBoolean(key, number == 1);
-                else if (existing instanceof String) editor.putString(key, String.valueOf(number));
-                else if (number > Integer.MAX_VALUE || number < Integer.MIN_VALUE) editor.putLong(key, number);
+                if (number > Integer.MAX_VALUE || number < Integer.MIN_VALUE) editor.putLong(key, number);
                 else editor.putInt(key, (int) number);
                 break;
             }
-            case "double": {
-                double number = Json.propDouble(value);
-                if (existing instanceof Integer && number == Math.rint(number)) editor.putInt(key, (int) number);
-                else if (existing instanceof Long && number == Math.rint(number)) editor.putLong(key, (long) number);
-                else if (existing instanceof String) editor.putString(key, String.valueOf(number));
-                else editor.putFloat(key, (float) number);
+            case "double":
+                editor.putFloat(key, (float) Json.propDouble(value));
                 break;
-            }
             case "string":
                 editor.putString(key, Json.propString(value));
                 break;
             default:
                 throw AgentError.unsupportedValue();
         }
-        editor.apply();
+    }
+
+    /**
+     * A key that exists keeps its type: the app reads it with `getString`,
+     * `getInt` and so on, and those throw on any other type — for good,
+     * since the value is saved. What can't be stored as that type is refused.
+     */
+    private static void putKeepingType(SharedPreferences.Editor editor, String key, Object existing, JSONObject value)
+            throws AgentError {
+        String kind = Json.caseName(value);
+        // The host guesses a type from what was typed: `true` and `12` arrive as a boolean and a number.
+        String text;
+        switch (kind) {
+            case "bool": text = String.valueOf(Json.propBool(value)); break;
+            case "int": text = String.valueOf(Json.propLong(value)); break;
+            case "double": text = String.valueOf(Json.propDouble(value)); break;
+            case "string": text = Json.propString(value); break;
+            default: throw AgentError.unsupportedValue();
+        }
+        if (existing instanceof String) {
+            editor.putString(key, text);
+        } else if (existing instanceof Boolean) {
+            if (text.equals("true") || text.equals("1")) editor.putBoolean(key, true);
+            else if (text.equals("false") || text.equals("0")) editor.putBoolean(key, false);
+            else throw mismatch(key, "a boolean", "true or false");
+        } else if (existing instanceof Integer) {
+            Long number = wholeNumber(kind, value, text);
+            if (number == null || number > Integer.MAX_VALUE || number < Integer.MIN_VALUE) {
+                throw mismatch(key, "an int", "a whole number that fits in 32 bits");
+            }
+            editor.putInt(key, (int) (long) number);
+        } else if (existing instanceof Long) {
+            Long number = wholeNumber(kind, value, text);
+            if (number == null) throw mismatch(key, "a long", "a whole number");
+            editor.putLong(key, number);
+        } else if (existing instanceof Float) {
+            if (kind.equals("bool")) throw mismatch(key, "a float", "a number");
+            try {
+                editor.putFloat(key, Float.parseFloat(text.trim()));
+            } catch (NumberFormatException e) {
+                throw mismatch(key, "a float", "a number");
+            }
+        } else {
+            throw AgentError.unavailable("\"" + key + "\" holds a set of strings, which can't be edited from here.");
+        }
+    }
+
+    /** The value as a whole number, or null when it isn't one. */
+    private static Long wholeNumber(String kind, JSONObject value, String text) throws AgentError {
+        switch (kind) {
+            case "int":
+                return Json.propLong(value);
+            case "double": {
+                double number = Json.propDouble(value);
+                return number == Math.rint(number) && Math.abs(number) < 9.2e18 ? (long) number : null;
+            }
+            case "string":
+                try {
+                    return Long.parseLong(text.trim());
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            default:
+                return null;
+        }
+    }
+
+    private static AgentError mismatch(String key, String holds, String wants) {
+        return AgentError.unavailable(
+            "\"" + key + "\" holds " + holds + " and the app reads it as one: give it " + wants + ".");
     }
 
     static void delete(String suite, String key) throws AgentError {

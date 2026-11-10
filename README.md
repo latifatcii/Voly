@@ -76,7 +76,7 @@ What Android things are called in Voly:
 | SwiftUI accessibility elements (MCP) | Jetpack Compose semantics: text, role, state, test tag, bounds |
 | Jump to Source | your Kotlin or Java class, or the layout XML that declares the view's id, opened in Android Studio |
 
-Measuring works from Voly's tree as on iOS (hover another row). In the emulator itself, with a view selected in pick mode, **drag** from it: the distance to whatever is under the pointer is drawn live.
+Measuring works as on iOS: with a view selected in pick mode, hover another one in the emulator, or another row in Voly's tree, and the distance is drawn live. Dragging from the selected view in the emulator does the same. Hovering needs no Accessibility permission here; it works when the emulator window shows just the display under its title bar, not when it draws a device frame around it.
 
 Emulators are inspected as soon as they run. A phone or tablet that adb can reach is listed but left alone, with nothing copied to it and nothing attached, until you switch it on with its toggle in the Simulators tab. The same toggle switches an emulator off; exclude an app from its context menu. Voly finds `adb` in the usual places (`~/Library/Android/sdk`, `ANDROID_HOME`, Homebrew); point it elsewhere with:
 
@@ -179,7 +179,7 @@ What Voly changes, and how it is undone:
 | Android: the agent loaded into a running debug app, with the hidden-API filter lifted for that process | the app's next launch; it is in memory only |
 | Android: `code_cache/voly-<version>/` in the app's data, `/data/local/tmp/voly-<version>/` on the device (≈150 KB) | clearing the app's cache / `adb shell rm -r /data/local/tmp/voly-*` |
 | Android: one forwarded port per inspected app (`adb forward --list`) | automatically, when the app exits or Voly quits |
-| Android 13+: the app's per-app language, when you switch language through Voly | choosing System / Default again |
+| Android 13+: the app's per-app language, when you switch language through Voly, and a note of it in the app's cache (`voly-language.json`) | choosing System / Default again, which puts back the language the app had before |
 
 Nothing is written into the simulator runtime, Xcode, or macOS settings, and physical devices are never touched. Restarting the simulator's `runningboardd` does not terminate running apps.
 
@@ -199,10 +199,10 @@ Android:
 - **Emulators are what is tested.** A physical device that adb can reach goes through the same path once you switch it on, but that path is not exercised.
 - **Jetpack Compose** appears as the view that hosts it; its content is only in the MCP tools (as semantics nodes), not in the inspector's tree, and has no font or color — the same as SwiftUI.
 - **Layout params are not Auto Layout.** What the Layout tab shows as constraints are sizes, margins and ConstraintLayout connections; their constant can be changed, priority and "active" cannot.
-- **Measuring by hovering in the emulator** isn't available (Voly would need to know where the screen sits inside the emulator's window); drag from the selection instead, or hover rows in Voly's tree.
+- **Measuring by hovering in the emulator** needs a window without a device frame: Voly finds the display from the window's shape, and can't tell where it sits inside a drawn phone. With a frame, drag from the selection instead, or hover rows in Voly's tree.
 - **No resizable preview**, and DataStore isn't read — SharedPreferences only.
 - **The emulator inside Android Studio** (Running Devices) has no window of its own to dock next to; Voly opens where it was. Everything else works.
-- **Jump to Source searches by name.** An APK carries no source paths, so classes are found with Spotlight by file name and `package`, and layouts by the view's id. A class in a file named differently isn't found.
+- **Jump to Source searches by name.** An APK carries no source paths, so classes are found with Spotlight by file name and `package`, and layouts by the view's id. A class in a file of another name is found where its package puts it, in the module the other classes around it were found in or the one whose Gradle file names the app.
 
 ## Linking the SDK (optional)
 
@@ -260,7 +260,8 @@ scripts/mcp-test.sh <booted-simulator-udid>
 scripts/android-integration-test.sh [<adb-serial>]
 
 # Rebuild the Android agent after changing AndroidAgent/src
-# (needs the Android SDK and NDK; the result is checked in)
+# (needs the Android SDK and NDK; the result is checked in).
+# --java-only rebuilds just the Java, without the NDK
 AndroidAgent/build.sh
 
 # A distributable DMG in build/dist

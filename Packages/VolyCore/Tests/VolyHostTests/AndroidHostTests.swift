@@ -205,6 +205,18 @@ final class AndroidDiscoveryTests: XCTestCase {
         XCTAssertEqual(output.errorText, "done")
     }
 
+    func test_a_command_past_its_time_limit_is_stopped_and_reported() async throws {
+        let shell = AdbClient(executable: URL(fileURLWithPath: "/bin/sh"))
+        let started = Date()
+        let output = try await shell.run(["-c", "echo partial; sleep 30"], timeout: 0.3)
+        XCTAssertTrue(output.timedOut)
+        XCTAssertFalse(output.succeeded)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 10)
+        // And the next command runs as if nothing had happened.
+        let next = try await shell.run(["-c", "echo ok"], timeout: 5)
+        XCTAssertEqual(next.text, "ok\n")
+    }
+
     func test_an_executable_that_is_gone_is_an_error_not_a_hang() async {
         let missing = AdbClient(executable: URL(fileURLWithPath: "/nonexistent/platform-tools/adb"))
         do {
@@ -240,6 +252,58 @@ final class AndroidDiscoveryTests: XCTestCase {
         // Somebody's Linux machine in QEMU from Homebrew.
         XCTAssertFalse(AndroidEmulatorApp.isEmulator(executablePath: "/opt/homebrew/bin/qemu-system-aarch64"))
         XCTAssertFalse(AndroidEmulatorApp.isEmulator(executablePath: "/Users/me/Library/Android/sdk/emulator/emulator"))
+    }
+    #endif
+
+    func test_the_display_fills_an_emulator_window_under_its_title_bar() {
+        // As measured: a 1080×2400 display in a 402×922 window at 100,100.
+        let window = CGRect(x: 100, y: 100, width: 402, height: 922)
+        let display = AndroidEmulatorScreen.display(inWindow: window, displaySize: CGSize(width: 1080, height: 2400))
+        XCTAssertEqual(display, CGRect(x: 100, y: 128, width: 402, height: 894))
+        // The same in dp, which is what the agent reports; and resized, and turned on its side.
+        XCTAssertEqual(
+            AndroidEmulatorScreen.display(inWindow: window, displaySize: CGSize(width: 411.43, height: 914.29)), display
+        )
+        XCTAssertEqual(
+            AndroidEmulatorScreen.display(
+                inWindow: CGRect(x: 0, y: 0, width: 300, height: 694.7), displaySize: CGSize(width: 1080, height: 2400)
+            ),
+            CGRect(x: 0, y: 28, width: 300, height: 666.7)
+        )
+        XCTAssertEqual(
+            AndroidEmulatorScreen.display(
+                inWindow: CGRect(x: 0, y: 0, width: 800, height: 388), displaySize: CGSize(width: 2400, height: 1080)
+            ),
+            CGRect(x: 0, y: 28, width: 800, height: 360)
+        )
+    }
+
+    func test_a_window_that_draws_a_device_around_the_display_is_not_guessed_at() {
+        // A skin with bezels: nothing in the window's shape says where the display is.
+        XCTAssertNil(AndroidEmulatorScreen.display(
+            inWindow: CGRect(x: 0, y: 0, width: 440, height: 930), displaySize: CGSize(width: 1080, height: 2400)
+        ))
+        XCTAssertNil(AndroidEmulatorScreen.display(inWindow: .zero, displaySize: CGSize(width: 1080, height: 2400)))
+    }
+
+    #if canImport(AppKit)
+    func test_with_several_emulators_the_one_under_the_cursor_is_used() {
+        let size = CGSize(width: 1080, height: 2400)
+        let front = OnScreenWindow(ownerPID: 7, layer: 0, alpha: 1, bounds: CGRect(x: 100, y: 100, width: 402, height: 922))
+        let toolbar = OnScreenWindow(ownerPID: 7, layer: 0, alpha: 1, bounds: CGRect(x: 502, y: 128, width: 54, height: 506))
+        let back = OnScreenWindow(ownerPID: 8, layer: 0, alpha: 1, bounds: CGRect(x: 700, y: 100, width: 402, height: 922))
+        let other = OnScreenWindow(ownerPID: 9, layer: 0, alpha: 1, bounds: CGRect(x: 0, y: 0, width: 402, height: 922))
+        let windows = [toolbar, front, back, other]
+
+        XCTAssertEqual(
+            AndroidEmulatorScreen.display(in: windows, emulatorPIDs: [7, 8], displaySize: size, cursor: nil),
+            CGRect(x: 100, y: 128, width: 402, height: 894)
+        )
+        XCTAssertEqual(
+            AndroidEmulatorScreen.display(in: windows, emulatorPIDs: [7, 8], displaySize: size, cursor: CGPoint(x: 800, y: 500)),
+            CGRect(x: 700, y: 128, width: 402, height: 894)
+        )
+        XCTAssertNil(AndroidEmulatorScreen.display(in: windows, emulatorPIDs: [], displaySize: size, cursor: nil))
     }
     #endif
 
