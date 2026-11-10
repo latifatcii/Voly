@@ -136,14 +136,30 @@ final class VolySimulatorManager {
 
     // MARK: - Discovery
 
-    func refresh() async {
+    /// A refresh whose result the caller is going to read: waits out one
+    /// that is already running (at launch that includes switching
+    /// integration on, which takes seconds) instead of returning early with
+    /// the old list.
+    func refreshAndWait(includingRunningApps: Bool) async {
+        for _ in 0..<300 where refreshInFlight {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        await refresh(includingRunningApps: includingRunningApps)
+    }
+
+    /// - Parameter includingRunningApps: list running apps even while the
+    ///   inspector is hidden (an AI agent asked what is running).
+    func refresh(includingRunningApps: Bool = false) async {
         guard !refreshInFlight else { return }
         refreshInFlight = true
         defer { refreshInFlight = false }
 
-        let devices: [SimDevice]
+        var devices: [SimDevice]
         do {
             devices = try await inventory.listDevices(bootedOnly: true)
+            #if DEBUG
+            if let only = ScriptedRun.simulators { devices = devices.filter { only.contains($0.udid) } }
+            #endif
             discoveryError = nil
         } catch {
             discoveryError = "Could not list simulators: \(error.localizedDescription)"
@@ -169,7 +185,7 @@ final class VolySimulatorManager {
         for device in devices {
             let integration = coordinator.state(forSimulator: device.udid)
             var apps: [RunningAppEntry] = []
-            if isInspectorVisible {
+            if isInspectorVisible || includingRunningApps {
                 let instrumented = Set(portFiles.scan(deviceUDIDs: [device.udid]).map(\.pid))
                 let running = (try? await runningApps.listRunningUserApps(deviceUDID: device.udid)) ?? []
                 apps = running.map { app in

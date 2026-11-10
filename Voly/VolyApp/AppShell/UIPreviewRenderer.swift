@@ -25,6 +25,9 @@ enum UIPreviewRenderer {
         for tab in DetailTab.allCases {
             await render(connected, tab: tab, to: outputDirectory.appendingPathComponent("\(tab.rawValue).png"))
         }
+        let agentAtWork = makeSession(connected: true)
+        agentAtWork.agentAccess.setPreview(lastToolCall: "get_screen")
+        await render(agentAtWork, tab: .hierarchy, to: outputDirectory.appendingPathComponent("agent-active.png"))
         let empty = makeSession(connected: false)
         await render(empty, tab: .hierarchy, to: outputDirectory.appendingPathComponent("empty.png"))
         await render(empty, tab: .layout, to: outputDirectory.appendingPathComponent("no-selection.png"))

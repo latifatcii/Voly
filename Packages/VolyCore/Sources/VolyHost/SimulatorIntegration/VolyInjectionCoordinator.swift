@@ -81,8 +81,15 @@ public struct VolyInjectionCoordinator: Sendable {
         self.loadTimeout = loadTimeout
     }
 
+    /// Overrides where Voly keeps its state (tests run a scratch Voly
+    /// beside a real one).
+    public static let supportDirectoryEnvironmentKey = "VOLY_SUPPORT_DIRECTORY"
+
     public static var defaultSupportDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        if let override = ProcessInfo.processInfo.environment[supportDirectoryEnvironmentKey], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Developer/Voly", isDirectory: true)
     }
 

@@ -11,6 +11,9 @@
 //   volyctl screenshot <udid> <bundle-id> app|view:<id> <out.png>
 //   volyctl source <udid> <bundle-id> <ClassName>
 //   volyctl simulator-window
+//   volyctl mcp [--socket <path>]      MCP server on stdio, backed by a running Voly.app
+//   volyctl mcp-direct <udid>          the same tools without Voly.app, straight to the
+//                                      agents in one simulator (for scripted checks)
 
 #if os(macOS)
 import Foundation
@@ -85,6 +88,69 @@ func connect(to agent: DiscoveredAgent, token: String?? = nil) async throws -> (
         throw Failure("port \(agent.port) answered as pid \(pid), expected \(agent.pid)")
     }
     return (client, accepted)
+}
+
+/// `MCPInspecting` without Voly.app: every command opens its own
+/// authenticated connection to the agent, in one simulator.
+struct DirectInspector: MCPInspecting {
+    let udid: String
+    let coordinator: VolyInjectionCoordinator
+
+    var access: MCPAccess { .full }
+
+    private func agents() -> [DiscoveredAgent] {
+        PortFileWatcher().scan(deviceUDIDs: [udid])
+    }
+
+    private func id(of agent: DiscoveredAgent) -> String {
+        "\(agent.deviceUDID):\(agent.bundleIdentifier):\(agent.pid)"
+    }
+
+    func apps() async -> [MCPApp] {
+        agents().map {
+            MCPApp(
+                id: id(of: $0), name: $0.processName, bundleIdentifier: $0.bundleIdentifier, pid: $0.pid,
+                simulatorUDID: udid, simulatorName: nil, isShownInVoly: false
+            )
+        }
+    }
+
+    func overview() async -> MCPOverview {
+        let devices = (try? await SimInventory().listDevices(bootedOnly: true)) ?? []
+        let simulators = devices.filter { $0.udid == udid }.map {
+            MCPSimulator(
+                udid: $0.udid, name: $0.name, runtime: $0.runtime,
+                integration: "\(coordinator.state(forSimulator: $0.udid))".prefix(while: { $0 != "(" }).description,
+                isIntegrationActive: coordinator.state(forSimulator: $0.udid).isActive, appsWithoutAgent: []
+            )
+        }
+        return MCPOverview(simulators: simulators, apps: await apps())
+    }
+
+    func send(_ command: Command, to appID: String) async throws -> Response {
+        guard let agent = agents().first(where: { id(of: $0) == appID }) else {
+            throw Failure("that app is no longer running")
+        }
+        let (client, _) = try await connect(to: agent)
+        defer { client.close() }
+        let response = try await client.send(command)
+        if case .error(let error) = response { throw error }
+        return response
+    }
+
+    func selection() async -> (appID: String, viewID: ObjectID)? { nil }
+
+    func select(view: ObjectID, in appID: String) async throws {
+        _ = try await send(.highlight(objectID: view), to: appID)
+    }
+
+    func appDidChange(_ appID: String) async {}
+
+    func relaunch(bundleIdentifier: String, simulatorUDID: String) async throws {
+        throw Failure("relaunching needs Voly.app")
+    }
+
+    func noteToolCall(_ name: String) async {}
 }
 
 func describe(_ response: Response) -> String {
@@ -244,6 +310,19 @@ func run(_ arguments: [String]) async throws {
         if arguments.contains("--open"), let first = lookup.locations.first {
             try await VolySourceNavigator().open(first)
         }
+
+    case "mcp":
+        MCPStdioRelay.run(
+            socketPath: option("--socket", in: arguments) ?? MCPEndpoint.socketPath,
+            version: "volyctl", launchVoly: nil
+        )
+
+    case "mcp-direct":
+        guard arguments.count >= 2 else { throw Failure("usage: volyctl mcp-direct <udid>") }
+        MCPStdio.serve(MCPServer(
+            name: "voly", title: "Voly", version: "volyctl", instructions: MCPToolbox.instructions,
+            provider: MCPToolbox(inspector: DirectInspector(udid: arguments[1], coordinator: coordinator))
+        ))
 
     default:
         throw Failure("unknown command \(verb)")

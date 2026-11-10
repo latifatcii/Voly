@@ -57,6 +57,8 @@ final class SampleRootViewController: UIViewController {
             switch step {
             case "localize":
                 tabs.selectedIndex = 1
+            case "form":
+                tabs.selectedIndex = 2
             case "detail":
                 localization.loadViewIfNeeded()
                 localization.showDetails(animated: false)

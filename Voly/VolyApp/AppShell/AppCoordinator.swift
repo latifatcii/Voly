@@ -150,6 +150,7 @@ final class AppCoordinator {
         menuBar.integratesAllSimulatorsProvider = { [weak self] in
             self?.simulators.preference.allSimulators ?? true
         }
+        menuBar.agentAccess = session.agentAccess
         menuBar.onSetIntegratesAllSimulators = { [weak self] all in
             Task { @MainActor [weak self] in await self?.simulators.setIntegratesAllSimulators(all) }
         }

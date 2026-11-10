@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.session = session
         coordinator = AppCoordinator(session: session)
         coordinator?.start()
+        session.agentAccess.start(session: session)
         installTerminationSignals()
         if scripted {
             coordinator?.showInspector()
@@ -97,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// first unloads it everywhere. The wait is bounded: a stuck simulator
     /// can't keep the app from quitting.
     func applicationWillTerminate(_ notification: Notification) {
+        session?.agentAccess.stop()
         guard let unload = session?.simulators.prepareUnloadForQuit() else { return }
         let done = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {

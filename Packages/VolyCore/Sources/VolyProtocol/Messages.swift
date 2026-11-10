@@ -176,6 +176,8 @@ public enum Command: Codable, Sendable {
     case screenInfo
     case navigationState
     case navigate(NavigationAction)
+    /// The view tree with each view's content, styling and layout flags.
+    case describeScreen(ScreenDescriptionRequest)
 }
 
 public enum Response: Codable, Sendable {
@@ -197,6 +199,7 @@ public enum Response: Codable, Sendable {
     case screenInfo(ScreenInfo)
     case navigationState(NavigationState)
     case navigationResult(NavigationResult)
+    case screenDescription(ScreenDescription)
     case ack
     case pong
     case error(InspectorError)
