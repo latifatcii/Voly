@@ -119,17 +119,25 @@ final class AndroidDeviceManager {
         }
     }
 
-    /// The integration, once there is something for it to talk to: adb is
-    /// installed, its server is running, and the agent is in the bundle.
+    /// The integration, once there is something for it to talk to: an adb
+    /// server is running, its adb is found, and the agent is in the bundle.
     private func currentIntegration() async -> AndroidIntegration? {
-        if adbURL == nil, Date().timeIntervalSince(lastAdbLookup) > 30 {
+        guard await Task.detached(operation: { AdbServerProbe.isRunning() }).value else {
+            // No server, so no forwarded ports either: start over when one is back.
+            integration = nil
+            return nil
+        }
+        if let integration { return integration }
+        // The server's own adb when it can be told, so Voly never makes the
+        // server restart over a version mismatch; else the usual places.
+        if Date().timeIntervalSince(lastAdbLookup) > 10 || adbURL == nil {
             lastAdbLookup = Date()
-            adbURL = await Task.detached { AdbLocator.locate() }.value
-            if let adbURL { log.notice("adb found at \(adbURL.path, privacy: .public)") }
+            adbURL = await Task.detached {
+                AdbLocator.runningServerExecutable() ?? AdbLocator.locate()
+            }.value
+            if let adbURL { log.notice("using adb at \(adbURL.path, privacy: .public)") }
         }
         guard let adbURL else { return nil }
-        guard await Task.detached(operation: { AdbServerProbe.isRunning() }).value else { return nil }
-        if let integration { return integration }
         do {
             let payload = try AndroidAgentPayload.load(from: AndroidAgentPayload.bundledDirectories())
             let created = AndroidIntegration(adb: AdbClient(executable: adbURL), payload: payload)

@@ -177,6 +177,19 @@ public actor AndroidIntegration {
             return AndroidDeviceStatus(device: device, isIntegrationEnabled: true, apps: [], error: error.localizedDescription)
         }
 
+        // An adb server that was restarted lost every forwarded port, and
+        // with it the way to the agents: those are attached again below.
+        if agents.keys.contains(where: { $0.serial == serial }) {
+            let listed = (try? await adb.run(["-s", serial, "forward", "--list"], timeout: 5))
+                .flatMap { $0.succeeded ? $0.text : nil }
+            if let listed {
+                for (key, endpoint) in agents where key.serial == serial && !listed.contains("tcp:\(endpoint.port) ") {
+                    log.notice("port \(endpoint.port) is no longer forwarded; attaching to \(endpoint.package, privacy: .public) again")
+                    agents[key] = nil
+                }
+            }
+        }
+
         // Processes that ended: free their forwarded ports.
         let alive = Set(running.map { Key(serial: serial, pid: $0.pid) })
         for (key, endpoint) in agents where key.serial == serial && !alive.contains(key) {

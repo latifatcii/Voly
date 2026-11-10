@@ -90,6 +90,42 @@ public enum AdbLocator {
     ) -> URL? {
         candidates.first(where: isExecutable).map { URL(fileURLWithPath: $0) }
     }
+
+    /// The adb executable the running server was started from.
+    ///
+    /// This is the one to use whenever it can be told: an adb client of
+    /// another version makes the server restart itself, which would cut off
+    /// Android Studio's debugger and everything else attached through it.
+    public static func serverExecutable(
+        processList: String,
+        isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) -> URL? {
+        for line in processList.split(whereSeparator: \.isNewline) {
+            // `/path/to/adb -L tcp:5037 fork-server server --reply-fd 4`
+            guard let marker = line.range(of: " fork-server server") else { continue }
+            var command = String(line[..<marker.lowerBound])
+            if let listen = command.range(of: " -L ") { command = String(command[..<listen.lowerBound]) }
+            let path = command.trimmingCharacters(in: .whitespaces)
+            if path.hasPrefix("/"), (path as NSString).lastPathComponent == "adb", isExecutable(path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+        return nil
+    }
+
+    /// `serverExecutable` for the processes running now.
+    public static func runningServerExecutable() -> URL? {
+        let ps = Process()
+        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+        ps.arguments = ["-axww", "-o", "args="]
+        let output = Pipe()
+        ps.standardOutput = output
+        ps.standardError = FileHandle.nullDevice
+        guard (try? ps.run()) != nil else { return nil }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        ps.waitUntilExit()
+        return serverExecutable(processList: String(decoding: data, as: UTF8.self))
+    }
 }
 
 /// Whether an adb server is already running on this Mac.

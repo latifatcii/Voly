@@ -125,6 +125,21 @@ final class AndroidDiscoveryTests: XCTestCase {
         XCTAssertNil(AdbLocator.locate(candidates: ["/a"], isExecutable: { _ in false }))
     }
 
+    func test_the_running_servers_own_adb_is_preferred() {
+        let processes = """
+            /sbin/launchd
+            /Users/John Doe/Library/Android/sdk/platform-tools/adb -L tcp:5037 fork-server server --reply-fd 4
+            /Applications/Android Studio.app/Contents/MacOS/studio
+            grep adb fork-server server
+            """
+        XCTAssertEqual(
+            AdbLocator.serverExecutable(processList: processes, isExecutable: { _ in true })?.path,
+            "/Users/John Doe/Library/Android/sdk/platform-tools/adb"
+        )
+        XCTAssertNil(AdbLocator.serverExecutable(processList: processes, isExecutable: { _ in false }))
+        XCTAssertNil(AdbLocator.serverExecutable(processList: "/usr/bin/adb devices\n", isExecutable: { _ in true }))
+    }
+
     func test_png_size_is_read_from_the_header() {
         XCTAssertEqual(PNGSize.read(AndroidFixtures.onePixelPNG)?.width, 1)
         XCTAssertEqual(PNGSize.read(AndroidFixtures.onePixelPNG)?.height, 1)
@@ -166,11 +181,15 @@ enum AndroidFixtures {
     static func device(
         running: @escaping @Sendable () -> [(package: String, pid: Int32)],
         releaseBuilds: Set<String> = [],
-        attachFails: Bool = false
+        attachFails: Bool = false,
+        forwardsLost: Bool = false
     ) -> ScriptedAdb {
         ScriptedAdb { arguments in
             if arguments == ["devices"] { return ScriptedAdb.ok("List of devices attached\nemulator-5554\tdevice\n") }
             if arguments.contains("forward") {
+                if arguments.contains("--list") {
+                    return ScriptedAdb.ok(forwardsLost ? "" : "emulator-5554 tcp:40123 localabstract:voly-agent\n")
+                }
                 return arguments.contains("--remove") ? ScriptedAdb.ok() : ScriptedAdb.ok("40123\n")
             }
             if arguments.contains("push") { return ScriptedAdb.ok("1 file pushed") }
@@ -400,6 +419,17 @@ final class AndroidIntegrationTests: XCTestCase {
         let gone = await refresh(integration)
         XCTAssertTrue(gone.agents.isEmpty)
         XCTAssertEqual(gone.devices.first?.apps, [])
+    }
+
+    func test_an_agent_whose_forwarded_port_is_gone_is_attached_again() async {
+        // As after `adb kill-server`: the app still runs, the way to it doesn't.
+        let running = Running([("com.example.app", 4242)])
+        let adb = AndroidFixtures.device(running: { running.value }, forwardsLost: true)
+        let integration = integration(adb)
+        _ = await refresh(integration)
+        let again = await refresh(integration)
+        XCTAssertEqual(again.agents.map(\.pid), [4242])
+        XCTAssertEqual(adb.shellCommands.filter { $0.hasPrefix("cmd activity attach-agent") }.count, 2)
     }
 
     func test_a_device_that_is_switched_off_is_left_alone() async {
