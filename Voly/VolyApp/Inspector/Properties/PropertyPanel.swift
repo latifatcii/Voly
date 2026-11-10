@@ -46,6 +46,9 @@ struct PropertyPanel: View {
                     }
                 }
                 .padding(VolyTheme.gutter)
+                // Rows keep what is being typed or picked; that must never
+                // carry over to the next view that gets selected.
+                .id(bag.objectID)
             } else {
                 EmptyView()
             }
@@ -124,9 +127,7 @@ struct PropertyRow: View {
         case .double(let v):
             DoubleField(value: v, readOnly: readOnly) { onChange(.double($0)) }
         case .string(let v):
-            TextField("", text: Binding(get: { v }, set: { onChange(.string($0)) }))
-                .volyField()
-                .disabled(readOnly)
+            StringField(value: v, readOnly: readOnly) { onChange(.string($0)) }
         case .color(let c):
             ColorPickerField(color: c, readOnly: readOnly) { onChange(.color($0)) }
         case .size(let s):
@@ -147,6 +148,36 @@ struct PropertyRow: View {
 
     private func fmt(_ d: Double) -> String {
         String(format: "%.1f", d)
+    }
+}
+
+/// Text that is sent as it is typed. While the field has focus it shows what
+/// was typed, not what the app last reported: a reply to an earlier
+/// keystroke would otherwise overwrite the characters typed since.
+private struct StringField: View {
+    let value: String
+    let readOnly: Bool
+    let onChange: (String) -> Void
+    @State private var draft: String?
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("", text: Binding(
+            get: { draft ?? value },
+            set: { newValue in
+                // Only an edit is a change; the field also writes back the
+                // text it already shows, e.g. when it gains or loses focus.
+                guard newValue != (draft ?? value) else { return }
+                draft = newValue
+                onChange(newValue)
+            }
+        ))
+        .volyField()
+        .focused($isFocused)
+        .disabled(readOnly)
+        .onChange(of: isFocused) { _, focused in
+            if !focused { draft = nil }
+        }
     }
 }
 
@@ -209,7 +240,12 @@ private struct ColorPickerField: View {
     }
     var body: some View {
         HStack {
-            ColorPicker("", selection: $picked, supportsOpacity: true)
+            // Only a color picked in the panel is a change. Showing a color
+            // the app reported (another view was selected, the value changed
+            // in the app) goes through `picked` too and must not be sent
+            // back: that would turn an inherited tint or a dynamic color into
+            // a fixed one, and recolor all of an attributed text.
+            ColorPicker("", selection: Binding(get: { picked }, set: { pick($0) }), supportsOpacity: true)
                 .labelsHidden()
                 .disabled(readOnly)
             Text(color.hex).font(VolyTheme.code()).foregroundStyle(VolyTheme.dim).textSelection(.enabled)
@@ -222,24 +258,28 @@ private struct ColorPickerField: View {
             NSColorPanel.shared.level = .popUpMenu
             NSColorPanel.shared.hidesOnDeactivate = false
         }
-        .onChange(of: picked) { _, newValue in
-            let ns = NSColor(newValue).usingColorSpace(.sRGB) ?? NSColor(newValue)
-            onCommit(CGColorCodable(red: Double(ns.redComponent),
-                                    green: Double(ns.greenComponent),
-                                    blue: Double(ns.blueComponent),
-                                    alpha: Double(ns.alphaComponent)))
-        }
-        .onChange(of: colorIdentity) { _, _ in
-            // Re-seed local state if the color is updated externally (e.g. the
-            // server clamped / replaced the value after we committed).
-            picked = Color(red: color.red, green: color.green,
-                           blue: color.blue, opacity: color.alpha)
+        .onChange(of: color) { _, newValue in
+            picked = Color(red: newValue.red, green: newValue.green,
+                           blue: newValue.blue, opacity: newValue.alpha)
         }
     }
 
-    /// Tuple used as the observation key so SwiftUI detects external color
-    /// changes on the incoming `color` value.
-    private var colorIdentity: String {
-        "\(color.red),\(color.green),\(color.blue),\(color.alpha)"
+    private func pick(_ newValue: Color) {
+        picked = newValue
+        let ns = NSColor(newValue).usingColorSpace(.sRGB) ?? NSColor(newValue)
+        let chosen = CGColorCodable(
+            red: Double(ns.redComponent), green: Double(ns.greenComponent),
+            blue: Double(ns.blueComponent), alpha: Double(ns.alphaComponent)
+        )
+        // The panel echoes the color it was just shown; that is not a pick.
+        guard Self.differ(chosen, color) else { return }
+        onCommit(chosen)
+    }
+
+    /// Whether two colors are further apart than 8-bit rounding.
+    private static func differ(_ a: CGColorCodable, _ b: CGColorCodable) -> Bool {
+        let step = 0.5 / 255
+        return abs(a.red - b.red) > step || abs(a.green - b.green) > step
+            || abs(a.blue - b.blue) > step || abs(a.alpha - b.alpha) > step
     }
 }
