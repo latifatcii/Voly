@@ -24,7 +24,9 @@ final class InspectorSession {
     /// connected at once; `client` is the one commands currently go to, and
     /// each client is bound to the single process its handshake verified.
     private var clients: [ConnectionManager.Peer.ID: WebSocketClient] = [:]
-    private static let maxPooledConnections = 4
+    private static let maxPooledConnections = 8
+    /// Peers with a background connection attempt in flight.
+    private var connectingPeerIDs: Set<ConnectionManager.Peer.ID> = []
     private var selectedPeer: ConnectionManager.Peer?
     /// Booted simulators and their per-simulator runtime integration.
     let simulators = VolySimulatorManager()
@@ -48,13 +50,20 @@ final class InspectorSession {
         startFileDiscoveryLoop()
         connections.startBrowsing()
         connections.onPeerAppeared = { [weak self] peer in
-            guard let self else { return }
-            guard self.autoConnectEnabled, !self.hasAutoConnected else { return }
-            guard self.state.connectionStatus == .disconnected else { return }
-            self.hasAutoConnected = true
-            log.notice("auto-connecting to first discovered peer: \(peer.displayName, privacy: .public)")
-            Task { [weak self] in
-                await self?.connect(to: peer)
+            guard let self, self.autoConnectEnabled else { return }
+            if !self.hasAutoConnected, self.state.connectionStatus == .disconnected {
+                self.hasAutoConnected = true
+                log.notice("auto-connecting to first discovered peer: \(peer.displayName, privacy: .public)")
+                Task { [weak self] in
+                    await self?.connect(to: peer)
+                }
+            } else if peer.deviceUDID != nil {
+                // Every other instrumented simulator app is connected in the
+                // background, so picking a view in any of them can bring it
+                // into the inspector without a click here first.
+                Task { [weak self] in
+                    await self?.connectInBackground(peer)
+                }
             }
         }
     }
@@ -102,18 +111,57 @@ final class InspectorSession {
 
     /// Add a freshly handshaken client to the pool and make it active.
     private func adopt(_ client: WebSocketClient, peerID: String) async {
+        await pool(client, peerID: peerID)
+        await activate(client, peerID: peerID)
+    }
+
+    private func pool(_ client: WebSocketClient, peerID: String) async {
         if clients.count >= Self.maxPooledConnections,
            let evicted = clients.keys.first(where: { $0 != state.activePeerID }) {
             await clients.removeValue(forKey: evicted)?.disconnect()
         }
         clients[peerID] = client
+        state.connectedPeerIDs = Set(clients.keys)
         pumpEvents(client: client, peerID: peerID)
-        await activate(client, peerID: peerID)
+        // Pick mode covers every connected app, including late arrivals.
+        if state.pickModeActive { _ = try? await client.send(.enterPickMode) }
+    }
+
+    /// Connect without taking over the inspector. The app becomes active
+    /// when the user picks a view in it or clicks it in the list.
+    private func connectInBackground(_ peer: ConnectionManager.Peer) async {
+        guard clients[peer.id] == nil, connectingPeerIDs.insert(peer.id).inserted else { return }
+        defer { connectingPeerIDs.remove(peer.id) }
+        let client = WebSocketClient()
+        do {
+            try await client.connect(to: peer.endpoint, authToken: peer.token, expectedPID: peer.pid)
+        } catch {
+            log.info("background connect to \(peer.displayName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        guard clients[peer.id] == nil else {
+            await client.disconnect()
+            return
+        }
+        log.notice("connected in background to \(peer.displayName, privacy: .public) pid=\(peer.pid ?? -1) sim=\(peer.deviceUDID ?? "-", privacy: .public)")
+        if self.client == nil, state.connectionStatus == .disconnected {
+            // Nothing is being inspected (the first connection failed or its
+            // app went away): this one takes the inspector.
+            selectedPeer = peer
+            hasAutoConnected = true
+            await adopt(client, peerID: peer.id)
+        } else {
+            await pool(client, peerID: peer.id)
+        }
     }
 
     private func activate(_ client: WebSocketClient, peerID: String) async {
         self.client = client
+        // Pick mode is a property of the inspector, not of one app: it
+        // survives moving between apps.
+        let picking = state.pickModeActive
         state.resetForNewAgent()
+        state.pickModeActive = picking
         measurement.reset()
         lastMeasurementSummary = nil
         state.agent = await client.agent
@@ -121,19 +169,28 @@ final class InspectorSession {
         state.connectedPeerIDs = Set(clients.keys)
         state.connectionStatus = .connected
         await refreshHierarchy()
+        guard client === self.client else { return }   // switched again meanwhile
         await refreshRuntimeState()
     }
 
-    /// Before switching apps: don't leave pick mode or overlays behind in the
-    /// app we stop driving. Its connection stays in the pool.
+    /// Before switching apps: take Voly's selection highlight and
+    /// measurement guides off the app we stop driving. Its connection stays
+    /// in the pool, and it stays pickable if pick mode is on.
     private func leaveActiveAgent() async {
         guard let client else { return }
-        hoverMonitor.stop()
-        if state.pickModeActive { _ = try? await client.send(.exitPickMode) }
-        _ = try? await client.send(.clearMeasure)
-        _ = try? await client.send(.clearSelection)
         self.client = nil
         state.activePeerID = nil
+        _ = try? await client.send(.clearMeasure)
+        _ = try? await client.send(.clearSelection)
+    }
+
+    /// The user picked a view in an app the inspector wasn't showing.
+    private func switchActive(to client: WebSocketClient, peerID: String) async {
+        guard client !== self.client, clients[peerID] === client else { return }
+        await leaveActiveAgent()
+        selectedPeer = connections.peers.first { $0.id == peerID } ?? selectedPeer
+        log.notice("pick in \(self.selectedPeer?.displayName ?? peerID, privacy: .public) — switching the inspector to it")
+        await activate(client, peerID: peerID)
     }
 
     func reconnect() async {
@@ -187,7 +244,7 @@ final class InspectorSession {
         guard let client else { return }
         do {
             let response = try await client.send(.getHierarchy)
-            if case .hierarchy(let snapshot) = response {
+            if case .hierarchy(let snapshot) = response, client === self.client {
                 state.hierarchy = snapshot
             }
         } catch {
@@ -199,7 +256,7 @@ final class InspectorSession {
         guard let client else { return }
         do {
             let response = try await client.send(.getSubtree(objectID: id, maxDepth: depth))
-            if case .subtree(let node) = response {
+            if case .subtree(let node) = response, client === self.client {
                 state.merge(subtree: node)
             }
         } catch {
@@ -237,7 +294,7 @@ final class InspectorSession {
         guard let client else { return }
         do {
             let response = try await client.send(.getProperties(objectID: id))
-            if case .properties(let bag) = response {
+            if case .properties(let bag) = response, client === self.client {
                 state.propertyBag = bag
             }
         } catch {
@@ -249,7 +306,7 @@ final class InspectorSession {
         guard let client else { return }
         do {
             let response = try await client.send(.getConstraints(objectID: id))
-            if case .constraints(let list) = response {
+            if case .constraints(let list) = response, client === self.client {
                 state.constraints = list
             }
         } catch {
@@ -285,17 +342,25 @@ final class InspectorSession {
     /// and the Mac-side hover monitor starts driving live measurements against
     /// whatever view is selected. If Accessibility isn't granted, the hover
     /// monitor fails silently — clicking still works, just no hover measure.
+    ///
+    /// Pick mode is switched on in *every* connected app, not just the one
+    /// being inspected: clicking a view in any simulator selects it, and if
+    /// it belongs to another app the inspector switches to that app.
     func enterPickMode() async {
         _ = hoverMonitor.start()
-        _ = try? await client?.send(.enterPickMode)
         state.pickModeActive = true
+        for pooled in clients.values {
+            _ = try? await pooled.send(.enterPickMode)
+        }
     }
 
     func exitPickMode() async {
         hoverMonitor.stop()
-        _ = try? await client?.send(.exitPickMode)
-        _ = try? await client?.send(.clearMeasure)
         state.pickModeActive = false
+        for pooled in clients.values {
+            _ = try? await pooled.send(.exitPickMode)
+            _ = try? await pooled.send(.clearMeasure)
+        }
         measurement.reset()
         lastMeasurementSummary = nil
         await clearSelection()
@@ -617,9 +682,14 @@ final class InspectorSession {
             log.info("pumpEvents: started for \(peerID, privacy: .public)")
             for await event in client.events {
                 guard let self else { return }
-                // Pooled background connections stay quiet; only the app the
-                // inspector is driving may change its state.
-                guard client === self.client else { continue }
+                if client !== self.client {
+                    // A background app only speaks up for one thing: the user
+                    // picked a view in it. That means "inspect this app now".
+                    guard case .selectionChanged(let id) = event else { continue }
+                    await self.switchActive(to: client, peerID: peerID)
+                    if client === self.client { await self.select(id) }
+                    continue
+                }
                 log.notice("event received: \(String(describing: event), privacy: .public)")
                 switch event {
                 case .selectionChanged(let id):
