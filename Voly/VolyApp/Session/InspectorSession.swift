@@ -46,8 +46,11 @@ final class InspectorSession {
     private let portFileWatcher = PortFileWatcher()
     private var fileDiscoveryTimer: Timer?
 
-    init() {
+    /// - Parameter startDiscovery: false builds a session that never looks
+    ///   for or connects to agents — used to render the UI from fixtures.
+    init(startDiscovery: Bool = true) {
         hoverMonitor.session = self
+        guard startDiscovery else { return }
         startFileDiscoveryLoop()
         connections.startBrowsing()
         connections.onPeerAppeared = { [weak self] peer in

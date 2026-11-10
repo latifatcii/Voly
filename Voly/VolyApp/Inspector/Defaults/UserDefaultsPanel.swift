@@ -11,51 +11,94 @@ struct UserDefaultsPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                TextField("Suite name (blank = standard)", text: $suite)
-                    .textFieldStyle(.roundedBorder)
-                Button("Load") { Task { await session.listUserDefaults(suite: suite.isEmpty ? nil : suite) } }
-            }
-            .padding(8)
-            Divider()
-
-            Table(session.state.userDefaults) {
-                TableColumn("Key") { item in
-                    Text(item.key).fontDesign(.monospaced).font(.caption)
-                }
-                .width(min: 140, ideal: 220)
-                TableColumn("Type") { item in
-                    Text(item.type.rawValue).font(.caption2).foregroundStyle(.secondary)
-                }
-                .width(60)
-                TableColumn("Value") { item in
-                    Text(describe(item.value)).font(.caption)
-                }
-                TableColumn("") { item in
-                    Button(role: .destructive) {
-                        Task { await session.deleteUserDefault(suite: item.suite.isEmpty ? nil : item.suite, key: item.key) }
-                    } label: {
-                        Image(systemName: "trash")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    VolySection("Suite") {
+                        HStack(spacing: 8) {
+                            VolyTextField("Standard defaults", text: $suite)
+                                .onSubmit(load)
+                            Button("Load", action: load)
+                                .buttonStyle(VolyTextButtonStyle())
+                        }
+                        .volyCard()
                     }
-                    .buttonStyle(.plain)
+                    VolySection("Keys") {
+                        Text("\(session.state.userDefaults.count)")
+                            .font(VolyTheme.code(10.5))
+                            .foregroundStyle(VolyTheme.faint)
+                    } content: {
+                        if session.state.userDefaults.isEmpty {
+                            Text("Load a suite to see its keys.")
+                                .font(VolyTheme.small)
+                                .foregroundStyle(VolyTheme.dim)
+                                .volyCard()
+                        } else {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(session.state.userDefaults.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { VolyTheme.hairline.frame(height: 1) }
+                                    row(item)
+                                }
+                            }
+                            .volyCard(padding: 0)
+                        }
+                    }
                 }
-                .width(24)
+                .padding(VolyTheme.gutter)
             }
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Add / replace key").font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    TextField("key", text: $newKey).textFieldStyle(.roundedBorder)
-                    TextField("value", text: $newValue).textFieldStyle(.roundedBorder)
-                    Button("Save") { save() }.disabled(newKey.isEmpty)
-                }
-            }
-            .padding(8)
+            VolyTheme.hairline.frame(height: 1)
+            addRow
         }
     }
 
+    private func row(_ item: UserDefaultsItem) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.key)
+                    .font(VolyTheme.code())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                Text(describe(item.value))
+                    .font(VolyTheme.code(11))
+                    .foregroundStyle(VolyTheme.dim)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 6)
+            VolyChip(text: item.type.rawValue)
+            Button(role: .destructive) {
+                Task { await session.deleteUserDefault(suite: item.suite.isEmpty ? nil : item.suite, key: item.key) }
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 11))
+                    .foregroundStyle(VolyTheme.dim)
+            }
+            .buttonStyle(.plain)
+            .help("Delete \(item.key)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+    }
+
+    private var addRow: some View {
+        HStack(spacing: 8) {
+            VolyTextField("Key", text: $newKey)
+            VolyTextField("Value", text: $newValue).onSubmit(save)
+            Button("Save", action: save)
+                .buttonStyle(VolyTextButtonStyle())
+                .disabled(newKey.isEmpty)
+                .help("Add the key, or replace its value")
+        }
+        .padding(VolyTheme.gutter)
+        .background(VolyTheme.chrome.opacity(0.55))
+    }
+
+    private func load() {
+        Task { await session.listUserDefaults(suite: suite.isEmpty ? nil : suite) }
+    }
+
     private func save() {
+        guard !newKey.isEmpty else { return }
         let suiteValue = suite.isEmpty ? nil : suite
         let request = UserDefaultsSetRequest(suite: suiteValue, key: newKey, value: bestValue(for: newValue))
         Task {
@@ -75,7 +118,7 @@ struct UserDefaultsPanel: View {
 
     private func describe(_ v: PropValue) -> String {
         switch v {
-        case .null: return "—"
+        case .null: return "nil"
         case .bool(let b): return b ? "true" : "false"
         case .int(let i): return "\(i)"
         case .double(let d): return "\(d)"

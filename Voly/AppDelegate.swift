@@ -12,6 +12,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         let environment = ProcessInfo.processInfo.environment
         #if DEBUG
+        // Render the inspector from fixtures to PNGs and exit. Touches no
+        // simulator and no agent, so it is safe next to a running Voly.
+        if let directory = environment["VOLY_UI_PREVIEW"] {
+            Task { @MainActor in
+                await UIPreviewRenderer.run(outputDirectory: URL(fileURLWithPath: directory, isDirectory: true))
+                exit(0)
+            }
+            return
+        }
+        #endif
+        #if DEBUG
         // Scripted smoke runs of a debug build: no modal waiting for a click,
         // and the inspector on screen without the global hotkey.
         let scripted = environment["VOLY_SCRIPTED_RUN"] == "1"

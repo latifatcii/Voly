@@ -12,72 +12,79 @@ struct PropertyPanel: View {
     var body: some View {
         ScrollView {
             if let bag = session.state.propertyBag {
-                VStack(alignment: .leading, spacing: 12) {
-                    DisclosureGroup("View", isExpanded: $viewExpanded) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(bag.view.keys.sorted(), id: \.self) { key in
-                                if let value = bag.view[key] {
-                                    PropertyRow(
-                                        name: key,
-                                        value: value,
-                                        readOnly: false,
-                                        onChange: { newValue in
-                                            Task {
-                                                await session.setProperty(SetPropertyRequest(
-                                                    objectID: bag.objectID, scope: .view,
-                                                    change: PropertyChange(property: key, value: newValue)))
-                                            }
-                                        }
-                                    )
+                VStack(alignment: .leading, spacing: 14) {
+                    section("View", isExpanded: $viewExpanded) {
+                        ForEach(bag.view.keys.sorted(), id: \.self) { key in
+                            if let value = bag.view[key] {
+                                PropertyRow(name: key, value: value, readOnly: false) { newValue in
+                                    set(key, to: newValue, scope: .view, on: bag.objectID)
                                 }
                             }
                         }
                     }
-                    DisclosureGroup("Layer", isExpanded: $layerExpanded) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(bag.layer.keys.sorted(), id: \.self) { key in
-                                if let value = bag.layer[key] {
-                                    PropertyRow(
-                                        name: key,
-                                        value: value,
-                                        readOnly: false,
-                                        onChange: { newValue in
-                                            Task {
-                                                await session.setProperty(SetPropertyRequest(
-                                                    objectID: bag.objectID, scope: .layer,
-                                                    change: PropertyChange(property: key, value: newValue)))
-                                            }
-                                        }
-                                    )
+                    section("Layer", isExpanded: $layerExpanded) {
+                        ForEach(bag.layer.keys.sorted(), id: \.self) { key in
+                            if let value = bag.layer[key] {
+                                PropertyRow(name: key, value: value, readOnly: false) { newValue in
+                                    set(key, to: newValue, scope: .layer, on: bag.objectID)
                                 }
                             }
                         }
                     }
                     if !bag.custom.isEmpty {
-                        DisclosureGroup("Custom", isExpanded: $customExpanded) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                ForEach(bag.custom) { descriptor in
-                                    PropertyRow(
-                                        name: descriptor.name,
-                                        value: descriptor.currentValue,
-                                        readOnly: descriptor.isReadOnly,
-                                        onChange: { newValue in
-                                            Task {
-                                                await session.setProperty(SetPropertyRequest(
-                                                    objectID: bag.objectID, scope: .custom,
-                                                    change: PropertyChange(property: descriptor.name, value: newValue)))
-                                            }
-                                        }
-                                    )
+                        section("Custom", isExpanded: $customExpanded) {
+                            ForEach(bag.custom) { descriptor in
+                                PropertyRow(
+                                    name: descriptor.name,
+                                    value: descriptor.currentValue,
+                                    readOnly: descriptor.isReadOnly
+                                ) { newValue in
+                                    set(descriptor.name, to: newValue, scope: .custom, on: bag.objectID)
                                 }
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(VolyTheme.gutter)
             } else {
                 EmptyView()
+            }
+        }
+    }
+
+    private func set(_ name: String, to value: PropValue, scope: SetPropertyRequest.Scope, on objectID: ObjectID) {
+        Task {
+            await session.setProperty(SetPropertyRequest(
+                objectID: objectID, scope: scope,
+                change: PropertyChange(property: name, value: value)))
+        }
+    }
+
+    /// A collapsible card of property rows.
+    private func section<Rows: View>(
+        _ title: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder rows: () -> Rows
+    ) -> some View {
+        VolySection(title) {
+            Button {
+                isExpanded.wrappedValue.toggle()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .semibold))
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                    .foregroundStyle(VolyTheme.dim)
+                    .frame(width: 18, height: 14)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded.wrappedValue ? "Collapse" : "Expand")
+        } content: {
+            if isExpanded.wrappedValue {
+                VStack(alignment: .leading, spacing: 7) {
+                    rows()
+                }
+                .volyCard()
             }
         }
     }
@@ -90,13 +97,10 @@ struct PropertyRow: View {
     let onChange: (PropValue) -> Void
 
     var body: some View {
-        HStack(alignment: .top) {
-            Text(PropertyNameFormatter.humanize(name))
-                .font(.caption)
-                .frame(width: 150, alignment: .leading)
-                .foregroundStyle(.primary)
-            editor.frame(maxWidth: .infinity, alignment: .leading)
+        VolyRow(label: PropertyNameFormatter.humanize(name), labelWidth: 132) {
+            editor
         }
+        .opacity(readOnly ? 0.75 : 1)
     }
 
     @ViewBuilder
@@ -105,6 +109,7 @@ struct PropertyRow: View {
         case .bool(let v):
             Toggle("", isOn: Binding(get: { v }, set: { onChange(.bool($0)) }))
                 .toggleStyle(.switch)
+                .controlSize(.mini)
                 .labelsHidden()
                 .disabled(readOnly)
         case .int(let v):
@@ -112,31 +117,31 @@ struct PropertyRow: View {
                 IntField(value: v, readOnly: readOnly) { onChange(.int($0)) }
                 if let label = PropertyValueFormatter.label(forProperty: name, intValue: v) {
                     Text(label)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(VolyTheme.small)
+                        .foregroundStyle(VolyTheme.dim)
                 }
             }
         case .double(let v):
             DoubleField(value: v, readOnly: readOnly) { onChange(.double($0)) }
         case .string(let v):
             TextField("", text: Binding(get: { v }, set: { onChange(.string($0)) }))
-                .textFieldStyle(.roundedBorder)
+                .volyField()
                 .disabled(readOnly)
         case .color(let c):
             ColorPickerField(color: c, readOnly: readOnly) { onChange(.color($0)) }
         case .size(let s):
             SizeField(value: s, readOnly: readOnly) { onChange(.size($0)) }
         case .null:
-            Text("(null)").foregroundStyle(.tertiary).font(.caption)
+            Text("nil").foregroundStyle(VolyTheme.faint).font(VolyTheme.code())
         case .url(let u):
-            Text(u.absoluteString).foregroundStyle(.secondary).font(.caption)
+            Text(u.absoluteString).foregroundStyle(VolyTheme.dim).font(VolyTheme.code()).textSelection(.enabled)
         case .rect(let r):
-            Text("x:\(fmt(r.x)) y:\(fmt(r.y)) w:\(fmt(r.width)) h:\(fmt(r.height))")
-                .foregroundStyle(.secondary).font(.caption).fontDesign(.monospaced)
+            Text("x \(fmt(r.x))  y \(fmt(r.y))  w \(fmt(r.width))  h \(fmt(r.height))")
+                .foregroundStyle(VolyTheme.dim).font(VolyTheme.code()).textSelection(.enabled)
         case .point(let p):
-            Text("x:\(fmt(p.x)) y:\(fmt(p.y))").foregroundStyle(.secondary).font(.caption).fontDesign(.monospaced)
+            Text("x \(fmt(p.x))  y \(fmt(p.y))").foregroundStyle(VolyTheme.dim).font(VolyTheme.code()).textSelection(.enabled)
         case .arrayOf, .dictOf:
-            Text("(complex value)").foregroundStyle(.tertiary).font(.caption)
+            Text("Not editable here").foregroundStyle(VolyTheme.faint).font(VolyTheme.small)
         }
     }
 
@@ -152,7 +157,8 @@ private struct IntField: View {
     @State private var text = ""
     var body: some View {
         TextField("", text: Binding(get: { text.isEmpty ? "\(value)" : text }, set: { text = $0 }))
-            .textFieldStyle(.roundedBorder)
+            .volyField()
+            .frame(width: 100)
             .onSubmit { if let v = Int64(text) { onCommit(v) } }
             .disabled(readOnly)
     }
@@ -165,7 +171,7 @@ private struct DoubleField: View {
     @State private var text = ""
     var body: some View {
         TextField("", text: Binding(get: { text.isEmpty ? String(format: "%.3f", value) : text }, set: { text = $0 }))
-            .textFieldStyle(.roundedBorder)
+            .volyField()
             .frame(width: 100)
             .onSubmit { if let v = Double(text) { onCommit(v) } }
             .disabled(readOnly)
@@ -177,12 +183,12 @@ private struct SizeField: View {
     let readOnly: Bool
     let onCommit: (CGSizeCodable) -> Void
     var body: some View {
-        HStack(spacing: 4) {
-            Text("w")
+        HStack(spacing: 5) {
+            Text("w").font(VolyTheme.code()).foregroundStyle(VolyTheme.dim)
             DoubleField(value: value.width, readOnly: readOnly) { w in
                 onCommit(CGSizeCodable(width: w, height: value.height))
             }
-            Text("h")
+            Text("h").font(VolyTheme.code()).foregroundStyle(VolyTheme.dim)
             DoubleField(value: value.height, readOnly: readOnly) { h in
                 onCommit(CGSizeCodable(width: value.width, height: h))
             }
@@ -206,7 +212,7 @@ private struct ColorPickerField: View {
             ColorPicker("", selection: $picked, supportsOpacity: true)
                 .labelsHidden()
                 .disabled(readOnly)
-            Text(color.hex).font(.caption2).foregroundStyle(.secondary).fontDesign(.monospaced)
+            Text(color.hex).font(VolyTheme.code()).foregroundStyle(VolyTheme.dim).textSelection(.enabled)
         }
         .onAppear {
             // Voly's inspector is an NSPanel at .floating level. The system

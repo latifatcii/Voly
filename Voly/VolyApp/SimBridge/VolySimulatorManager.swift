@@ -94,6 +94,13 @@ final class VolySimulatorManager {
         }
     }
 
+    #if DEBUG
+    /// UI previews only: show these simulators without discovering anything.
+    func setPreview(simulators: [Simulator]) {
+        self.simulators = simulators
+    }
+    #endif
+
     // MARK: - Lifecycle
 
     func start() {

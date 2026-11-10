@@ -1,32 +1,14 @@
 import Foundation
 import Observation
-import VolyModels
 
-/// UI-only state for the Sherlock-style inspector: the currently selected tab
-/// and which selections have their inheritance chain expanded. Kept separate
-/// from InspectorStateStore (which is protocol-level).
+/// UI-only state for the inspector: the currently selected tab. Kept
+/// separate from InspectorStateStore (which is protocol-level).
 @MainActor
 @Observable
 final class InspectorPane {
-    var currentTab: DetailTab = .hierarchy
-    /// Per-selection expansion. Cleared automatically when selection changes;
-    /// callers invoke `resetInheritance(for:)` on selection change.
-    private var inheritanceExpanded: Set<ObjectID> = []
+    var currentTab: DetailTab
 
-    func isInheritanceExpanded(_ id: ObjectID) -> Bool {
-        inheritanceExpanded.contains(id)
-    }
-
-    func toggleInheritance(_ id: ObjectID) {
-        if inheritanceExpanded.contains(id) {
-            inheritanceExpanded.remove(id)
-        } else {
-            inheritanceExpanded.insert(id)
-        }
-    }
-
-    /// Clear expanded state when selection moves to a different view.
-    func resetInheritance(for newSelection: ObjectID?) {
-        inheritanceExpanded.removeAll(keepingCapacity: true)
+    init(tab: DetailTab = .hierarchy) {
+        currentTab = tab
     }
 }

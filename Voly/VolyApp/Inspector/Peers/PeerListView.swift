@@ -1,7 +1,7 @@
 import SwiftUI
 import VolyHost
 
-/// The Sims tab's content: booted simulators with their runtime-integration
+/// The Simulators tab's content: booted simulators with their runtime-integration
 /// switch and running apps, any other discovered agents, and manual connect.
 struct PeerListView: View {
     @Bindable var session: InspectorSession
@@ -20,63 +20,47 @@ struct PeerListView: View {
     private var simulators: VolySimulatorManager { session.simulators }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                sectionTitle("Simulators")
-                Spacer()
+        VStack(alignment: .leading, spacing: 14) {
+            VolySection("Simulators") {
                 Toggle("All simulators", isOn: Binding(
                     get: { simulators.preference.allSimulators },
                     set: { all in Task { await simulators.setIntegratesAllSimulators(all) } }
                 ))
                 .toggleStyle(.checkbox)
                 .controlSize(.small)
-                .font(.caption)
-                .padding(.trailing, 8)
-                .padding(.top, 8)
+                .font(VolyTheme.small)
+                .foregroundStyle(VolyTheme.dim)
                 .help("Integrate with every booted simulator automatically. Switch a simulator off below to leave it alone, or uncheck this to pick simulators by hand.")
-            }
-            if let error = simulators.stagingError {
-                caption(error, color: .red)
-            }
-            if let error = simulators.discoveryError {
-                caption(error, color: .orange)
-            } else if simulators.simulators.isEmpty {
-                caption("No booted simulators.", color: .secondary)
-            }
-            ForEach(simulators.simulators) { simulator in
-                simulatorSection(simulator)
+            } content: {
+                if let error = simulators.stagingError {
+                    caption(error, color: VolyTheme.danger)
+                }
+                if let error = simulators.discoveryError {
+                    caption(error, color: VolyTheme.warning)
+                } else if simulators.simulators.isEmpty {
+                    caption("No booted simulators. Boot one and it appears here.", color: VolyTheme.dim)
+                        .volyCard()
+                }
+                ForEach(simulators.simulators) { simulator in
+                    simulatorCard(simulator)
+                }
             }
 
             let others = otherPeers
             if !others.isEmpty {
-                sectionTitle("Other Agents")
-                ForEach(others) { peer in
-                    peerRow(peer, subtitle: nil)
-                }
-            }
-
-            Divider().padding(.vertical, 4)
-
-            DisclosureGroup(isExpanded: $showManual) {
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("host", text: $manualHost)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("port", text: $manualPort)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Connect") {
-                        if let p = UInt16(manualPort) {
-                            Task { await session.connectManually(host: manualHost, port: p) }
+                VolySection("Other agents") {
+                    VStack(spacing: 0) {
+                        ForEach(others) { peer in
+                            peerRow(peer, subtitle: nil)
                         }
                     }
-                    .disabled(UInt16(manualPort) == nil || manualHost.isEmpty)
+                    .volyCard(padding: 4)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
-            } label: {
-                Text("Manual connect").font(.caption).foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 8)
+
+            manualConnect
         }
+        .padding(VolyTheme.gutter)
         .confirmationDialog(
             "Relaunch \(relaunchCandidate?.bundleIdentifier ?? "") with Voly?",
             isPresented: Binding(get: { relaunchCandidate != nil }, set: { if !$0 { relaunchCandidate = nil } }),
@@ -97,56 +81,111 @@ struct PeerListView: View {
         }
     }
 
+    private var manualConnect: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                showManual.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .rotationEffect(.degrees(showManual ? 90 : 0))
+                    Text("Manual connect")
+                        .font(.system(size: 11.5, weight: .medium))
+                }
+                .foregroundStyle(VolyTheme.dim)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 2)
+
+            if showManual {
+                VStack(alignment: .leading, spacing: 6) {
+                    VolyRow(label: "Host", labelWidth: 44) {
+                        VolyTextField("127.0.0.1", text: $manualHost)
+                    }
+                    VolyRow(label: "Port", labelWidth: 44) {
+                        HStack(spacing: 8) {
+                            VolyTextField("51234", text: $manualPort).frame(width: 90)
+                            Button("Connect") {
+                                if let p = UInt16(manualPort) {
+                                    Task { await session.connectManually(host: manualHost, port: p) }
+                                }
+                            }
+                            .buttonStyle(VolyTextButtonStyle())
+                            .disabled(UInt16(manualPort) == nil || manualHost.isEmpty)
+                        }
+                    }
+                }
+                .volyCard()
+            }
+        }
+    }
+
     // MARK: - Simulator
 
-    @ViewBuilder
-    private func simulatorSection(_ simulator: VolySimulatorManager.Simulator) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "iphone")
-            VStack(alignment: .leading, spacing: 0) {
-                Text(simulator.device.name).lineLimit(1)
-                Text(simulator.runtimeName).font(.caption2).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if simulator.isBusy {
-                ProgressView().controlSize(.small)
-            }
-            Toggle("Runtime integration", isOn: Binding(
-                get: { simulator.integration.isActive },
-                set: { enabled in
-                    Task { await simulators.setIntegration(enabled: enabled, for: simulator.id) }
-                }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .disabled(simulator.isBusy)
-            .help("Load the Voly agent into apps launched in this simulator — from Xcode, the home screen or simctl — without relaunching them. Turning it on restarts the simulator's launch service once; running apps keep running.")
-        }
-        .padding(.horizontal, 8)
-        .padding(.top, 4)
-
-        integrationStatus(simulator)
-
+    private func simulatorCard(_ simulator: VolySimulatorManager.Simulator) -> some View {
         let peers = session.connections.peers.filter { $0.deviceUDID == simulator.id }
-        ForEach(simulator.runningApps) { app in
-            if let peer = peers.first(where: { $0.pid == app.pid }) {
-                peerRow(peer, subtitle: app.bundleIdentifier)
-                    .contextMenu { policyMenu(bundleIdentifier: app.bundleIdentifier) }
-            } else {
-                uninstrumentedRow(app, simulator: simulator)
+        let strays = peers.filter { peer in !simulator.runningApps.contains { $0.pid == peer.pid } }
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "iphone")
+                    .font(.system(size: 15))
+                    .foregroundStyle(simulator.integration.isActive ? VolyTheme.text : VolyTheme.dim)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(simulator.device.name)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .lineLimit(1)
+                    Text(simulator.runtimeName)
+                        .font(VolyTheme.small)
+                        .foregroundStyle(VolyTheme.dim)
+                }
+                Spacer()
+                if simulator.isBusy {
+                    ProgressView().controlSize(.small)
+                }
+                Toggle("Runtime integration", isOn: Binding(
+                    get: { simulator.integration.isActive },
+                    set: { enabled in
+                        Task { await simulators.setIntegration(enabled: enabled, for: simulator.id) }
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(simulator.isBusy)
+                .help("Load the Voly agent into apps launched in this simulator — from Xcode, the home screen or simctl — without relaunching them. Turning it on restarts the simulator's launch service once; running apps keep running.")
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 9)
+            .padding(.bottom, 6)
+
+            integrationStatus(simulator)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
+
+            ForEach(simulator.runningApps) { app in
+                VolyTheme.hairline.frame(height: 1)
+                if let peer = peers.first(where: { $0.pid == app.pid }) {
+                    peerRow(peer, subtitle: app.bundleIdentifier)
+                        .contextMenu { policyMenu(bundleIdentifier: app.bundleIdentifier) }
+                } else {
+                    uninstrumentedRow(app, simulator: simulator)
+                }
+            }
+            // Agents whose app isn't in the running-apps list (e.g. system apps).
+            ForEach(strays) { peer in
+                VolyTheme.hairline.frame(height: 1)
+                peerRow(peer, subtitle: peer.bundleIdentifier)
             }
         }
-        // Agents whose app isn't in the running-apps list (e.g. system apps).
-        ForEach(peers.filter { peer in !simulator.runningApps.contains { $0.pid == peer.pid } }) { peer in
-            peerRow(peer, subtitle: peer.bundleIdentifier)
-        }
+        .volyCard(padding: 0)
     }
 
     @ViewBuilder
     private func integrationStatus(_ simulator: VolySimulatorManager.Simulator) -> some View {
         if let error = simulator.error {
-            caption(error, color: .red)
+            caption(error, color: VolyTheme.danger)
         } else {
             switch simulator.integration {
             case .inactive:
@@ -154,14 +193,14 @@ struct PeerListView: View {
                     simulators.isIntegrationWanted(for: simulator.id)
                         ? "Runtime integration is starting…"
                         : "Runtime integration is off for this simulator.",
-                    color: .secondary
+                    color: VolyTheme.dim
                 )
             case .active:
-                caption(activeDescription, color: .secondary)
+                caption(activeDescription, color: VolyTheme.dim)
             case .paused:
-                caption("Runtime integration is paused.", color: .secondary)
+                caption("Runtime integration is paused.", color: VolyTheme.dim)
             case .unsupported(let reason, _):
-                caption("Not supported on this runtime: \(reason)", color: .orange)
+                caption("Not supported on this runtime: \(reason)", color: VolyTheme.warning)
             }
         }
     }
@@ -169,24 +208,28 @@ struct PeerListView: View {
     private var activeDescription: String {
         let policy = simulators.policy
         if !policy.allowedBundleIDs.isEmpty {
-            return "Integration on for \(policy.allowedBundleIDs.count) selected app(s). Applies from each app's next launch."
+            return "On for \(policy.allowedBundleIDs.count) selected app(s), from each app's next launch."
         }
-        return "Integration on. Apps launched from now on load Voly automatically."
+        return "Apps launched from now on load Voly automatically."
     }
 
     private func uninstrumentedRow(
         _ app: VolySimulatorManager.RunningAppEntry,
         simulator: VolySimulatorManager.Simulator
     ) -> some View {
-        HStack(spacing: 6) {
-            Circle().frame(width: 6, height: 6).foregroundStyle(.tertiary)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(app.bundleIdentifier).lineLimit(1).truncationMode(.middle)
+        HStack(spacing: 8) {
+            Circle().strokeBorder(VolyTheme.faint, lineWidth: 1).frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(app.bundleIdentifier)
+                    .font(VolyTheme.code(11))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Text(uninstrumentedReason(app, simulator: simulator))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(VolyTheme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer()
+            Spacer(minLength: 6)
             Button("Relaunch…") {
                 relaunchCandidate = RelaunchCandidate(
                     udid: simulator.id,
@@ -194,12 +237,11 @@ struct PeerListView: View {
                     bundleIdentifier: app.bundleIdentifier
                 )
             }
-            .controlSize(.small)
+            .buttonStyle(VolyTextButtonStyle())
             .help("Terminate and relaunch this app with the Voly agent. Ends its Xcode debug session.")
         }
-        .padding(.leading, 22)
-        .padding(.trailing, 8)
-        .padding(.vertical, 2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .contextMenu { policyMenu(bundleIdentifier: app.bundleIdentifier) }
     }
 
@@ -208,10 +250,10 @@ struct PeerListView: View {
         simulator: VolySimulatorManager.Simulator
     ) -> String {
         if app.instrumentsOnNextLaunch {
-            return "Not instrumented — started before integration. Available on its next launch."
+            return "Started before integration. Inspectable from its next launch."
         }
         if simulator.integration.isActive {
-            return "Not instrumented — excluded from integration."
+            return "Excluded from integration."
         }
         return "Not instrumented."
     }
@@ -249,45 +291,46 @@ struct PeerListView: View {
         return Button {
             Task { await session.connect(to: peer) }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Circle()
-                    .frame(width: 6, height: 6)
-                    .foregroundStyle(isActive ? Color.green : (isConnected ? Color.blue : Color.secondary))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(peer.displayName).lineLimit(1)
+                    .frame(width: 7, height: 7)
+                    .foregroundStyle(isActive ? VolyTheme.ok : (isConnected ? VolyTheme.selection : VolyTheme.faint))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(peer.displayName)
+                        .font(.system(size: 12, weight: isActive ? .medium : .regular))
+                        .lineLimit(1)
                     if let subtitle {
-                        Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(subtitle)
+                            .font(VolyTheme.code(10.5))
+                            .foregroundStyle(VolyTheme.dim)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
-                Spacer()
-                Text(isActive ? "Inspecting" : (isConnected ? "Connected" : "Ready"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Spacer(minLength: 6)
+                if isActive {
+                    VolyChip(text: "Inspecting", color: VolyTheme.ok)
+                } else {
+                    Text(isConnected ? "Connected" : "Ready")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(VolyTheme.dim)
+                }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(isActive ? VolyTheme.ok.opacity(0.06) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.leading, 22)
-        .padding(.trailing, 8)
-        .padding(.vertical, 2)
-        .help(isActive ? "The inspector is driving this app." : "Inspect this app.")
-    }
-
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
+        .help(isActive ? "The inspector is showing this app." : "Inspect this app.")
     }
 
     private func caption(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.caption2)
+            .font(.system(size: 10.5))
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .textSelection(.enabled)
     }
 }

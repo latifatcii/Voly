@@ -52,7 +52,7 @@ Building `Voly` builds both simulator dylibs and embeds them in `Voly.app/Conten
 
 ## Running
 
-1. Build and run `Voly` on macOS. It lives in the menu bar. ⌘E while the Simulator is frontmost (or ⌃⌥⌘V from anywhere) shows and hides the inspector, docked next to the simulator window you last focused. It opens in pick mode: click a view in any simulator to inspect it. Every booted simulator gets runtime integration automatically (switch individual ones off in the Sims tab or the menu bar).
+1. Build and run `Voly` on macOS. It lives in the menu bar. ⌘E while the Simulator is frontmost (or ⌃⌥⌘V from anywhere) shows and hides the inspector, docked next to the simulator window you last focused. It opens in pick mode: click a view in any simulator to inspect it. Every booted simulator gets runtime integration automatically (switch individual ones off in the Simulators tab or the menu bar).
 2. Run any app in a simulator — from Xcode, the home screen, or `simctl`. It appears under its simulator and Voly connects.
 
 To try it with the bundled sample:

@@ -15,8 +15,10 @@ final class InspectorWindowController: NSObject, NSWindowDelegate {
     private var isProgrammaticMove = false
     private(set) var userHasDetached = false
 
-    init(session: InspectorSession) {
-        let content = NSHostingView(rootView: InspectorShell(session: session))
+    init(session: InspectorSession, initialTab: DetailTab = .hierarchy) {
+        let content = NSHostingView(rootView: InspectorShell(session: session, initialTab: initialTab))
+        // The panel's frame is driven by docking, never by its content.
+        content.sizingOptions = []
         panel = InspectorPanel(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 700),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .fullSizeContentView],
@@ -24,6 +26,14 @@ final class InspectorWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         panel.title = "Voly"
+        // The SwiftUI header draws the title and fills the title bar area;
+        // AppKit keeps only the close button. Always dark: see VolyTheme.
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.backgroundColor = NSColor(VolyTheme.panel)
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.contentView = content
         panel.level = .floating
         // .canJoinAllSpaces and .moveToActiveSpace are mutually exclusive.

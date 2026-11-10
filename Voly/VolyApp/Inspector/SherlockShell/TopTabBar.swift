@@ -1,37 +1,25 @@
 import SwiftUI
 
+/// The inspector's tabs as a row of icons. Names live in tooltips, which
+/// keeps six tabs comfortable at the panel's narrowest width.
 struct TopTabBar: View {
     @Bindable var pane: InspectorPane
     let hasSelection: Bool
 
     var body: some View {
-        Picker(selection: $pane.currentTab) {
+        HStack(spacing: 6) {
             ForEach(DetailTab.allCases) { tab in
-                Label {
-                    Text(tab.label)
-                        .font(.system(size: 11, weight: .medium))
-                } icon: {
-                    Image(systemName: tab.symbol)
+                let enabled = !tab.requiresSelection || hasSelection
+                Button {
+                    pane.currentTab = tab
+                } label: {
+                    Label(tab.title, systemImage: tab.symbol)
                 }
-                .labelStyle(TabLabelStyle())
-                .disabled(tab.requiresSelection && !hasSelection)
-                .tag(tab)
+                .buttonStyle(VolyIconButtonStyle(isOn: pane.currentTab == tab))
+                .disabled(!enabled)
+                .help(enabled ? tab.title : "\(tab.title) — select a view first")
+                .accessibilityAddTraits(pane.currentTab == tab ? .isSelected : [])
             }
-        } label: {
-            EmptyView()
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
-}
-
-private struct TabLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon
-            configuration.title
         }
     }
 }

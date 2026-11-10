@@ -2,8 +2,8 @@ import SwiftUI
 import VolyModels
 import VolyProtocol
 
-/// Runtime actions that sit in the inspector's top bar next to Pick and
-/// Refresh: UIKit navigation, language override, screenshots.
+/// Runtime actions in the inspector's footer, next to Pick and Refresh:
+/// UIKit navigation, language override, screenshots.
 struct RuntimeActionsBar: View {
     @Bindable var session: InspectorSession
     /// Remembered across language switches so "Arabic strings, LTR layout"
@@ -36,8 +36,7 @@ struct RuntimeActionsBar: View {
         } label: {
             Label(title, systemImage: symbol)
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.borderless)
+        .buttonStyle(VolyIconButtonStyle())
         .disabled(!available)
         .help(available ? title : (navigation.unavailableReasons[action.rawValue] ?? title))
     }
@@ -81,10 +80,13 @@ struct RuntimeActionsBar: View {
             }
             .disabled(active == nil)
         } label: {
-            Label("Language", systemImage: active == nil ? "globe" : "globe.badge.chevron.backward")
+            Image(systemName: "globe")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(active == nil ? VolyTheme.dim : VolyTheme.selection)
+                .frame(width: 26, height: 22)
         }
-        .labelStyle(.iconOnly)
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .disabled(!isConnected || capabilities?.localization == false)
@@ -125,10 +127,13 @@ struct RuntimeActionsBar: View {
                 session.screenshots.chooseDirectory()
             }
         } label: {
-            Label("Screenshot", systemImage: "camera")
+            Image(systemName: "camera")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(VolyTheme.dim)
+                .frame(width: 26, height: 22)
         }
-        .labelStyle(.iconOnly)
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Capture the simulator screen, the app's content, or the selected view")
