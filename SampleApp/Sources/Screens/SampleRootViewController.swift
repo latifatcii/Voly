@@ -70,6 +70,10 @@ final class SampleRootViewController: UIViewController {
                 let host = UIHostingController(rootView: SwiftUIStackDemo(depth: 3))
                 host.modalPresentationStyle = .fullScreen
                 present(host, animated: false)
+            case "styled":
+                let styled = StyledTextDemoVC()
+                styled.modalPresentationStyle = .fullScreen
+                present(styled, animated: false)
             default:
                 break
             }

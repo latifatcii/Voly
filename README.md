@@ -190,6 +190,10 @@ scripts/integration-test.sh <booted-simulator-udid>
 # Voly.app and the sample app (quit your own Voly first)
 scripts/mcp-test.sh <booted-simulator-udid>
 
+# Editing text keeps its styling: the sample app's styled-text screen, edited
+# the way the property panel does
+scripts/text-style-test.sh <booted-simulator-udid>
+
 # A distributable DMG in build/dist
 scripts/package-release.sh
 ```
