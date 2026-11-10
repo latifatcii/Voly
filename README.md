@@ -84,7 +84,7 @@ Switch a device off with its toggle in the Simulators tab; exclude an app from i
 defaults write com.latifatci.Voly voly.android.adbPath /path/to/adb
 ```
 
-Voly only uses `adb` while an adb server is already running (Android Studio and the emulator start one), so it never starts a daemon on a Mac that isn't used for Android.
+Voly only uses `adb` while an adb server is already running (Android Studio and the emulator start one), so it never starts a daemon on a Mac that isn't used for Android. It uses the same `adb` executable that server was started from, so it can't trigger the "server version doesn't match this client" restart that would disconnect Android Studio.
 
 To try it, [`SampleAppAndroid`](SampleAppAndroid) is a small app with views, Compose, dialogs, translations and deliberately broken layouts: `cd SampleAppAndroid && ./gradlew :app:installDebug`.
 
