@@ -82,7 +82,7 @@ for name in app device; do
   else echo "FAIL $name screenshot"; FAILED=1; fi
 done
 
-echo "== a wrong token gets nothing"
+echo "== nothing is left behind"
 PORT="$(adb -s "$SERIAL" forward --list | awk -v s="$SERIAL" '$1 == s && $3 ~ /voly-agent/ { sub("tcp:", "", $2); print $2 }' | tail -1)"
 if [ -n "$PORT" ]; then echo "FAIL forwarded ports should be released after each command"; FAILED=1; else echo "ok   no port is left forwarded"; fi
 
