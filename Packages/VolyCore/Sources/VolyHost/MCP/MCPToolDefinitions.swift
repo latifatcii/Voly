@@ -16,6 +16,16 @@ extension MCPToolbox {
         shows up as accessibility elements (lines starting with ~) under its hosting view, without font or \
         color. set_property, set_constraint, navigate and set_language change the running app only — use \
         them to try a fix live, then make the real change in source.
+
+        Android apps (debug builds in an emulator, or on a device adb can reach) work through the same \
+        tools; list_apps marks them android=. What differs: frames are in dp from the display's top-left \
+        corner; a view's id= is its android:id; vc= names the activity or fragment a view is the root of; \
+        Jetpack Compose content appears as ~ lines (semantics nodes: text, role, state, test tag); layout \
+        params are reported as constraints (fixed sizes, margins, ConstraintLayout connections) and \
+        get_view lists padding, margins, layout_width/height, text and the like as class-specific \
+        properties; user defaults are SharedPreferences (suite = the preferences file); navigate's dismiss \
+        closes a dialog, bottom sheet or popup and pop goes back like the Back button; source is found by \
+        class name in the project (Kotlin or Java) and by android:id in layout XML.
         """
 
     static let definitions: [MCPTool] = [
@@ -117,7 +127,7 @@ extension MCPToolbox {
                 the points-to-pixels factor for matching frames from get_screen.
                 """,
             inputSchema: schema([
-                ("target", string("app, view or simulator. Default app, or view when view is given.", options: ["app", "view", "simulator"])),
+                ("target", string("app, view or simulator (the whole display; also for an Android emulator). Default app, or view when view is given.", options: ["app", "view", "simulator"])),
                 ("view", integer("The view's #id, for target=view.")),
                 ("max_dimension", integer("Longest side of the returned image in pixels; larger captures are scaled down. Default 1568.")),
                 app,
@@ -135,7 +145,7 @@ extension MCPToolbox {
         MCPTool(
             name: "get_user_defaults",
             title: "Read user defaults",
-            description: "The app's UserDefaults keys and values.",
+            description: "The app's UserDefaults keys and values. For an Android app: its SharedPreferences, every file unless suite names one.",
             inputSchema: schema([
                 ("contains", string("Only keys containing this text (case-insensitive).")),
                 ("suite", string("A suite name; default is the app's standard defaults.")),
@@ -238,11 +248,12 @@ extension MCPToolbox {
             description: """
                 Terminate an app and start it again with Voly's agent loaded. Only needed for an app that \
                 was already running when Voly started (list_apps says so); apps launched afterwards are \
-                inspectable without this. The app loses its in-memory state and any attached debugger.
+                inspectable without this. The app loses its in-memory state and any attached debugger. \
+                Android apps never need it to become inspectable; there it simply restarts the app.
                 """,
             inputSchema: schema([
-                ("bundle_id", string("The app's bundle identifier.")),
-                ("simulator", string("Simulator name or UDID, when more than one is booted.")),
+                ("bundle_id", string("The app's bundle identifier (Android: its package name).")),
+                ("simulator", string("Simulator name or UDID (or Android emulator name or adb serial), when more than one is running.")),
             ], required: ["bundle_id"]),
             changesApp: true
         ),

@@ -87,17 +87,30 @@ public struct MCPToolbox: MCPToolProviding {
 
     private func listApps() async throws -> MCPToolResult {
         let overview = await inspector.overview()
+        let simulators = overview.simulators.filter { $0.platform == .iOS }
+        let androidDevices = overview.simulators.filter { $0.platform == .android }
         var lines: [String] = []
-        if overview.simulators.isEmpty {
-            lines.append("No simulator is booted.")
+        if simulators.isEmpty {
+            lines.append(androidDevices.isEmpty ? "No simulator is booted." : "No iOS simulator is booted.")
         } else {
             lines.append("Booted simulators:")
-            for simulator in overview.simulators {
+            for simulator in simulators {
                 lines.append("- \(simulator.name), \(simulator.runtime) (\(simulator.udid)): \(simulator.integration)")
                 if !simulator.appsWithoutAgent.isEmpty {
                     lines.append("    running but not inspectable (started before Voly): "
                         + simulator.appsWithoutAgent.joined(separator: ", ")
                         + " — relaunch_app makes them inspectable")
+                }
+            }
+        }
+        if !androidDevices.isEmpty {
+            lines.append("Android emulators and devices:")
+            for device in androidDevices {
+                lines.append("- \(device.name), \(device.runtime) (\(device.udid)): \(device.integration)")
+                if !device.appsWithoutAgent.isEmpty {
+                    lines.append("    running but not inspectable: "
+                        + device.appsWithoutAgent.joined(separator: ", ")
+                        + " — Voly can only inspect debuggable (debug) builds on Android")
                 }
             }
         }
@@ -107,7 +120,10 @@ public struct MCPToolbox: MCPToolProviding {
                 No inspectable app is running. Apps launched in a booted simulator while Voly is running \
                 (from Xcode, simctl or the home screen) are picked up automatically, usually within a \
                 couple of seconds of launch.
-                """)
+                """ + (androidDevices.isEmpty ? "" : """
+                 On Android, debug builds running in an emulator are picked up the same way, whether \
+                they were started before or after Voly.
+                """))
         } else {
             let outdated = await appsWithOutdatedAgent(among: overview.apps)
             lines.append("Inspectable apps:")
@@ -135,7 +151,9 @@ public struct MCPToolbox: MCPToolProviding {
         var parts = [app.name]
         if let bundle = app.bundleIdentifier { parts.append("bundle=\(bundle)") }
         if let pid = app.pid { parts.append("pid=\(pid)") }
-        if let simulator = app.simulatorName ?? app.simulatorUDID { parts.append("simulator=\(simulator)") }
+        if let simulator = app.simulatorName ?? app.simulatorUDID {
+            parts.append(app.platform == .android ? "android=\(simulator)" : "simulator=\(simulator)")
+        }
         if app.isShownInVoly { parts.append("[shown in Voly]") }
         return parts.joined(separator: "  ")
     }
@@ -277,13 +295,13 @@ public struct MCPToolbox: MCPToolProviding {
         formatter.collapsesWrappers = arguments.bool("collapse_wrappers") ?? true
         let tree = formatter.tree(for: screen)
 
-        var sections = [formatter.header(for: screen, simulator: app.simulatorName)]
+        var sections = [formatter.header(for: screen, simulator: app.simulatorName, platform: app.platform)]
         var counts = "\(screen.viewCount) views."
         if screen.isTruncated { counts += " The app has more; this is the first \(screen.viewCount)." }
         if let levels = tree.levelsShown {
             counts += " Too large to show whole: cut to \(levels) levels. Ask for a part with root=<id>."
         }
-        sections.append(counts + " " + ScreenDescriptionFormatter.legend)
+        sections.append(counts + " " + ScreenDescriptionFormatter.legend(for: app.platform))
         if let ancestors = screen.ancestors, !ancestors.isEmpty {
             sections.append("Inside: " + Self.path(ancestors))
         }
@@ -317,14 +335,16 @@ public struct MCPToolbox: MCPToolProviding {
             summary.append("Inside: " + Self.path(ancestors))
             if node.viewController == nil,
                let controller = ancestors.last(where: { $0.viewController != nil })?.viewController {
-                summary.append("View controller: \(ScreenDescriptionFormatter.shortClassName(controller))")
+                summary.append((app.platform == .android ? "Screen: " : "View controller: ")
+                    + ScreenDescriptionFormatter.shortClassName(controller))
             }
         }
         if let layout = node.layout { summary.append(Self.describe(layout)) }
         sections.append(summary.joined(separator: "\n"))
 
         if let elements = node.accessibilityElements, !elements.isEmpty {
-            sections.append("Accessibility elements inside:\n" + elements.map { formatter.line(for: $0) }.joined(separator: "\n"))
+            sections.append((app.platform == .android ? "Compose semantics nodes inside:\n" : "Accessibility elements inside:\n")
+                + elements.map { formatter.line(for: $0) }.joined(separator: "\n"))
         }
         if !node.children.isEmpty || node.omittedChildren > 0 {
             var lines = formatter.lines(for: node.children, maxLevels: 1)
@@ -336,7 +356,7 @@ public struct MCPToolbox: MCPToolProviding {
             guard case .constraints(let constraints) = try await send(.getConstraints(objectID: id), to: app) else {
                 throw ToolError("unexpected answer")
             }
-            sections.append(Self.describe(constraints, for: id))
+            sections.append(Self.describe(constraints, for: id, platform: app.platform))
         } catch {
             sections.append("Constraints: could not be read (\(Self.message(error))).")
         }
@@ -357,6 +377,8 @@ public struct MCPToolbox: MCPToolProviding {
     }
 
     private static func describe(_ layout: LayoutDetails) -> String {
+        // An agent that describes layout in its platform's own terms.
+        if let summary = layout.summary, !summary.isEmpty { return "Layout: " + summary }
         let number = ScreenDescriptionFormatter.number
         var parts = [layout.usesAutoLayout ? "Auto Layout" : "frame-based (autoresizing mask)"]
         parts.append("bounds \(ScreenDescriptionFormatter.frame(layout.bounds))")
@@ -374,8 +396,14 @@ public struct MCPToolbox: MCPToolProviding {
         return "Layout: " + parts.joined(separator: "; ")
     }
 
-    private static func describe(_ constraints: [ConstraintNode], for viewID: ObjectID) -> String {
-        guard !constraints.isEmpty else { return "Constraints: none." }
+    private static func describe(
+        _ constraints: [ConstraintNode], for viewID: ObjectID, platform: MCPPlatform = .iOS
+    ) -> String {
+        guard !constraints.isEmpty else {
+            return platform == .android
+                ? "Constraints: none (no fixed size, margin or ConstraintLayout connection)."
+                : "Constraints: none."
+        }
         let lines = constraints.map { constraint -> String in
             let presentation = ConstraintPresentation(constraint)
             var line = "- #\(constraint.id) "
@@ -391,7 +419,11 @@ public struct MCPToolbox: MCPToolProviding {
             return line
         }
         let limit = 60
-        return "Constraints (\(constraints.count)), each with the #id set_constraint takes:\n"
+        let title = platform == .android
+            ? "Layout params as constraints (\(constraints.count)): fixed sizes, margins and ConstraintLayout "
+                + "connections, each with the #id set_constraint takes to change its constant (dp):\n"
+            : "Constraints (\(constraints.count)), each with the #id set_constraint takes:\n"
+        return title
             + lines.prefix(limit).joined(separator: "\n")
             + (lines.count > limit ? "\n…and \(lines.count - limit) more" : "")
     }
@@ -458,7 +490,10 @@ public struct MCPToolbox: MCPToolProviding {
                 switch location.role {
                 case .viewClass?: line += " (this view's class)"
                 case .superclass?: line += " (its app-defined superclass)"
-                case .viewController?: line += " (the view controller that owns it)"
+                case .viewController?:
+                    line += app.platform == .android
+                        ? " (the fragment or activity that owns it)"
+                        : " (the view controller that owns it)"
                 case .ancestorView?: line += " (nearest app-defined view above it)"
                 case nil: break
                 }
@@ -572,7 +607,7 @@ public struct MCPToolbox: MCPToolProviding {
         let screen = try await describeScreen(ScreenDescriptionRequest(rootID: id, maxDepth: 0), in: app)
         try await inspector.select(view: id, in: app.id)
         let line = screen.roots.first.map { formatter.line(for: $0) } ?? "#\(id)"
-        return .text("Selected in Voly and highlighted in the simulator: \(line)")
+        return .text("Selected in Voly and highlighted in the \(app.platform == .android ? "emulator" : "simulator"): \(line)")
     }
 
     // MARK: - Screenshots
@@ -603,7 +638,7 @@ public struct MCPToolbox: MCPToolProviding {
             png = shot.png
             scale = shot.scale
             subject = "view #\(viewID) of \(app.name)"
-        case "simulator":
+        case "simulator", "device", "emulator":
             guard let udid = app.simulatorUDID else {
                 throw ToolError("\(app.name) isn't running in a simulator Voly knows; use target=app.")
             }
@@ -612,8 +647,13 @@ public struct MCPToolbox: MCPToolProviding {
                 orientation = info.orientation
                 scale = info.scale
             }
-            let raw = try await captureSimulator(udid)
-            png = (try? SimulatorScreenshot.upright(png: raw, orientation: orientation).png) ?? raw
+            if let display = try await inspector.captureDisplay(of: app) {
+                // Captured as it is shown: nothing to turn upright.
+                png = display
+            } else {
+                let raw = try await captureSimulator(udid)
+                png = (try? SimulatorScreenshot.upright(png: raw, orientation: orientation).png) ?? raw
+            }
             subject = "the whole display of \(app.simulatorName ?? udid), system UI included"
         default:
             throw ToolError("target must be app, view or simulator.")
@@ -628,7 +668,7 @@ public struct MCPToolbox: MCPToolProviding {
         }
         if let scale, scale > 0 {
             let pixelsPerPoint = scale * Double(fitted.width) / Double(fitted.originalWidth)
-            caption += ". 1 pt = \(String(format: "%.2f", pixelsPerPoint)) px in this image"
+            caption += ". 1 \(app.platform == .android ? "dp" : "pt") = \(String(format: "%.2f", pixelsPerPoint)) px in this image"
             if target == "view" {
                 caption += ", with the view's top-left corner at 0,0"
             } else {
@@ -651,20 +691,23 @@ public struct MCPToolbox: MCPToolProviding {
             lines.append("Orientation: \(info.orientation.rawValue), display scale @\(ScreenDescriptionFormatter.number(info.scale))x")
         }
         if case .navigationState(let navigation)? = try? await send(.navigationState, to: app) {
-            lines.append(Self.describe(navigation))
+            lines.append(Self.describe(navigation, platform: app.platform))
         }
         if case .localization(let localization)? = try? await send(.localizationState, to: app) {
-            lines.append(Self.describe(localization))
+            lines.append(Self.describe(localization, platform: app.platform))
         }
         return .text(lines.joined(separator: "\n"))
     }
 
-    private static func describe(_ navigation: NavigationState) -> String {
+    private static func describe(_ navigation: NavigationState, platform: MCPPlatform = .iOS) -> String {
         var parts: [String] = []
         if let top = navigation.topViewController {
-            parts.append("Top view controller: \(ScreenDescriptionFormatter.shortClassName(top))")
+            parts.append((platform == .android ? "Top screen: " : "Top view controller: ")
+                + ScreenDescriptionFormatter.shortClassName(top))
         }
-        if let depth = navigation.navigationStackDepth { parts.append("navigation stack depth \(depth)") }
+        if let depth = navigation.navigationStackDepth {
+            parts.append(platform == .android ? "back stack depth \(depth)" : "navigation stack depth \(depth)")
+        }
         if navigation.isTransitioning { parts.append("a transition is in progress") }
         let actions = NavigationAction.allCases.map { action -> String in
             let name = Self.toolName(of: action)
@@ -683,14 +726,16 @@ public struct MCPToolbox: MCPToolProviding {
         }
     }
 
-    private static func describe(_ localization: LocalizationState) -> String {
+    private static func describe(_ localization: LocalizationState, platform: MCPPlatform = .iOS) -> String {
         let languages = localization.available.map { language -> String in
             var entry = "\(language.code) (\(language.displayName)"
             if language.isRightToLeft { entry += ", right-to-left" }
             if language.code == localization.developmentLanguage { entry += ", development language" }
             return entry + ")"
         }
-        var lines = ["Languages in the app: " + (languages.isEmpty ? "none found" : languages.joined(separator: ", "))]
+        var lines = ["Languages in the app: " + (languages.isEmpty
+            ? (platform == .android ? "none besides its default resources" : "none found")
+            : languages.joined(separator: ", "))]
         var current = "Language: " + (localization.activeOverride.map { "\($0) (set through Voly)" }
             ?? "the system's (\(localization.systemLanguage ?? "unknown"))")
         current += "; layout is \(localization.isLayoutRightToLeft ? "right-to-left" : "left-to-right")"
@@ -716,11 +761,20 @@ public struct MCPToolbox: MCPToolProviding {
         }
         let limit = min(max(arguments.int("limit") ?? 100, 1), 1000)
         guard !items.isEmpty else {
-            return .text(total == 0 ? "No user defaults." : "None of the \(total) keys match.")
+            return .text(total == 0
+                ? (app.platform == .android ? "No SharedPreferences values." : "No user defaults.")
+                : "None of the \(total) keys match.")
         }
         var lines = ["\(items.count) of \(total) keys" + (items.count > limit ? ", first \(limit)" : "") + ":"]
-        lines += items.sorted { $0.key < $1.key }.prefix(limit).map {
-            "\($0.key) (\($0.type.rawValue)) = \(Self.describe($0.value))"
+        // Android lists every SharedPreferences file when no suite is named;
+        // say which file a key is in then.
+        let severalSuites = Set(items.map(\.suite)).count > 1
+        if severalSuites {
+            lines[0] = "\(items.count) of \(total) keys, as file/key (pass suite=<file> to read or write one file)"
+                + (items.count > limit ? ", first \(limit)" : "") + ":"
+        }
+        lines += items.sorted { ($0.suite, $0.key) < ($1.suite, $1.key) }.prefix(limit).map {
+            "\(severalSuites ? $0.suite + "/" : "")\($0.key) (\($0.type.rawValue)) = \(Self.describe($0.value))"
         }
         return .text(lines.joined(separator: "\n"))
     }
@@ -930,6 +984,14 @@ public struct MCPToolbox: MCPToolProviding {
             throw ToolError("\(app.name) gave an unexpected answer.")
         }
         await inspector.appDidChange(app.id)
+        if app.platform == .android {
+            return .text(Self.describe(state, platform: .android) + """
+
+                The app's activities were recreated in this language, so view ids from before no longer \
+                apply — call get_screen again. On Android 13 and later the choice is the system's per-app \
+                language and stays until set back with language="system".
+                """)
+        }
         return .text(Self.describe(state) + """
 
             Screens opened from now on load in this language. Text that was already on screen is \
@@ -956,7 +1018,7 @@ public struct MCPToolbox: MCPToolProviding {
         let suite = arguments.string("suite")
         guard let value = arguments.raw["value"], !value.isNull else {
             _ = try await send(.userDefaultsDelete(suite: suite, key: key), to: app)
-            return .text("Removed \(key) from \(app.name)'s user defaults.")
+            return .text("Removed \(key) from \(app.name)'s \(Self.defaultsName(app)).")
         }
         let converted: PropValue
         switch value {
@@ -967,7 +1029,11 @@ public struct MCPToolbox: MCPToolProviding {
         default: throw ToolError("value must be a string, number or boolean (or null to remove the key).")
         }
         _ = try await send(.userDefaultsSet(UserDefaultsSetRequest(suite: suite, key: key, value: converted)), to: app)
-        return .text("Set \(key) = \(Self.describe(converted)) in \(app.name)'s user defaults.")
+        return .text("Set \(key) = \(Self.describe(converted)) in \(app.name)'s \(Self.defaultsName(app)).")
+    }
+
+    private static func defaultsName(_ app: MCPApp) -> String {
+        app.platform == .android ? "SharedPreferences" : "user defaults"
     }
 
     private func relaunchApp(_ arguments: Arguments) async throws -> MCPToolResult {

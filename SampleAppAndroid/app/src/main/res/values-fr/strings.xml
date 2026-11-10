@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Voly Démo</string>
+
+    <string name="demo_constraint_title">Mise en page par contraintes</string>
+    <string name="demo_constraint_subtitle">Des vues contraintes les unes aux autres</string>
+    <string name="demo_forms_title">Contrôles de formulaire</string>
+    <string name="demo_forms_subtitle">Champs, interrupteurs et boutons</string>
+    <string name="demo_localization_title">Localisation</string>
+    <string name="demo_localization_subtitle">Textes traduits et écriture de droite à gauche</string>
+    <string name="demo_problems_title">Problèmes de mise en page</string>
+    <string name="demo_problems_subtitle">Vues tronquées, masquées ou de taille nulle</string>
+    <string name="demo_gallery_title">Galerie</string>
+    <string name="demo_gallery_subtitle">Une grille de cellules colorées</string>
+    <string name="demo_compose_title">Compose</string>
+    <string name="demo_compose_subtitle">Un écran Jetpack Compose</string>
+    <string name="demo_dialogs_title">Boîtes de dialogue</string>
+    <string name="demo_dialogs_subtitle">Alerte, panneau inférieur et menu contextuel</string>
+    <string name="demo_prefs_title">Préférences</string>
+    <string name="demo_prefs_subtitle">Valeurs SharedPreferences</string>
+
+    <string name="loc_heading">Bienvenue dans Voly</string>
+    <string name="loc_greeting">Bonjour, %1$s !</string>
+    <string name="loc_current_locale">Langue actuelle : %1$s</string>
+    <string name="loc_long_text">Ce paragraphe est volontairement long. Il est là pour que vous puissiez voir comment un texte traduit s\'étend sur plusieurs lignes, à quel point il s\'allonge ou se raccourcit dans une autre langue, et comment la mise en page s\'inverse lorsque la langue s\'écrit de droite à gauche.</string>
+    <plurals name="loc_items_count">
+        <item quantity="one">%d article dans votre panier</item>
+        <item quantity="many">%d d\'articles dans votre panier</item>
+        <item quantity="other">%d articles dans votre panier</item>
+    </plurals>
+    <string name="loc_language_label">Langue de l\'application</string>
+    <string name="loc_language_system">Système</string>
+    <string name="loc_show_details">Afficher les détails</string>
+    <string name="loc_detail_title">Détails localisés</string>
+
+    <string name="detail_default_title">Détails</string>
+    <string name="detail_default_body">Voici l\'écran de détail. C\'est une seconde activité avec un bouton de retour.</string>
+</resources>

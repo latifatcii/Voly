@@ -65,20 +65,36 @@ public struct SourceInfo: Codable, Sendable, Hashable {
     /// view's own app-defined class, then app-defined owners. Empty when the
     /// selection and everything around it belongs to system frameworks.
     public let candidates: [SourceCandidate]?
+    /// `android` when the view belongs to an Android app. There is no debug
+    /// info to resolve then; the host finds the classes in the project by
+    /// name instead.
+    public let platform: String?
+    /// Entry name of the view's `android:id`, to find it in a layout file.
+    public let resourceID: String?
+    /// The Android app's package (application id).
+    public let applicationID: String?
 
     public init(
         className: String,
         moduleName: String?,
         dsymUUID: String?,
         guessedRelativePath: String?,
-        candidates: [SourceCandidate]? = nil
+        candidates: [SourceCandidate]? = nil,
+        platform: String? = nil,
+        resourceID: String? = nil,
+        applicationID: String? = nil
     ) {
         self.className = className
         self.moduleName = moduleName
         self.dsymUUID = dsymUUID
         self.guessedRelativePath = guessedRelativePath
         self.candidates = candidates
+        self.platform = platform
+        self.resourceID = resourceID
+        self.applicationID = applicationID
     }
+
+    public var isAndroid: Bool { platform == "android" }
 }
 
 /// One class the host can try to resolve to a file and line.

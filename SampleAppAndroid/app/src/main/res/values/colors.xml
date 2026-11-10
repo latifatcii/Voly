@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_primary">#3F51B5</color>
+    <color name="brand_accent">#F4511E</color>
+    <color name="swatch_red">#E53935</color>
+    <color name="swatch_green">#43A047</color>
+    <color name="swatch_blue">#1E88E5</color>
+    <color name="swatch_amber">#FFB300</color>
+    <color name="swatch_purple">#8E24AA</color>
+</resources>

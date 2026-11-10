@@ -61,6 +61,8 @@ public struct HandshakeAccepted: Codable, Sendable {
     /// `SIMULATOR_UDID` of the hosting simulator; nil on a physical device.
     public let simulatorUDID: String?
     public let capabilities: AgentCapabilities?
+    /// `android` for the Android agent. The iOS agent doesn't send it.
+    public let platform: String?
     public init(
         protocolVersion: Int,
         sessionID: UUID,
@@ -70,7 +72,8 @@ public struct HandshakeAccepted: Codable, Sendable {
         processName: String,
         pid: Int32? = nil,
         simulatorUDID: String? = nil,
-        capabilities: AgentCapabilities? = nil
+        capabilities: AgentCapabilities? = nil,
+        platform: String? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.sessionID = sessionID
@@ -81,7 +84,11 @@ public struct HandshakeAccepted: Codable, Sendable {
         self.pid = pid
         self.simulatorUDID = simulatorUDID
         self.capabilities = capabilities
+        self.platform = platform
     }
+
+    /// The agent runs in an Android app (an emulator or device reached through adb).
+    public var isAndroid: Bool { platform == "android" }
 }
 
 public struct PropertyChange: Codable, Sendable {
