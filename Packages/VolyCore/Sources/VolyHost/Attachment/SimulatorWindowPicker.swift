@@ -9,12 +9,15 @@ public struct OnScreenWindow: Equatable, Sendable {
     public let layer: Int
     public let alpha: Double
     public let bounds: CGRect
+    /// The window server's number for it, the one `NSWindow.order(_:relativeTo:)` takes.
+    public let number: Int
 
-    public init(ownerPID: pid_t, layer: Int, alpha: Double, bounds: CGRect) {
+    public init(ownerPID: pid_t, layer: Int, alpha: Double, bounds: CGRect, number: Int = 0) {
         self.ownerPID = ownerPID
         self.layer = layer
         self.alpha = alpha
         self.bounds = bounds
+        self.number = number
     }
 }
 
@@ -54,7 +57,8 @@ public enum SimulatorWindowPicker {
                 ownerPID: pid,
                 layer: entry[kCGWindowLayer as String] as? Int ?? 0,
                 alpha: entry[kCGWindowAlpha as String] as? Double ?? 1,
-                bounds: bounds
+                bounds: bounds,
+                number: entry[kCGWindowNumber as String] as? Int ?? 0
             )
         }
     }

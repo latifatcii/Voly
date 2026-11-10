@@ -69,6 +69,65 @@ public enum AndroidEmulatorScreen {
     }
 }
 
+/// Where Voly's inspector sits among other apps' windows.
+///
+/// It floats above everything while the app in front is one it belongs next
+/// to: the Simulator, an emulator, or Voly itself. When the user turns to
+/// another app, the device window drops behind that app's windows, and the
+/// inspector goes with it: an ordinary window just above the device window,
+/// wherever that is in the stack.
+public enum InspectorLayering {
+    public struct Placement: Equatable, Sendable {
+        public enum Order: Equatable, Sendable {
+            /// In front of everything at its level.
+            case front
+            /// Directly above the window with this number.
+            case above(Int)
+            /// Directly below the window with this number.
+            case below(Int)
+        }
+
+        /// Above every ordinary window, or one of them.
+        public let floats: Bool
+        /// Where to move it in the stack. Nil leaves it where it is: it is
+        /// on another desktop, and ordering it next to a window here would
+        /// drag it over.
+        public let order: Order?
+
+        public init(floats: Bool, order: Order?) {
+            self.floats = floats
+            self.order = order
+        }
+    }
+
+    /// - Parameters:
+    ///   - windows: the windows on screen now, front to back.
+    ///   - inspector: the inspector panel's own window number.
+    ///   - devicePIDs: the Simulator and the emulators.
+    public static func placement(
+        windows: [OnScreenWindow], inspector: Int, frontmostPID: pid_t?, devicePIDs: Set<pid_t>, ownPID: pid_t
+    ) -> Placement {
+        // One list tells both where the inspector is and where the device
+        // window is, so the two are never taken from different desktops
+        // while the user is switching between them.
+        let isHere = windows.contains { $0.number == inspector }
+        guard let frontmostPID, frontmostPID != ownPID, !devicePIDs.contains(frontmostPID) else {
+            return Placement(floats: true, order: isHere ? .front : nil)
+        }
+        guard isHere else { return Placement(floats: false, order: nil) }
+        let ordinary = windows.filter { $0.layer == 0 && $0.alpha > 0 && $0.number != 0 && $0.ownerPID != ownPID }
+        let device = ordinary.first { window in
+            devicePIDs.contains(window.ownerPID)
+                && min(window.bounds.width, window.bounds.height) >= SimulatorWindowPicker.minimumShortSide
+                && max(window.bounds.width, window.bounds.height) >= SimulatorWindowPicker.minimumLongSide
+        }
+        if let device { return Placement(floats: false, order: .above(device.number)) }
+        // No device window to follow: at least not in front of the app the user turned to.
+        let front = ordinary.first { $0.ownerPID == frontmostPID }
+        return Placement(floats: false, order: front.map { .below($0.number) })
+    }
+}
+
 /// The window Voly docks next to: the device window the user focused last,
 /// whether that is an iOS simulator or an Android emulator.
 ///
@@ -99,6 +158,24 @@ public final class DeviceWindowLocator: SimulatorLocator, @unchecked Sendable {
 
     public func iosScreenRegionInScreen() -> IosScreenBoundsOnScreen? {
         simulator.iosScreenRegionInScreen()
+    }
+
+    /// Where the inspector belongs among the windows on screen, given the
+    /// app that is in front now.
+    public func inspectorPlacement(
+        of inspector: Int, frontmost: NSRunningApplication?
+    ) -> InspectorLayering.Placement {
+        var devices = AndroidEmulatorApp.processIDs()
+        for simulator in NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.iphonesimulator") {
+            devices.insert(simulator.processIdentifier)
+        }
+        return InspectorLayering.placement(
+            windows: SimulatorWindowPicker.onScreenWindows(),
+            inspector: inspector,
+            frontmostPID: frontmost?.processIdentifier,
+            devicePIDs: devices,
+            ownPID: ProcessInfo.processInfo.processIdentifier
+        )
     }
 
     /// Where an emulator shows its display, in Cocoa screen coordinates,

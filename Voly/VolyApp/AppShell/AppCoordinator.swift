@@ -12,7 +12,8 @@ final class AppCoordinator {
     private let window: InspectorWindowController
     private let menuBar: MenuBarController
     private let attachment: SimulatorAttachment
-    private let locator: SimulatorLocator
+    private let locator: DeviceWindowLocator
+    private var layeringObservers: [NSObjectProtocol] = []
     private var simulators: VolySimulatorManager { session.simulators }
     private var hotkey: GlobalHotkey?
     private var simulatorHotkey: FrontmostAppHotkey?
@@ -73,6 +74,18 @@ final class AppCoordinator {
             self?.toggleInspector()
         }
 
+        // The inspector floats next to a device window, and goes behind
+        // other apps with it when the user turns to one of them.
+        // Again once a switch of desktops has finished: only then is it
+        // settled which windows are on screen.
+        for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.activeSpaceDidChangeNotification] {
+            layeringObservers.append(NSWorkspace.shared.notificationCenter.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.placeInspector() }
+            })
+        }
+
         // Simulator discovery + restoring per-simulator runtime integration
         // the user had turned on. Fire-and-forget; failures surface in the
         // simulator list, they don't block the rest of startup.
@@ -80,6 +93,12 @@ final class AppCoordinator {
         // Android emulators: does nothing unless adb is installed and its
         // server is already running.
         session.android.start()
+    }
+
+    private func placeInspector() {
+        window.place(locator.inspectorPlacement(
+            of: window.windowNumber, frontmost: NSWorkspace.shared.frontmostApplication
+        ))
     }
 
     func toggleInspector() {
@@ -98,7 +117,10 @@ final class AppCoordinator {
             voly: .voly,
             screen: Self.screen(for: simFrame)
         )
-        window.show(at: seed.frame)
+        let placement = locator.inspectorPlacement(
+            of: window.windowNumber, frontmost: NSWorkspace.shared.frontmostApplication
+        )
+        window.show(at: seed.frame, floating: placement.floats)
         menuBar.isInspectorVisible = true
         simulators.isInspectorVisible = true
         Task { @MainActor [weak self] in await self?.simulators.refresh() }
