@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: Build and test (macOS)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Unit tests (VolyCore)
+        working-directory: Packages/VolyCore
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log" | grep -E "error|warning: unre|failed|Executed|Compiling|Build complete" || true; grep -q "with 0 failures" "$RUNNER_TEMP/swift-test.log" && ! grep -q "error:" "$RUNNER_TEMP/swift-test.log"
+
+      - name: Build Voly.app
+        run: |
+          set -o pipefail
+          xcodebuild -project Voly.xcodeproj -scheme Voly -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/derived" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            build 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: unre|BUILD|Embedded" || true
+          grep -q "BUILD SUCCEEDED" "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: The app carries the Android agent
+        run: |
+          RESOURCES="$RUNNER_TEMP/derived/Build/Products/Debug/Voly.app/Contents/Resources"
+          ls -l "$RESOURCES"
+          found=$(find "$RESOURCES" -name 'voly-agent.dex' | head -1)
+          test -n "$found" || { echo "voly-agent.dex is not in the app bundle"; exit 1; }
+          dir=$(dirname "$found")
+          for f in voly-agent.version voly-agent-arm64-v8a.elf voly-agent-x86_64.elf; do
+            test -f "$dir/$f" || { echo "$f is not in the app bundle"; exit 1; }
+          done
+
+      - name: Build logs
+        if: failure()
+        run: |
+          grep -B2 -A12 "error:" "$RUNNER_TEMP/swift-test.log" | head -300 || true
+          grep -B2 -A12 "error:" "$RUNNER_TEMP/xcodebuild.log" | head -400 || true
+
+  android-agent:
+    name: Build the Android agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: AndroidAgent/build.sh "$RUNNER_TEMP/agent"
+      - name: Built files
+        run: ls -l "$RUNNER_TEMP/agent"

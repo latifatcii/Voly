@@ -93,14 +93,23 @@ final class FrontmostAppHotkey {
     private let keyCode: UInt32
     private let modifiers: UInt32
     private let bundleIdentifiers: Set<String>
+    /// Frontmost apps that count besides the listed ones.
+    private let alsoMatches: (NSRunningApplication) -> Bool
     private let onFire: () -> Void
     private var hotkey: GlobalHotkey?
     private var observer: NSObjectProtocol?
 
-    init(keyCode: UInt32, modifiers: UInt32, whileFrontmost bundleIdentifiers: Set<String>, onFire: @escaping () -> Void) {
+    init(
+        keyCode: UInt32,
+        modifiers: UInt32,
+        whileFrontmost bundleIdentifiers: Set<String>,
+        orWhen alsoMatches: @escaping (NSRunningApplication) -> Bool = { _ in false },
+        onFire: @escaping () -> Void
+    ) {
         self.keyCode = keyCode
         self.modifiers = modifiers
         self.bundleIdentifiers = bundleIdentifiers
+        self.alsoMatches = alsoMatches
         self.onFire = onFire
         observer = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -115,8 +124,10 @@ final class FrontmostAppHotkey {
     }
 
     private func update() {
-        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        let wanted = frontmost.map(bundleIdentifiers.contains) ?? false
+        let frontmostApp = NSWorkspace.shared.frontmostApplication
+        let frontmost = frontmostApp?.bundleIdentifier
+        let wanted = (frontmost.map(bundleIdentifiers.contains) ?? false)
+            || (frontmostApp.map(alsoMatches) ?? false)
         if wanted, hotkey == nil {
             hotkey = GlobalHotkey(keyCode: keyCode, modifiers: modifiers, onFire: onFire)
             if hotkey == nil {

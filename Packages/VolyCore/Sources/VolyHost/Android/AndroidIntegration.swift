@@ -195,7 +195,7 @@ public actor AndroidIntegration {
                 state = .excluded
             } else if agents[key] != nil {
                 state = .inspectable
-            } else if !process.isDebuggable || notDebuggable.contains(key) {
+            } else if notDebuggable.contains(key) {
                 state = .notDebuggable
             } else if let failure = failures[key], failure.attempts >= Self.maxAttachAttempts {
                 state = .failed(failure.message)

@@ -99,10 +99,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// can't keep the app from quitting.
     func applicationWillTerminate(_ notification: Notification) {
         session?.agentAccess.stop()
+        // Android: give back the ports adb forwards to the agents.
+        let releaseAndroid = session?.android.prepareReleaseForQuit()
         guard let unload = session?.simulators.prepareUnloadForQuit() else { return }
         let done = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {
             await unload()
+            await releaseAndroid?()
             done.signal()
         }
         _ = done.wait(timeout: .now() + .seconds(8))

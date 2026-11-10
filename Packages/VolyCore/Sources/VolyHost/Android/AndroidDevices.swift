@@ -118,15 +118,11 @@ public struct AndroidDeviceInventory: Sendable {
 public struct AndroidProcess: Sendable, Equatable, Hashable {
     public let package: String
     public let pid: Int32
-    /// The app can have an agent attached: it is a debuggable build (or the
-    /// device is a debug image, where every app is).
-    public let isDebuggable: Bool
     public let is64Bit: Bool
 
-    public init(package: String, pid: Int32, isDebuggable: Bool, is64Bit: Bool) {
+    public init(package: String, pid: Int32, is64Bit: Bool) {
         self.package = package
         self.pid = pid
-        self.isDebuggable = isDebuggable
         self.is64Bit = is64Bit
     }
 }
@@ -139,16 +135,12 @@ public struct AndroidProcessLister: Sendable {
         self.adb = adb
     }
 
-    /// Main processes of user-installed apps, with whether each can take
-    /// an agent.
+    /// Main processes of user-installed apps. Whether one is debuggable —
+    /// and so can take an agent — only shows when attaching is tried.
     public func runningUserApps(serial: String, userPackages: Set<String>) async throws -> [AndroidProcess] {
         let ps = try await adb.shell(serial, "ps -A -o PID,PPID,NAME", timeout: 8)
         guard ps.succeeded else { throw AdbError.failed(command: "shell ps", detail: ps.errorText) }
-        // `adb jdwp` lists the pids a debugger (and so an agent) may attach
-        // to. It doesn't exit on its own on every adb version, hence the
-        // short limit; what it printed until then is the answer.
-        let jdwp = try await adb.run(["-s", serial, "jdwp"], timeout: 2)
-        return Self.userApps(ps: ps.text, debuggablePIDs: Self.parsePIDs(jdwp.text), userPackages: userPackages)
+        return Self.userApps(ps: ps.text, userPackages: userPackages)
     }
 
     /// Packages the user installed (`pm list packages -3`).
@@ -166,11 +158,7 @@ public struct AndroidProcessLister: Sendable {
         })
     }
 
-    public static func parsePIDs(_ text: String) -> Set<Int32> {
-        Set(text.split(whereSeparator: \.isNewline).compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) })
-    }
-
-    public static func userApps(ps: String, debuggablePIDs: Set<Int32>, userPackages: Set<String>) -> [AndroidProcess] {
+    public static func userApps(ps: String, userPackages: Set<String>) -> [AndroidProcess] {
         struct Row { let pid: Int32, parent: Int32, name: String }
         let rows = ps.split(whereSeparator: \.isNewline).compactMap { line -> Row? in
             let fields = line.split(separator: " ", omittingEmptySubsequences: true)
@@ -186,9 +174,7 @@ public struct AndroidProcessLister: Sendable {
                 // Apps are forked from zygote64 or, for 32-bit apps, zygote.
                 let parent = names[row.parent] ?? ""
                 return AndroidProcess(
-                    package: row.name, pid: row.pid,
-                    isDebuggable: debuggablePIDs.contains(row.pid),
-                    is64Bit: parent.isEmpty || parent.contains("64")
+                    package: row.name, pid: row.pid, is64Bit: parent.isEmpty || parent.contains("64")
                 )
             }
             .sorted { $0.package < $1.package }

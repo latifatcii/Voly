@@ -37,7 +37,7 @@ public enum AndroidMCP {
     public static func describe(_ status: AndroidDeviceStatus) -> String {
         if let error = status.error { return "Voly could not use this device: \(error)" }
         guard status.isIntegrationEnabled else {
-            return "Voly is switched off for this device (Voly menu → Runtime Integration)"
+            return "Voly is switched off for this device (its switch in Voly's Simulators tab)"
         }
         return "debuggable apps running here are inspectable"
     }

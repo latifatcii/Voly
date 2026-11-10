@@ -14,6 +14,7 @@
 //   volyctl mcp [--socket <path>]      MCP server on stdio, backed by a running Voly.app
 //   volyctl mcp-direct <udid>          the same tools without Voly.app, straight to the
 //                                      agents in one simulator (for scripted checks)
+//   volyctl android …                  Android emulators: see AndroidCommands.swift
 
 #if os(macOS)
 import Foundation
@@ -193,6 +194,11 @@ func run(_ arguments: [String]) async throws {
             ?? VolyInjectionCoordinator.defaultSupportDirectory
     )
     guard let verb = arguments.first else { throw Failure("usage: see the header of Sources/volyctl/main.swift") }
+    // Android has its own verbs and needs none of the simulator set-up.
+    if verb == "android" {
+        try await runAndroid(Array(arguments.dropFirst()))
+        return
+    }
     switch verb {
     case "integration":
         guard arguments.count >= 3 else { throw Failure("usage: volyctl integration enable|disable|status <udid>") }

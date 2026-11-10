@@ -92,6 +92,12 @@ final class SimulatorHoverMonitor {
             cachedRegion = nil
             return
         }
+        // The region is the iOS Simulator's screen. An Android app measures
+        // on its own, in the emulator: drag from the selection in pick mode.
+        if session?.isActiveAgentAndroid == true {
+            cachedRegion = nil
+            return
+        }
         guard let snapshot = state.hierarchy else {
             if cachedRegion != nil { log.info("refreshRegion: no snapshot (not connected?)") }
             cachedRegion = nil

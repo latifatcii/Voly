@@ -206,6 +206,9 @@ struct InspectorShell: View {
 
     /// The simulator the inspected app runs in, by its device name.
     private var simulatorName: String? {
+        if session.state.connectionStatus == .connected, let serial = session.activeAndroidSerial {
+            return session.android.device(serial: serial)?.displayName ?? serial
+        }
         guard session.state.connectionStatus == .connected,
               let udid = session.activeSimulatorUDID
         else { return nil }
@@ -220,6 +223,11 @@ struct InspectorShell: View {
         var parts = [agent.bundleIdentifier ?? agent.processName]
         if let pid = agent.pid { parts.append("pid \(pid)") }
         if let udid = agent.simulatorUDID { parts.append("simulator \(udid)") }
+        if agent.isAndroid {
+            if let serial = session.activeAndroidSerial { parts.append("Android \(serial)") }
+            parts.append("agent attached to the running app")
+            return parts.joined(separator: ", ")
+        }
         if let capabilities = agent.capabilities {
             parts.append(capabilities.injectionMode == .injected ? "agent loaded automatically" : "agent linked into the app")
             if !capabilities.previewHost {
@@ -233,7 +241,9 @@ struct InspectorShell: View {
         HStack(spacing: 6) {
             Image(systemName: "cursorarrow.click")
                 .foregroundStyle(VolyTheme.selection)
-            Text("Click a view in a simulator to select it. Hover another to measure.")
+            Text(session.isActiveAgentAndroid
+                ? "Click a view in the emulator to select it. Drag from it to another to measure."
+                : "Click a view in a simulator to select it. Hover another to measure.")
                 .foregroundStyle(VolyTheme.dim)
             Spacer(minLength: 0)
         }
