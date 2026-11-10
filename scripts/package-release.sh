@@ -44,6 +44,9 @@ APP="$STAGE/Voly.app"
 for DYLIB in VolyAgent.dylib VolyLaunchBridge.dylib; do
     [ -f "$APP/Contents/Resources/$DYLIB" ] || { echo "missing $DYLIB in the app bundle"; exit 1; }
 done
+# The Android agent (Voly/AndroidAgentPayload, built by AndroidAgent/build.sh).
+ANDROID_AGENT="$(find "$APP/Contents/Resources" -name voly-agent.dex | head -1)"
+[ -n "$ANDROID_AGENT" ] || { echo "missing the Android agent (voly-agent.dex) in the app bundle"; exit 1; }
 
 # Strip debug symbol tables (keeping exported symbols, which the dylibs are
 # loaded by), then sign again inside-out since stripping invalidates the
@@ -60,6 +63,7 @@ echo "   version: $VERSION"
 echo "   app:     $(lipo -archs "$APP/Contents/MacOS/Voly")"
 echo "   agent:   $(lipo -archs "$APP/Contents/Resources/VolyAgent.dylib")"
 echo "   bridge:  $(lipo -archs "$APP/Contents/Resources/VolyLaunchBridge.dylib")"
+echo "   android: agent $(cat "$(dirname "$ANDROID_AGENT")/voly-agent.version")"
 LEAKS=$(strings - "$APP/Contents/MacOS/Voly" "$APP/Contents/Resources/"*.dylib | grep -c "$HOME" || true)
 if [ "$LEAKS" != "0" ]; then echo "   warning: $LEAKS strings still contain $HOME"; fi
 
