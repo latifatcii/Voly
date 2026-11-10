@@ -15,7 +15,7 @@ Live iOS inspector / editor — a macOS host that connects to a running UIKit ap
 - dismiss / pop / pop to root from the inspector
 - resize the app's root container under simulated trait / safe-area / size-class overrides
 
-In a simulator none of this needs changes to your app: turn on **Runtime Integration** for the simulator and run your app from Xcode as usual. It comes up with the agent loaded and the debugger still attached. See [`docs/runtime-integration.md`](docs/runtime-integration.md).
+In a simulator none of this needs changes to your app or any setup: with Voly running, run your app from Xcode as usual. It comes up with the agent loaded and the debugger still attached. See [`docs/runtime-integration.md`](docs/runtime-integration.md).
 
 See [`docs/plan.md`](../../.claude/plans/you-are-a-senior-piped-bubble.md) for the full architecture and MVP phases.
 
@@ -52,9 +52,8 @@ Building `Voly` builds both simulator dylibs and embeds them in `Voly.app/Conten
 
 ## Running
 
-1. Build and run `Voly` on macOS. It lives in the menu bar; ⌃⌥⌘V shows the inspector.
-2. Boot a simulator and turn on **Runtime Integration** for it (menu bar, or the switch in the inspector's Tree tab).
-3. Run any app in that simulator — from Xcode, the home screen, or `simctl`. It appears under its simulator and Voly connects.
+1. Build and run `Voly` on macOS. It lives in the menu bar; ⌃⌥⌘V shows the inspector. Every booted simulator gets runtime integration automatically (switch individual ones off in the Tree tab or the menu bar).
+2. Run any app in a simulator — from Xcode, the home screen, or `simctl`. It appears under its simulator and Voly connects.
 
 To try it with the bundled sample:
 
@@ -69,7 +68,7 @@ xcrun simctl launch booted com.latifatci.VolySampleApp
 
 ## Safety model
 
-- Runtime integration is off until you enable it, per simulator, and never applies to physical devices. It is removed when you turn it off, quit Voly, or shut the simulator down.
+- Runtime integration applies to booted simulators while Voly is running — all of them by default, or only the ones you pick — and never to physical devices. It is removed when you switch a simulator off, quit Voly, or shut the simulator down.
 - Voly does not terminate or relaunch apps on its own. The one relaunch action is explicit and asks first.
 - Injected agents listen on loopback only and require a per-process session token (from a `0600` file in the app's own container) before accepting any command. Voly also checks the handshake came from the pid it expected.
 - The linked SDK is inert unless the host app is a Debug build **and** `VOLY_AGENT_ENABLED=1` (or `--voly-agent-enabled`) is set **and** your code calls `VolyAgent.start()`. In Release builds `VolyAgent.start()` is a no-op. SDK agents advertise over Bonjour on the LAN and are not token-protected.

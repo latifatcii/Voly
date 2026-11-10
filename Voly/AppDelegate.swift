@@ -3,7 +3,9 @@ import Foundation
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let session = InspectorSession()
+    /// Created only once we know this is the only Voly running: a session
+    /// starts discovering and connecting to agents as soon as it exists.
+    private var session: InspectorSession?
     private var coordinator: AppCoordinator?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -16,10 +18,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #else
         let scripted = false
         #endif
+        // Two copies would each manage the same simulators and keep undoing
+        // each other (e.g. an installed Voly plus a build run from Xcode).
+        if let other = Self.otherRunningInstance() {
+            NSLog("[Voly] another instance is already running (pid %d) — quitting this one", other.processIdentifier)
+            if !scripted {
+                let alert = NSAlert()
+                alert.messageText = "Voly is already running"
+                alert.informativeText = """
+                    Another copy of Voly (pid \(other.processIdentifier)) is managing your simulators. \
+                    Quit it first if you want to use this one.
+                    """
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+            NSApp.terminate(nil)
+            return
+        }
+
         if !scripted {
             FirstRunAccessibilityPrompt.runIfNeeded()
         }
 
+        let session = InspectorSession()
+        self.session = session
         coordinator = AppCoordinator(session: session)
         coordinator?.start()
         installTerminationSignals()
@@ -51,13 +73,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     #endif
 
+    private static func otherRunningInstance() -> NSRunningApplication? {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return nil }
+        let me = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first { $0.processIdentifier != me && !$0.isTerminated }
+    }
+
     private var terminationSignals: [DispatchSourceSignal] = []
 
     /// Voly's launch bridge must not outlive Voly in a simulator, so quitting
     /// first unloads it everywhere. The wait is bounded: a stuck simulator
     /// can't keep the app from quitting.
     func applicationWillTerminate(_ notification: Notification) {
-        let unload = session.simulators.prepareUnloadForQuit()
+        guard let unload = session?.simulators.prepareUnloadForQuit() else { return }
         let done = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {
             await unload()

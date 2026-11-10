@@ -21,7 +21,20 @@ struct PeerListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            sectionTitle("Simulators")
+            HStack {
+                sectionTitle("Simulators")
+                Spacer()
+                Toggle("All simulators", isOn: Binding(
+                    get: { simulators.preference.allSimulators },
+                    set: { all in Task { await simulators.setIntegratesAllSimulators(all) } }
+                ))
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .font(.caption)
+                .padding(.trailing, 8)
+                .padding(.top, 8)
+                .help("Integrate with every booted simulator automatically. Switch a simulator off below to leave it alone, or uncheck this to pick simulators by hand.")
+            }
             if let error = simulators.stagingError {
                 caption(error, color: .red)
             }
@@ -137,7 +150,12 @@ struct PeerListView: View {
         } else {
             switch simulator.integration {
             case .inactive:
-                caption("Runtime integration is off.", color: .secondary)
+                caption(
+                    simulators.isIntegrationWanted(for: simulator.id)
+                        ? "Runtime integration is starting…"
+                        : "Runtime integration is off for this simulator.",
+                    color: .secondary
+                )
             case .active:
                 caption(activeDescription, color: .secondary)
             case .paused:

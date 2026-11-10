@@ -130,10 +130,15 @@ final class AppCoordinator {
         menuBar.onSetIntegration = { [weak self] udid, enabled in
             self?.setIntegration(enabled: enabled, for: udid)
         }
+        menuBar.integratesAllSimulatorsProvider = { [weak self] in
+            self?.simulators.preference.allSimulators ?? true
+        }
+        menuBar.onSetIntegratesAllSimulators = { [weak self] all in
+            Task { @MainActor [weak self] in await self?.simulators.setIntegratesAllSimulators(all) }
+        }
     }
 
-    /// Menu-bar entry point for per-simulator integration. Turning it on
-    /// restarts that simulator's launch service once, so say so first.
+    /// Menu-bar entry point for the per-simulator switch.
     func setIntegration(enabled: Bool, for udid: String) {
         Task { @MainActor [weak self] in
             guard let self else { return }

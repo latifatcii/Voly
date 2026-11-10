@@ -7,11 +7,14 @@ nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", ca
 
 /// Tracks booted simulators and owns per-simulator runtime integration.
 ///
-/// Integration is opt-in per simulator. Enabling it loads Voly's launch
-/// bridge into that simulator only (see `VolyInjectionCoordinator`); apps
-/// launched afterwards — from Xcode, SpringBoard or `simctl` — come up with
-/// the agent already loaded and their debugger untouched. Nothing here ever
-/// terminates an app on its own: `relaunch` is the one explicit exception.
+/// By default every booted simulator gets integration, so an app can be
+/// inspected without switching anything on first; single simulators can be
+/// opted out, or "all" turned off in favour of a hand-picked set (see
+/// `IntegrationPreference`). Integration loads Voly's launch bridge into a
+/// simulator (see `VolyInjectionCoordinator`); apps launched afterwards —
+/// from Xcode, SpringBoard or `simctl` — come up with the agent already
+/// loaded and their debugger untouched. Nothing here ever terminates an app
+/// on its own: `relaunch` is the one explicit exception.
 @MainActor
 @Observable
 final class VolySimulatorManager {
@@ -43,7 +46,6 @@ final class VolySimulatorManager {
         }
     }
 
-    private static let wantedKey = "voly.integration.enabledSimulators"
     private static let policyKey = "voly.integration.policy"
 
     private(set) var simulators: [Simulator] = []
@@ -68,10 +70,10 @@ final class VolySimulatorManager {
     private let stager = VolyRuntimeStager(supportDirectory: VolyInjectionCoordinator.defaultSupportDirectory)
     private var stagedRuntime: StagedRuntime?
 
-    /// Simulators the user turned integration on for. The bridge itself only
-    /// lives until the simulator shuts down, so this is what re-applies it
-    /// after the next boot.
-    private var wantedUDIDs: Set<String>
+    /// Which simulators should have integration. The bridge itself only
+    /// lives until a simulator shuts down (or Voly quits), so this is what
+    /// applies it to every simulator that boots.
+    private(set) var preference: IntegrationPreference
     private var busyUDIDs: Set<String> = []
     private var errors: [String: String] = [:]
     /// Restore attempts per booted simulator, so a runtime that can't be
@@ -83,7 +85,7 @@ final class VolySimulatorManager {
 
     init() {
         let defaults = UserDefaults.standard
-        wantedUDIDs = Set(defaults.stringArray(forKey: Self.wantedKey) ?? [])
+        preference = IntegrationPreference(defaults: defaults)
         if let data = defaults.data(forKey: Self.policyKey),
            let stored = try? JSONDecoder().decode(InjectionPolicy.self, from: data) {
             policy = stored
@@ -185,32 +187,55 @@ final class VolySimulatorManager {
         }
         if updated != simulators { simulators = updated }
 
-        // A bridge loaded in a simulator the user never enabled here is a
-        // leftover (a crash before cleanup, or reset preferences): remove it
-        // rather than leave an unexplained modification in place.
+        // A bridge loaded in a simulator that shouldn't have one — opted out,
+        // or left over from a crash in hand-picked mode — is removed rather
+        // than left as an unexplained modification.
         for simulator in updated where simulator.integration != .inactive
-            && !wantedUDIDs.contains(simulator.id)
+            && !preference.wants(simulator.id)
             && !simulator.isBusy {
-            log.notice("stale launch bridge found in \(simulator.id, privacy: .public); removing it")
-            await setIntegration(enabled: false, for: simulator.id)
+            log.notice("launch bridge loaded in \(simulator.id, privacy: .public) but not wanted there; removing it")
+            await applyIntegration(enabled: false, to: simulator.id)
         }
 
-        // Restore integration on simulators the user had enabled it for.
-        for simulator in updated where wantedUDIDs.contains(simulator.id)
+        // Bring integration up wherever it is wanted: by default that is
+        // every booted simulator, including ones that boot later.
+        for simulator in updated where preference.wants(simulator.id)
             && simulator.integration == .inactive
             && !simulator.isBusy
             && restoreAttempts[simulator.id, default: 0] < Self.maxRestoreAttempts {
             restoreAttempts[simulator.id, default: 0] += 1
-            log.notice("restoring integration on \(simulator.id, privacy: .public) after boot (attempt \(self.restoreAttempts[simulator.id] ?? 0))")
-            await setIntegration(enabled: true, for: simulator.id)
+            log.notice("enabling integration on \(simulator.id, privacy: .public) (attempt \(self.restoreAttempts[simulator.id] ?? 0))")
+            await applyIntegration(enabled: true, to: simulator.id)
         }
     }
 
     // MARK: - Integration
 
-    func isIntegrationWanted(for udid: String) -> Bool { wantedUDIDs.contains(udid) }
+    func isIntegrationWanted(for udid: String) -> Bool { preference.wants(udid) }
 
+    /// Switch between "every booted simulator" and a hand-picked set. What
+    /// is integrated at this moment doesn't change; only what happens to
+    /// simulators from here on.
+    func setIntegratesAllSimulators(_ all: Bool) async {
+        let active = Set(simulators.filter(\.integration.isActive).map(\.id))
+        preference.setAllSimulators(all, currentlyActive: active)
+        preference.save(to: .standard)
+        restoreAttempts.removeAll()
+        log.notice("integration mode: \(all ? "all booted simulators" : "selected simulators only", privacy: .public)")
+        await refresh()
+    }
+
+    /// The per-simulator switch: remember the choice, then act on it.
     func setIntegration(enabled: Bool, for udid: String) async {
+        preference.set(enabled, for: udid)
+        preference.save(to: .standard)
+        restoreAttempts[udid] = nil
+        await applyIntegration(enabled: enabled, to: udid)
+    }
+
+    /// Load or unload the bridge without touching the stored preference —
+    /// used directly when bringing a simulator in line with it.
+    private func applyIntegration(enabled: Bool, to udid: String) async {
         guard busyUDIDs.insert(udid).inserted else { return }
         errors[udid] = nil
         markBusy(udid, true)
@@ -222,10 +247,8 @@ final class VolySimulatorManager {
             if enabled {
                 let runtime = try stageRuntime()
                 try await coordinator.enable(simulator: udid, runtime: runtime, policy: policy)
-                wantedUDIDs.insert(udid)
                 log.notice("integration enabled for \(udid, privacy: .public)")
             } else {
-                wantedUDIDs.remove(udid)
                 try await coordinator.disable(simulator: udid)
                 log.notice("integration disabled for \(udid, privacy: .public)")
             }
@@ -233,7 +256,6 @@ final class VolySimulatorManager {
             errors[udid] = error.localizedDescription
             log.error("integration \(enabled ? "enable" : "disable", privacy: .public) failed for \(udid, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
-        UserDefaults.standard.set(wantedUDIDs.sorted(), forKey: Self.wantedKey)
         refreshState(of: udid)
     }
 

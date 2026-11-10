@@ -18,6 +18,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Booted simulators, read each time the submenu opens.
     var simulatorsProvider: () -> [VolySimulatorManager.Simulator] = { [] }
     var onSetIntegration: (_ udid: String, _ enabled: Bool) -> Void = { _, _ in }
+    /// Whether every booted simulator is integrated automatically.
+    var integratesAllSimulatorsProvider: () -> Bool = { true }
+    var onSetIntegratesAllSimulators: (Bool) -> Void = { _ in }
 
     var isInspectorVisible: Bool = false {
         didSet { showHideItem.title = isInspectorVisible ? "Hide Inspector" : "Show Inspector" }
@@ -81,6 +84,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === integrationMenu else { return }
         menu.removeAllItems()
+        let allItem = NSMenuItem(
+            title: "All Booted Simulators",
+            action: #selector(allSimulatorsSelected(_:)),
+            keyEquivalent: ""
+        )
+        allItem.target = self
+        allItem.state = integratesAllSimulatorsProvider() ? .on : .off
+        allItem.toolTip = "Load the Voly agent into apps launched in any booted simulator. Uncheck a simulator below to leave it alone."
+        menu.addItem(allItem)
+        menu.addItem(.separator())
+
         let simulators = simulatorsProvider()
         guard !simulators.isEmpty else {
             let empty = NSMenuItem(title: "No booted simulators", action: nil, keyEquivalent: "")
@@ -110,6 +124,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func integrationSelected(_ sender: NSMenuItem) {
         guard let udid = sender.representedObject as? String else { return }
         onSetIntegration(udid, sender.state != .on)
+    }
+
+    @objc private func allSimulatorsSelected(_ sender: NSMenuItem) {
+        onSetIntegratesAllSimulators(sender.state != .on)
     }
 
     @objc private func showHideSelected() { onToggle() }
