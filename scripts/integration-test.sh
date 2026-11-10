@@ -9,6 +9,10 @@
 #
 # Usage: scripts/integration-test.sh <booted-simulator-udid>
 #
+# Set VOLY_TEST_RUNTIME_DIR to a directory holding VolyAgent.dylib and
+# VolyLaunchBridge.dylib (e.g. a packaged Voly.app/Contents/Resources) to
+# test those exact dylibs instead of building Debug ones.
+#
 # Everything it changes is scoped to that simulator and undone at the end.
 # Integration state lives in a temporary directory, not in Voly's own, so a
 # running Voly.app doesn't interfere and isn't interfered with — but don't
@@ -23,6 +27,7 @@ DERIVED="${VOLY_TEST_DERIVED_DATA:-$WORK/DerivedData}"
 SUPPORT="$WORK/support"
 BUNDLE=com.latifatci.VolySampleApp
 PRODUCTS="$DERIVED/Build/Products/Debug-iphonesimulator"
+RUNTIME="${VOLY_TEST_RUNTIME_DIR:-$PRODUCTS}"
 VOLYCTL="$ROOT/Packages/VolyCore/.build/debug/volyctl"
 FAILURES=0
 
@@ -54,10 +59,14 @@ build() {   # quiet unless it fails
     if ! "$@" >"$WORK/build.log" 2>&1; then cat "$WORK/build.log"; exit 1; fi
 }
 (cd "$ROOT/Packages/VolyCore" && build swift build --product volyctl)
-for SCHEME in VolyAgentDylib VolyLaunchBridge; do
-    build xcodebuild -project "$ROOT/Voly.xcodeproj" -scheme "$SCHEME" -configuration Debug \
-        -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DERIVED" build
-done
+if [ -z "${VOLY_TEST_RUNTIME_DIR:-}" ]; then
+    for SCHEME in VolyAgentDylib VolyLaunchBridge; do
+        build xcodebuild -project "$ROOT/Voly.xcodeproj" -scheme "$SCHEME" -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DERIVED" build
+    done
+else
+    echo "   using prebuilt dylibs from $RUNTIME"
+fi
 build xcodebuild -project "$ROOT/Voly.xcodeproj" -scheme SampleApp -configuration Debug \
     -destination "platform=iOS Simulator,id=$UDID,arch=$(uname -m)" -derivedDataPath "$DERIVED" build
 xcrun simctl install "$UDID" "$PRODUCTS/SampleApp.app"
@@ -69,7 +78,7 @@ check "no insert libraries without integration" lacks "$(insert_libraries "$PID"
 echo "== enable"
 xcrun simctl launch "$UDID" com.apple.Preferences >/dev/null; sleep 1
 SETTINGS_BEFORE=$(xcrun simctl spawn "$UDID" launchctl list | grep 'com.apple.Preferences' | awk '{print $1}')
-STATE=$(ctl integration enable "$UDID" --agent "$PRODUCTS/VolyAgent.dylib" --bridge "$PRODUCTS/VolyLaunchBridge.dylib")
+STATE=$(ctl integration enable "$UDID" --agent "$RUNTIME/VolyAgent.dylib" --bridge "$RUNTIME/VolyLaunchBridge.dylib")
 check "bridge reports active" contains "$STATE" "active("
 SETTINGS_AFTER=$(xcrun simctl spawn "$UDID" launchctl list | grep 'com.apple.Preferences' | awk '{print $1}')
 check "an app that was already running was not restarted" test -n "$SETTINGS_BEFORE" -a "$SETTINGS_BEFORE" = "$SETTINGS_AFTER"
@@ -95,9 +104,16 @@ check "handshake names this simulator" contains "$HANDSHAKE" "$UDID"
 echo "== debugger-style launch (suspended until a debugger attaches)"
 PID=$(launch --wait-for-debugger)
 xcrun lldb --no-lldbinit -p "$PID" -o "script lldb.debugger.SetAsync(True)" -o "process continue" \
-    -o "script import time; time.sleep(9)" -o "process interrupt" -o "script import time; time.sleep(1)" \
+    -o "script import time; time.sleep(24)" \
     -o "image list -b VolyAgent.dylib" -o "process detach" -o "quit" >"$WORK/lldb.log" 2>&1 &
-sleep 6
+# (No "process interrupt" before detaching: if the detach wins the race, the
+# pending SIGSTOP lands on a process nobody is debugging and freezes it.)
+# Attaching and launching take a variable few seconds; wait for the agent
+# rather than for a fixed time. The debugger stays attached well past this.
+for _ in $(seq 1 18); do
+    if contains "$(send '{"ping":{}}')" "pong"; then break; fi
+    sleep 1
+done
 check "agent is up while the debugger is attached" contains "$(send '{"ping":{}}')" "pong"
 check "inspection works under the debugger" contains "$(send '{"navigationState":{}}')" "LocalizationDetailVC"
 check "same process, not relaunched" kill -0 "$PID"
@@ -146,7 +162,7 @@ check "a system view resolves to its app-defined owner" contains "$SOURCE" "cand
 check "debug info gives file and declaration line" bash -c "grep -Eq 'LocalizationDemoVC.swift:[0-9]+ \[debugInfo declaration\] LocalizationDetailVC' <<<'$SOURCE'"
 
 echo "== policy"
-ctl integration enable "$UDID" --agent "$PRODUCTS/VolyAgent.dylib" --bridge "$PRODUCTS/VolyLaunchBridge.dylib" --exclude "$BUNDLE" >/dev/null
+ctl integration enable "$UDID" --agent "$RUNTIME/VolyAgent.dylib" --bridge "$RUNTIME/VolyLaunchBridge.dylib" --exclude "$BUNDLE" >/dev/null
 PID=$(launch); sleep 2
 check "an excluded app launches without the agent" lacks "$(insert_libraries "$PID")" "VolyAgent"
 check "updating the policy did not restart the launch service" contains "$(ctl integration status "$UDID")" "active("
