@@ -243,8 +243,27 @@ final class Localization implements Application.ActivityLifecycleCallbacks {
         decor.post(() -> applyDirection(decor));
     }
 
+    /**
+     * Before Android 13 nothing remembers the override for an activity that
+     * is created later (or recreated): give each one the language before it
+     * inflates anything.
+     */
+    private void applyLegacyOverride(Activity activity) {
+        if (Build.VERSION.SDK_INT >= 33 || legacyOverride == null) return;
+        Locale locale = Locale.forLanguageTag(legacyOverride);
+        if (!locale.equals(activity.getResources().getConfiguration().getLocales().get(0))) {
+            updateConfiguration(activity.getResources(), locale);
+        }
+    }
+
+    @Override
+    public void onActivityPreCreated(Activity activity, Bundle savedInstanceState) {
+        applyLegacyOverride(activity);
+    }
+
     @Override
     public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+        applyLegacyOverride(activity);
     }
 
     @Override
