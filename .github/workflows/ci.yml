@@ -25,7 +25,10 @@ jobs:
 
       - name: Unit tests (VolyCore)
         working-directory: Packages/VolyCore
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log" | grep -E "error|warning: unre|failed|Executed|Compiling|Build complete" || true; grep -q "with 0 failures" "$RUNNER_TEMP/swift-test.log" && ! grep -q "error:" "$RUNNER_TEMP/swift-test.log"
+        run: |
+          swift test 2>&1 | tee "$RUNNER_TEMP/swift-test.log" | grep -E "error|failed|Executed|Build complete" || true
+          grep -q "with 0 failures" "$RUNNER_TEMP/swift-test.log"
+          ! grep -q "error:" "$RUNNER_TEMP/swift-test.log"
 
       - name: Build Voly.app
         run: |
