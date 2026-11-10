@@ -748,7 +748,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_DYLIB_INSTALL_NAME = "@rpath/VolyLaunchBridge.dylib";
 				MACH_O_TYPE = mh_dylib;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyLaunchBridge;
 				PRODUCT_NAME = VolyLaunchBridge;
@@ -782,7 +782,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolySampleApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -815,7 +815,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolySampleApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -967,7 +967,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.Voly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1000,7 +1000,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.Voly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1044,7 +1044,7 @@
 					"@loader_path",
 				);
 				MACH_O_TYPE = mh_dylib;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyAgent;
 				PRODUCT_NAME = VolyAgent;
@@ -1087,7 +1087,7 @@
 					"@loader_path",
 				);
 				MACH_O_TYPE = mh_dylib;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyAgent;
 				PRODUCT_NAME = VolyAgent;
@@ -1124,7 +1124,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_DYLIB_INSTALL_NAME = "@rpath/VolyLaunchBridge.dylib";
 				MACH_O_TYPE = mh_dylib;
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.latifatci.VolyLaunchBridge;
 				PRODUCT_NAME = VolyLaunchBridge;
