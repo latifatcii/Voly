@@ -1,88 +1,99 @@
 # Voly
 
-Live iOS inspector / editor — a macOS host that connects to a running UIKit app in the iOS Simulator (or on device) and lets a developer:
+A live UIKit inspector for the iOS Simulator. Voly is a macOS menu-bar app that docks next to the Simulator and lets you inspect and edit the app that is running in it — without adding anything to the app, and without disturbing your Xcode debug session.
 
-- inspect the full view hierarchy
-- visually pick views
-- edit UIView / CALayer properties live
-- edit Auto Layout constraints
-- inspect custom / @IBInspectable properties
-- edit UserDefaults
-- test deep links
-- jump to the exact source file and line in Xcode
-- switch the app's language live, with independent layout direction
-- capture the simulator screen, the app's content, or a single view
-- dismiss / pop / pop to root from the inspector
-- resize the app's root container under simulated trait / safe-area / size-class overrides
+| View tree | Layout |
+| --- | --- |
+| ![The inspector's view tree with a selected label](assets/inspector-tree.png) | ![Frame, bounds and constraints of the selected view](assets/inspector-layout.png) |
 
-In a simulator none of this needs changes to your app or any setup: with Voly running, run your app from Xcode as usual. It comes up with the agent loaded and the debugger still attached. See [`docs/runtime-integration.md`](docs/runtime-integration.md).
+- Inspect the full view hierarchy and pick views by clicking them in the simulator
+- Edit `UIView` / `CALayer` properties and Auto Layout constraints live
+- Measure the distance between two views
+- Jump to the exact source file and line in Xcode
+- Switch the app's language live, with independent layout direction
+- Capture the simulator screen, the app's content, or a single view
+- Dismiss / pop / pop to root from the inspector
+- Inspect and edit `UserDefaults`, and fire deep links
 
-See [`docs/plan.md`](../../.claude/plans/you-are-a-senior-piped-bubble.md) for the full architecture and MVP phases.
+## Install
 
-## Repo layout
+1. Download `Voly-<version>.dmg` from [Releases](https://github.com/latifatcii/Voly/releases).
+2. Open it and drag **Voly** into **Applications**.
+3. Open Voly. The build is not notarized, so macOS blocks the first launch: right-click the app and choose **Open**, or allow it under **System Settings → Privacy & Security**. From a terminal you can clear the flag instead:
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/Voly.app
+   ```
+
+Requirements: macOS 14 or later, and Xcode with at least one iOS Simulator runtime. Runtime integration is verified on Xcode 26.2 with the iOS 18.3 and 26.2 simulator runtimes; on a runtime it can't work with, Voly says so instead of guessing.
+
+## Using it
+
+1. Launch Voly. It lives in the menu bar. Each booted simulator gets runtime integration within a few seconds.
+2. Run your app as usual — Xcode ⌘R, the home screen, or `simctl launch`. It comes up inspectable, with the debugger still attached.
+3. Press **⌘E** while the Simulator is frontmost (or **⌃⌥⌘V** from anywhere) to show Voly. It docks next to the simulator window you last focused and opens in pick mode: click a view in any simulator to select it. Press Esc to hand taps back to the app.
+
+Apps that were already running before Voly started are listed as not instrumented; they become inspectable the next time they launch. Voly never restarts an app by itself — the **Relaunch…** button next to such an app does it after asking.
+
+| Shortcut | Action |
+| --- | --- |
+| ⌘E (Simulator frontmost) | Show / hide Voly |
+| ⌃⌥⌘V | Show / hide Voly from anywhere |
+| ⌃⌥⌘M | Pick mode on / off |
+| ⌃⌥⌘J | Jump to Source for the selected view |
+| Esc | Leave pick mode |
+
+Voly asks for Accessibility permission only for live hover measurement while picking. Everything else, including docking and selecting by click, works without it.
+
+### Choosing simulators and apps
+
+Integration applies to every booted simulator by default. Switch a simulator off in the Simulators tab or under menu bar → **Runtime Integration**, or uncheck **All simulators** to pick them by hand. Right-click an app in the list to exclude it, or to instrument only selected apps. Apple's own apps are left alone.
+
+An app launched with `VOLY_DISABLE=1` in its environment is never instrumented.
+
+## How it works
 
 ```
-Voly/                          ─ macOS host app (SwiftUI, AppKit bridges)
-Packages/VolyCore/             ─ Local SwiftPM package
-  Sources/VolyCodables/        ─ Codable wrappers for CG types
-  Sources/VolyModels/          ─ ViewNode, LayerProps, ConstraintNode, …
-  Sources/VolyProtocol/        ─ Command / Response / Event / framing
-  Sources/VolyAgent/           ─ iOS-only runtime agent (bootstraps, serves WS)
-  Sources/VolyHost/            ─ macOS-side simulator integration, discovery, source lookup
-  Sources/volyctl/             ─ CLI over the same host code, for scripting
-LoaderShim/                    ─ ObjC constructor that boots the agent when injected
-LaunchBridge/                  ─ simulator-only dylib loaded into runningboardd
-SampleApp/                     ─ iOS dogfood app; links VolyAgent
-scripts/integration-test.sh    ─ end-to-end check against a booted simulator
+Voly.app ──simctl spawn <udid> launchctl debug … ─▶ simulator's runningboardd
+                                                     └─ VolyLaunchBridge.dylib
+Xcode / SpringBoard / simctl ── launch request ─────▶ bridge appends VolyAgent.dylib
+                                                       to DYLD_INSERT_LIBRARIES
+app starts with the agent ◀── loopback WebSocket + token ──▶ Voly.app
 ```
 
-## Targets and schemes
+- A small bridge is loaded into the simulator's `runningboardd`, the process every app launch passes through. For eligible apps it appends Voly's agent to the launch's `DYLD_INSERT_LIBRARIES`, keeping whatever was already there — including the libraries Xcode inserts for debugging.
+- The agent listens on `127.0.0.1` only and requires a per-process token before accepting any command.
+- Jump to Source resolves addresses through LLDB's line tables on the binary on disk. It never attaches to your app.
 
-| Target      | Platform       | Purpose                                    |
-| ----------- | -------------- | ------------------------------------------ |
-| `Voly`      | macOS          | Inspector UI. Links `VolyCore` (SPM).      |
-| `SampleApp` | iOS            | Dogfood host. Links `VolyAgent` (SPM).     |
-| `VolyCore`  | all            | Shared protocol / models library product.  |
-| `VolyAgent` | iOS            | Runtime inspector SDK library product.     |
-| `VolyHost`  | macOS          | Simulator integration + host-side logic.   |
-| `VolyAgentDylib` | iOS Simulator | The agent as an injectable dylib.      |
-| `VolyLaunchBridge` | iOS Simulator | Launch bridge for the simulator's runningboardd. |
+What Voly changes, and how it is undone:
 
-Building `Voly` builds both simulator dylibs and embeds them in `Voly.app/Contents/Resources`.
+| Change | Removed by |
+| --- | --- |
+| A one-shot `launchctl debug` environment for the simulator's `runningboardd` | automatically; it is consumed by the restart Voly triggers |
+| The bridge loaded in that `runningboardd` | switching the simulator off, quitting Voly, or shutting the simulator down |
+| `~/Library/Developer/Voly/` (config, status, copies of the two dylibs) | switching integration off; pruned as simulators shut down |
 
-## Running
+Nothing is written into the simulator runtime, Xcode, or macOS settings, and physical devices are never touched. Restarting the simulator's `runningboardd` does not terminate running apps.
 
-1. Build and run `Voly` on macOS. It lives in the menu bar. ⌘E while the Simulator is frontmost (or ⌃⌥⌘V from anywhere) shows and hides the inspector, docked next to the simulator window you last focused. It opens in pick mode: click a view in any simulator to inspect it. Every booted simulator gets runtime integration automatically (switch individual ones off in the Simulators tab or the menu bar).
-2. Run any app in a simulator — from Xcode, the home screen, or `simctl`. It appears under its simulator and Voly connects.
+## Limitations
 
-To try it with the bundled sample:
+- **Simulators only.** The SDK (below) can run on a device and advertise itself on the local network, but that path is not exercised.
+- **UIKit.** SwiftUI views appear as the UIKit views that host them.
+- **Language refresh is exact, not exhaustive.** Text already on screen is rewritten only when it is exactly a value from one of the app's `.strings` tables. Formatted strings, plurals, hard-coded text and SwiftUI `Text` keep their old language until their screen is rebuilt. Editable text is never touched.
+- **Source lookup needs debug info** (a Debug build, or a dSYM LLDB can find). Without it you get a file-name match.
+- **Private API.** The bridge relies on a private RunningBoard method. It checks for it on every load and refuses to hook otherwise, but a future iOS runtime can remove it.
+- **One Voly at a time.** A second copy would manage the same simulators, so it says so and quits.
 
-```sh
-xcodebuild -project Voly.xcodeproj -scheme SampleApp \
-  -destination 'platform=iOS Simulator,name=iPhone 16' \
-  -derivedDataPath /tmp/VolyDerivedData build
-xcrun simctl install booted \
-  /tmp/VolyDerivedData/Build/Products/Debug-iphonesimulator/SampleApp.app
-xcrun simctl launch booted com.latifatci.VolySampleApp
-```
+## Linking the SDK (optional)
 
-## Safety model
+Simulator apps don't need this. Link `VolyAgent` when you want to register custom properties, or to run the agent from inside your own build instead of having it loaded for you.
 
-- Runtime integration applies to booted simulators while Voly is running — all of them by default, or only the ones you pick — and never to physical devices. It is removed when you switch a simulator off, quit Voly, or shut the simulator down.
-- Voly does not terminate or relaunch apps on its own. The one relaunch action is explicit and asks first.
-- Injected agents listen on loopback only and require a per-process session token (from a `0600` file in the app's own container) before accepting any command. Voly also checks the handshake came from the pid it expected.
-- The linked SDK is inert unless the host app is a Debug build **and** `VOLY_AGENT_ENABLED=1` (or `--voly-agent-enabled`) is set **and** your code calls `VolyAgent.start()`. In Release builds `VolyAgent.start()` is a no-op. SDK agents advertise over Bonjour on the LAN and are not token-protected.
-- `VOLY_DISABLE=1` in an app's launch environment keeps the agent out of that launch.
-
-## Integrating `VolyAgent` into your own iOS app
-
-Optional. Simulator apps don't need it — runtime integration loads the agent for you. Link the SDK when you want the resizable preview (`VolyAgent.wrap`), custom property registration, or a device build.
-
-1. Add this package as a local SwiftPM dependency (or point at its repo) and link the `VolyAgent` library product into your app target.
-2. At scene setup, wrap your root view controller with `VolyAgent.wrap(original:)`:
+1. Add this repository as a Swift package and link the `VolyAgent` library into your app target.
+2. At scene setup, wrap your root view controller:
 
    ```swift
    import VolyAgent
+
    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
        VolyAgent.start()
        guard let windowScene = scene as? UIWindowScene else { return }
@@ -93,13 +104,12 @@ Optional. Simulator apps don't need it — runtime integration loads the agent f
    }
    ```
 
-3. Add `NSBonjourServices = ["_voly-agent._tcp"]` and `NSLocalNetworkUsageDescription = "..."` to your Info.plist (Debug only is fine — the agent never starts in Release).
+3. Add `NSBonjourServices = ["_voly-agent._tcp"]` and an `NSLocalNetworkUsageDescription` to your Info.plist.
+4. Launch with `VOLY_AGENT_ENABLED=1` in the environment.
 
-4. Launch with `VOLY_AGENT_ENABLED=1` in the environment when you want the agent active.
+The SDK is inert unless the app is a Debug build, `VOLY_AGENT_ENABLED=1` (or `--voly-agent-enabled`) is set, and your code calls `VolyAgent.start()`. In Release builds it is a no-op. SDK agents advertise over Bonjour on the local network and are not token-protected.
 
-### Registering custom inspectable properties
-
-If your custom view has pure-Swift properties the ObjC runtime can't see, register them explicitly:
+Custom properties the Objective-C runtime can't see can be registered:
 
 ```swift
 VolyAgent.register(BadgeView.self, property: "badgeText", type: .string,
@@ -109,49 +119,34 @@ VolyAgent.register(BadgeView.self, property: "badgeText", type: .string,
     })
 ```
 
-## What works today
-
-The phases from the plan that are *implemented and wired end-to-end*:
-
-- **Phase 0 — Bootstrap**: SPM package created, Xcode project updated, both targets build cleanly.
-- **Phase 1 — Transport + handshake**: Bonjour advertise, WebSocket server on iOS, WebSocket client on macOS, handshake/ping.
-- **Phase 2 — Hierarchy read**: `HierarchyTraversal`, `SnapshotBuilder`, `ObjectRegistry`, SwiftUI `HierarchyBrowser`.
-- **Phase 3 — Property inspection + editing**: `LayerProps` snapshot, UIView/CALayer mutation, type-aware PropertyPanel.
-- **Phase 4 — Visual pick + overlay**: `PickEngine` + `OverlayHost`, click-through selection.
-- **Phase 5 — Constraints**: relevant-constraint walk, edit constant / priority / isActive.
-- **Phase 6 — Custom properties**: runtime ObjC scan + registration API + panel.
-- **Phase 7 — UserDefaults + URL tester**: both panels wired.
-- **Phase 8 — Source navigation**: line-exact Jump to Source through LLDB's line tables, with file-name search as the fallback.
-- **Phase 9 — Preview subsystem**: `PreviewHostVC` with iOS 17+ `traitOverrides`, size + safe-area + trait + layout direction controls, macOS PreviewControl panel.
-- **Phase 10 — Hardening** and **Phase 11 — Device support**: designed for, not yet exercised. Real-device connection requires pairing UI (not in MVP).
-- **Simulator runtime integration**: per-simulator launch bridge, automatic agent loading with the Xcode debug session preserved, live localization, screenshots, navigation actions. Verified on the iOS 18.3.1 and 26.2 simulator runtimes.
-
-## What is intentionally deferred
-
-- SwiftUI hierarchy introspection (UIKit-only in v1 as per the plan).
-- TLS on the LAN transport (cheap to add — Info.plist `NSAppTransportSecurity` + self-signed cert in handshake).
-- Resizable preview through the automatically loaded agent (it still needs `VolyAgent.wrap` in the app), and a preview panel in the inspector.
-- Real-device support (transport and agent are LAN-clean; UI wiring for manual host:port pairing is future work).
-
-## Useful commands
+## Building from source
 
 ```sh
-# Build and test the SPM package (macOS slice only)
-(cd Packages/VolyCore && swift build && swift test)
+# The macOS app; also builds and embeds the two simulator dylibs
+xcodebuild -project Voly.xcodeproj -scheme Voly -destination 'platform=macOS' build
 
-# End-to-end check of runtime integration against a booted simulator
+# Unit tests (host logic, protocol, localization support)
+(cd Packages/VolyCore && swift test)
+
+# End-to-end check against a booted simulator
 scripts/integration-test.sh <booted-simulator-udid>
 
-# Build VolyAgent scheme for iOS Simulator
-xcodebuild -scheme VolyAgent -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /tmp/VolyDerivedData -skipPackagePluginValidation build
-
-# Build macOS host (also builds and embeds VolyAgent.dylib + VolyLaunchBridge.dylib)
-xcodebuild -project Voly.xcodeproj -scheme Voly -destination 'platform=macOS' \
-  -derivedDataPath /tmp/VolyDerivedData build
-
-# Build SampleApp
-xcodebuild -project Voly.xcodeproj -scheme SampleApp \
-  -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /tmp/VolyDerivedData build
+# A distributable DMG in build/dist
+scripts/package-release.sh
 ```
+
+```
+Voly/                  macOS app (SwiftUI + AppKit)
+Packages/VolyCore/     Swift package
+  Sources/VolyAgent/     the in-app agent
+  Sources/VolyHost/      simulator integration, discovery, source lookup
+  Sources/VolyProtocol/  commands, responses, framing
+  Sources/VolyModels/    shared model types
+  Sources/volyctl/       command-line client over the same host code
+LoaderShim/            starts the agent when it is loaded as a dylib
+LaunchBridge/          the dylib loaded into the simulator's runningboardd
+SampleApp/             a UIKit app to try Voly against
+scripts/               integration test and release packaging
+```
+
+`volyctl` drives the same code as the app from a terminal; see the header of `Packages/VolyCore/Sources/volyctl/main.swift`. A Debug build can also render every inspector tab from fixture data to PNG files, without a simulator: `VOLY_UI_PREVIEW=/tmp/voly-ui Voly.app/Contents/MacOS/Voly`.
