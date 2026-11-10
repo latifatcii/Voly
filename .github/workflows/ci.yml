@@ -13,13 +13,17 @@ concurrency:
 jobs:
   macos:
     name: Build and test (macOS)
-    runs-on: macos-26
+    runs-on: macos-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - name: Toolchain
         run: |
+          # The app target uses Swift 6.2 build settings: take the newest Xcode on the image.
+          NEWEST="$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)"
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST"; fi
+          ls -d /Applications/Xcode*.app
           xcodebuild -version
           swift --version
 
