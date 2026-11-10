@@ -7,6 +7,9 @@
 //   volyctl android screenshot <serial> <package> app|view:<id>|device <out.png>
 //   volyctl android mcp-direct [<serial>]           the MCP tools without Voly.app
 //
+// Attaching replaces the agent's previous session, so don't point this at an
+// app Voly.app is inspecting: Voly's connection to it would be cut.
+//
 //   --agent-dir <dir>   where voly-agent.dex and friends are
 //                       (default: $VOLY_ANDROID_AGENT_DIR, else Voly/AndroidAgentPayload)
 //   --adb <path>        the adb to use (default: the one Voly would find)

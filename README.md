@@ -176,7 +176,7 @@ What Voly changes, and how it is undone:
 | `~/Library/Developer/Voly/` (config, status, copies of the two dylibs) | switching integration off; pruned as simulators shut down |
 | `~/Library/Developer/Voly/mcp.sock`, the socket AI agents reach Voly through | quitting Voly |
 | Application accessibility switched on in a simulator, the first time an AI agent reads a screen there | erasing the simulator; it is the simulator's own setting and harmless to leave on |
-| Android: the agent loaded into a running debug app | the app's next launch; it is in memory only |
+| Android: the agent loaded into a running debug app, with the hidden-API filter lifted for that process | the app's next launch; it is in memory only |
 | Android: `code_cache/voly-<version>/` in the app's data, `/data/local/tmp/voly-<version>/` on the device (≈150 KB) | clearing the app's cache / `adb shell rm -r /data/local/tmp/voly-*` |
 | Android: one forwarded port per inspected app (`adb forward --list`) | automatically, when the app exits or Voly quits |
 | Android 13+: the app's per-app language, when you switch language through Voly | choosing System / Default again |

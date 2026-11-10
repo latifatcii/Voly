@@ -6,7 +6,8 @@
 # Usage: scripts/android-integration-test.sh [<adb serial>]   (default: the only emulator)
 #
 # Needs: adb on PATH (or ANDROID_HOME), a booted emulator running Android 8
-# or later, and a JDK for building the sample app the first time.
+# or later, and a JDK for building the sample app the first time. Quit
+# Voly.app first: both would attach to the same app and cut each other off.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

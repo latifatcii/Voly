@@ -30,6 +30,12 @@ debuggable build. Nothing is added to the app's view hierarchy: the
 highlight is drawn through each window's `ViewOverlay`, and pick mode wraps
 each window's `Window.Callback` while it is on.
 
+One thing does change in the process: the agent reads a few platform
+internals (the list of windows and activities, a drawable's stroke), so the
+loader lifts the hidden-API filter for that process when it attaches. An
+app that itself reflects on hidden APIs can therefore behave differently
+with the agent loaded than without. It lasts until the app exits.
+
 ## Building
 
 ```sh
