@@ -80,4 +80,74 @@ final class AttributedTextEditTests: XCTestCase {
         XCTAssertEqual(result.string, "a😁b")
         XCTAssertEqual(weights(result), ["regular", "bold", "bold", "regular"])
     }
+
+    // MARK: - AttributedString (a button configuration's title)
+
+    /// "Hello " plain, "World" strong, the whole string marked English.
+    private func title() -> AttributedString {
+        var text = AttributedString("Hello World")
+        text.languageIdentifier = "en"
+        text[text.range(of: "World")!].inlinePresentationIntent = .stronglyEmphasized
+        return text
+    }
+
+    /// The runs in order, a strong one marked with `*`.
+    private func runs(_ text: AttributedString) -> [String] {
+        text.runs.map { run in
+            (run.inlinePresentationIntent == .stronglyEmphasized ? "*" : "") + String(text[run.range].characters)
+        }
+    }
+
+    func test_title_edit_inside_one_run_leaves_the_other_runs_alone() {
+        let result = AttributedTextEdit.replacingText(in: title(), with: "Hey World")
+
+        XCTAssertEqual(runs(result), ["Hey ", "*World"])
+        XCTAssertEqual(result.runs.map(\.languageIdentifier), ["en", "en"])
+    }
+
+    func test_title_typing_at_the_end_continues_the_last_run() {
+        XCTAssertEqual(runs(AttributedTextEdit.replacingText(in: title(), with: "Hello World!")), ["Hello ", "*World!"])
+    }
+
+    func test_title_deleting_characters_keeps_the_runs_around_them() {
+        XCTAssertEqual(runs(AttributedTextEdit.replacingText(in: title(), with: "Hello Wd")), ["Hello ", "*Wd"])
+    }
+
+    func test_title_replacing_everything_takes_the_styling_the_text_started_with() {
+        let result = AttributedTextEdit.replacingText(in: title(), with: "Bye")
+
+        XCTAssertEqual(runs(result), ["Bye"])
+        XCTAssertEqual(result.runs.map(\.languageIdentifier), ["en"])
+    }
+
+    func test_title_typing_at_the_start_takes_the_styling_of_what_follows() {
+        var strong = AttributedString("World")
+        strong.inlinePresentationIntent = .stronglyEmphasized
+
+        XCTAssertEqual(runs(AttributedTextEdit.replacingText(in: strong, with: "Hello World")), ["*Hello World"])
+    }
+
+    func test_title_typing_between_two_runs_continues_the_run_before() {
+        XCTAssertEqual(runs(AttributedTextEdit.replacingText(in: title(), with: "Hello, World")), ["Hello, ", "*World"])
+    }
+
+    func test_unchanged_title_is_returned_as_it_was() {
+        XCTAssertEqual(AttributedTextEdit.replacingText(in: title(), with: "Hello World"), title())
+    }
+
+    func test_clearing_the_title_gives_an_empty_string() {
+        XCTAssertTrue(AttributedTextEdit.replacingText(in: title(), with: "").characters.isEmpty)
+    }
+
+    func test_title_with_no_styling_to_keep_is_just_the_new_text() {
+        XCTAssertEqual(AttributedTextEdit.replacingText(in: AttributedString(), with: "New"), AttributedString("New"))
+    }
+
+    func test_title_emoji_with_a_modifier_is_replaced_whole() {
+        var styled = AttributedString("a👍🏽b")
+        styled.inlinePresentationIntent = .stronglyEmphasized
+        let result = AttributedTextEdit.replacingText(in: styled, with: "a👍b")
+
+        XCTAssertEqual(runs(result), ["*a👍b"])
+    }
 }

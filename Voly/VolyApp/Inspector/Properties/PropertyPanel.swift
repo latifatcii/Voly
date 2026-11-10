@@ -1,4 +1,5 @@
 import SwiftUI
+import VolyHost
 import VolyModels
 import VolyCodables
 import VolyProtocol
@@ -153,12 +154,15 @@ struct PropertyRow: View {
 
 /// Text that is sent as it is typed. While the field has focus it shows what
 /// was typed, not what the app last reported: a reply to an earlier
-/// keystroke would otherwise overwrite the characters typed since.
+/// keystroke would otherwise overwrite the characters typed since. A report
+/// that is no such reply (the app changed the text, or reformatted what was
+/// typed) is shown at once.
 private struct StringField: View {
     let value: String
     let readOnly: Bool
     let onChange: (String) -> Void
     @State private var draft: String?
+    @State private var sent = SentEdits<String>()
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -169,14 +173,21 @@ private struct StringField: View {
                 // text it already shows, e.g. when it gains or loses focus.
                 guard newValue != (draft ?? value) else { return }
                 draft = newValue
+                sent.send(newValue)
                 onChange(newValue)
             }
         ))
         .volyField()
         .focused($isFocused)
         .disabled(readOnly)
+        .onChange(of: value) { _, reported in
+            if !sent.report(reported) { draft = nil }
+        }
         .onChange(of: isFocused) { _, focused in
-            if !focused { draft = nil }
+            if !focused {
+                draft = nil
+                sent.reset()
+            }
         }
     }
 }
@@ -232,6 +243,7 @@ private struct ColorPickerField: View {
     let readOnly: Bool
     let onCommit: (CGColorCodable) -> Void
     @State private var picked: Color
+    @State private var sent = SentEdits<CGColorCodable>(same: { !ColorPickerField.differ($0, $1) })
     init(color: CGColorCodable, readOnly: Bool, onCommit: @escaping (CGColorCodable) -> Void) {
         self.color = color
         self.readOnly = readOnly
@@ -259,6 +271,9 @@ private struct ColorPickerField: View {
             NSColorPanel.shared.hidesOnDeactivate = false
         }
         .onChange(of: color) { _, newValue in
+            // The reply to an earlier pick must not pull the picker back
+            // while later picks are still on their way.
+            if sent.report(newValue), sent.latest != nil { return }
             picked = Color(red: newValue.red, green: newValue.green,
                            blue: newValue.blue, opacity: newValue.alpha)
         }
@@ -272,7 +287,10 @@ private struct ColorPickerField: View {
             blue: Double(ns.blueComponent), alpha: Double(ns.alphaComponent)
         )
         // The panel echoes the color it was just shown; that is not a pick.
-        guard Self.differ(chosen, color) else { return }
+        // Compared with the last pick sent, when the app's report of it is
+        // still to come: picking the reported color again is a change then.
+        guard Self.differ(chosen, sent.latest ?? color) else { return }
+        sent.send(chosen)
         onCommit(chosen)
     }
 

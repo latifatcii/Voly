@@ -37,6 +37,36 @@ enum AttributedTextEdit {
         )
         return NSAttributedString(attributedString: result)
     }
+
+    /// The same for an `AttributedString` (a button configuration's title),
+    /// compared character by character.
+    static func replacingText(in styled: AttributedString, with text: String) -> AttributedString {
+        let old = Array(styled.characters)
+        guard !old.isEmpty else { return AttributedString(text) }
+        let new = Array(text)
+        let shorter = min(old.count, new.count)
+
+        var prefix = 0
+        while prefix < shorter, old[prefix] == new[prefix] {
+            prefix += 1
+        }
+        var suffix = 0
+        while suffix < shorter - prefix, old[old.count - 1 - suffix] == new[new.count - 1 - suffix] {
+            suffix += 1
+        }
+
+        let start = styled.index(styled.startIndex, offsetByCharacters: prefix)
+        let end = styled.index(styled.endIndex, offsetByCharacters: -suffix)
+        // As above: the first replaced character's attributes; for a pure
+        // insertion those of the character before it, or after it at the start.
+        let model = start < end || prefix == 0 ? start : styled.index(beforeCharacter: start)
+        var inserted = AttributedString(String(new[prefix..<(new.count - suffix)]))
+        inserted.setAttributes(styled.runs[model].attributes)
+
+        var result = styled
+        result.replaceSubrange(start..<end, with: inserted)
+        return result
+    }
 }
 #endif
 
@@ -60,27 +90,36 @@ final class TextStyleKeeper {
     /// the same styling back: an empty attributed string holds no attributes.
     @MainActor
     private final class Memory {
-        let property: String
         let attributes: [NSAttributedString.Key: Any]
         let container: AttributeContainer?
         let state: UIControl.State
         /// The view's own font right after the edit; a different font later
         /// means the app restyled the view and this is out of date.
         let font: UIFont?
+        /// A button's plain title for `state` right after the edit; a
+        /// different one later means the app gave the button a new title.
+        let plainTitle: String?
 
         init(
-            property: String,
             attributes: [NSAttributedString.Key: Any] = [:],
             container: AttributeContainer? = nil,
             state: UIControl.State = .normal,
-            font: UIFont? = nil
+            font: UIFont? = nil,
+            plainTitle: String? = nil
         ) {
-            self.property = property
             self.attributes = attributes
             self.container = container
             self.state = state
             self.font = font
+            self.plainTitle = plainTitle
         }
+    }
+
+    /// What is remembered about one view, by property: a text field has a
+    /// text and a placeholder, a button a title and a subtitle.
+    @MainActor
+    private final class Memories {
+        var byProperty: [String: Memory] = [:]
     }
 
     private enum ButtonPart {
@@ -98,12 +137,27 @@ final class TextStyleKeeper {
         }
     }
 
-    private let memories = NSMapTable<UIView, Memory>.weakToStrongObjects()
+    private let memories = NSMapTable<UIView, Memories>.weakToStrongObjects()
     /// Labels known to be a button's title or subtitle. A button takes its
     /// label out of the hierarchy while the title is empty.
     private let owners = NSMapTable<UILabel, Owner>.weakToStrongObjects()
 
     init() {}
+
+    private func memory(of property: String, for view: UIView) -> Memory? {
+        memories.object(forKey: view)?.byProperty[property]
+    }
+
+    /// Nil forgets what was remembered for that property.
+    private func remember(_ memory: Memory?, of property: String, for view: UIView) {
+        guard let memory else {
+            memories.object(forKey: view)?.byProperty[property] = nil
+            return
+        }
+        let all = memories.object(forKey: view) ?? Memories()
+        all.byProperty[property] = memory
+        memories.setObject(all, forKey: view)
+    }
 
     /// Sets the string property `property` of `view` to `text`, keeping the
     /// styling of the text it replaces.
@@ -134,8 +188,7 @@ final class TextStyleKeeper {
         let wanted: NSAttributedString?
         if let styled {
             wanted = AttributedTextEdit.replacingText(in: styled, with: text)
-        } else if let memory = memories.object(forKey: view), memory.property == property,
-                  memory.font == Self.font(of: view) {
+        } else if let memory = memory(of: property, for: view), memory.font == Self.font(of: view) {
             wanted = NSAttributedString(string: text, attributes: memory.attributes)
         } else {
             wanted = nil
@@ -147,20 +200,15 @@ final class TextStyleKeeper {
 
         if text.isEmpty {
             if let styled {
-                if Self.isPlain(styled) {
-                    memories.removeObject(forKey: view)
-                } else {
-                    let memory = Memory(
-                        property: property,
-                        attributes: styled.attributes(at: 0, effectiveRange: nil),
-                        font: Self.font(of: view)
-                    )
-                    memories.setObject(memory, forKey: view)
-                }
+                let memory = Self.isPlain(styled) ? nil : Memory(
+                    attributes: styled.attributes(at: 0, effectiveRange: nil),
+                    font: Self.font(of: view)
+                )
+                remember(memory, of: property, for: view)
             }
             return true
         }
-        memories.removeObject(forKey: view)
+        remember(nil, of: property, for: view)
 
         guard let wanted else {
             // No styled text to compare with; the view's own font is all
@@ -182,13 +230,13 @@ final class TextStyleKeeper {
     /// title starts with. Assigning `title` alone would drop them.
     static func setTitle(_ text: String, in configuration: inout UIButton.Configuration) {
         let attributes = Self.attributes(of: configuration.attributedTitle)
-        set(text, part: .title, attributes: attributes, in: &configuration)
+        set(text, part: .title, styled: attributes.map { AttributedString(text, attributes: $0) }, in: &configuration)
     }
 
     /// The same for the subtitle.
     static func setSubtitle(_ text: String, in configuration: inout UIButton.Configuration) {
         let attributes = Self.attributes(of: configuration.attributedSubtitle)
-        set(text, part: .subtitle, attributes: attributes, in: &configuration)
+        set(text, part: .subtitle, styled: attributes.map { AttributedString(text, attributes: $0) }, in: &configuration)
     }
 
     // MARK: - Deciding whether styling was lost
@@ -268,9 +316,10 @@ final class TextStyleKeeper {
         if let known = owners.object(forKey: label), let button = known.button {
             return (button, known.part)
         }
+        // The nearest button above the label: how deep its labels sit
+        // differs between iOS versions (three levels down in iOS 26).
         var ancestor = label.superview
-        for _ in 0..<2 {
-            guard let current = ancestor else { return nil }
+        while let current = ancestor {
             if let button = current as? UIButton {
                 let configuration = button.configuration
                 // `titleLabel` creates the label when there is none; don't
@@ -304,16 +353,21 @@ final class TextStyleKeeper {
         let current = part == .title ? configuration.attributedTitle : configuration.attributedSubtitle
         if let current, String(current.characters) == text { return }
 
-        var attributes = Self.attributes(of: current)
-        if attributes == nil, let memory = memories.object(forKey: button), memory.property == property {
-            attributes = memory.container
+        let styled: AttributedString?
+        if let current, current.runs.contains(where: { $0.attributes != AttributeContainer() }) {
+            // Every run outside the edit stays as it is, as in a label.
+            styled = AttributedTextEdit.replacingText(in: current, with: text)
+            let start = text.isEmpty ? Self.attributes(of: current) : nil
+            remember(start.map { Memory(container: $0) }, of: property, for: button)
+        } else {
+            // What was remembered is for text that is still empty; a plain
+            // title the app set since is styled by the app.
+            let isEmpty = current?.characters.isEmpty ?? true
+            let remembered = isEmpty ? memory(of: property, for: button)?.container : nil
+            styled = remembered.map { AttributedString(text, attributes: $0) }
+            if !text.isEmpty || !isEmpty { remember(nil, of: property, for: button) }
         }
-        if !text.isEmpty {
-            memories.removeObject(forKey: button)
-        } else if let attributes {
-            memories.setObject(Memory(property: property, container: attributes), forKey: button)
-        }
-        Self.set(text, part: part, attributes: attributes, in: &configuration)
+        Self.set(text, part: part, styled: styled, in: &configuration)
         button.configuration = configuration
     }
 
@@ -323,19 +377,20 @@ final class TextStyleKeeper {
         return attributes
     }
 
+    /// `styled` when the text carries attributes, else the plain `text`.
     private static func set(
         _ text: String,
         part: ButtonPart,
-        attributes: AttributeContainer?,
+        styled: AttributedString?,
         in configuration: inout UIButton.Configuration
     ) {
-        switch (part, attributes) {
-        case (.title, let attributes?):
-            configuration.attributedTitle = AttributedString(text, attributes: attributes)
+        switch (part, styled) {
+        case (.title, let styled?):
+            configuration.attributedTitle = styled
         case (.title, nil):
             configuration.title = text
-        case (.subtitle, let attributes?):
-            configuration.attributedSubtitle = AttributedString(text, attributes: attributes)
+        case (.subtitle, let styled?):
+            configuration.attributedSubtitle = styled
         case (.subtitle, nil):
             configuration.subtitle = text
         }
@@ -350,21 +405,24 @@ final class TextStyleKeeper {
             // Write to the state the title on screen comes from.
             let state: UIControl.State = button.attributedTitle(for: .normal) == current ? .normal : button.state
             button.setAttributedTitle(AttributedTextEdit.replacingText(in: current, with: text), for: state)
-            if text.isEmpty {
-                let memory = Memory(
-                    property: property, attributes: current.attributes(at: 0, effectiveRange: nil), state: state
-                )
-                memories.setObject(memory, forKey: button)
-            } else {
-                memories.removeObject(forKey: button)
-            }
+            let memory = text.isEmpty ? Memory(
+                attributes: current.attributes(at: 0, effectiveRange: nil), state: state,
+                plainTitle: button.title(for: state)
+            ) : nil
+            remember(memory, of: property, for: button)
             return
         }
-        if let memory = memories.object(forKey: button), memory.property == property {
-            guard !text.isEmpty else { return }
-            button.setAttributedTitle(NSAttributedString(string: text, attributes: memory.attributes), for: memory.state)
-            memories.removeObject(forKey: button)
-            return
+        if let memory = memory(of: property, for: button) {
+            if button.title(for: memory.state) == memory.plainTitle {
+                guard !text.isEmpty else { return }
+                button.setAttributedTitle(
+                    NSAttributedString(string: text, attributes: memory.attributes), for: memory.state
+                )
+                remember(nil, of: property, for: button)
+                return
+            }
+            // The app gave the button a new title since; its styling is the app's now.
+            remember(nil, of: property, for: button)
         }
         guard button.currentTitle != text else { return }
         let state: UIControl.State = button.title(for: .normal) == button.currentTitle ? .normal : button.state
