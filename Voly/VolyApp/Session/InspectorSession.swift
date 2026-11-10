@@ -80,11 +80,20 @@ final class InspectorSession {
         await leaveActiveAgent()
         selectedPeer = peer
 
+        // An agent serves one connection and drops it when another arrives,
+        // so a second attempt would cut off the first. If one is already on
+        // its way for this app (a background connect, an AI agent's
+        // request), use what it brings.
+        for _ in 0..<50 where clients[peer.id] == nil && connectingPeerIDs.contains(peer.id) {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
         if let pooled = clients[peer.id] {
             await activate(pooled, peerID: peer.id)
             return
         }
         state.connectionStatus = .connecting
+        connectingPeerIDs.insert(peer.id)
+        defer { connectingPeerIDs.remove(peer.id) }
         let client = WebSocketClient()
         do {
             try await client.connect(to: peer.endpoint, authToken: peer.token, expectedPID: peer.pid)

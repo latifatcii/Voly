@@ -11,6 +11,10 @@
 # and talks to it over MCP. Other booted simulators are left alone, and nothing is written to
 # Voly's own support directory or preferences. Only one Voly can run at a
 # time, so quit yours first; don't point this at a simulator you are using.
+#
+# Set VOLY_TEST_OLD_AGENT to a VolyAgent.dylib from an earlier release to also
+# check what an agent is told about an app that was launched before Voly was
+# updated (it keeps the agent it started with until it is launched again).
 
 set -euo pipefail
 
@@ -25,12 +29,14 @@ VOLY="$DERIVED/Build/Products/Debug/Voly.app/Contents/MacOS/Voly"
 VOLYCTL="$ROOT/Packages/VolyCore/.build/debug/volyctl"
 VOLY_PID=""
 
-# By executable, not by command line: the helper and the app are the same
-# binary, and a shell that merely mentions the path must not count.
-voly_running() { ps -axo comm= | grep -q "Voly.app/Contents/MacOS/Voly$"; }
+# The app is the process whose command line is exactly the executable: the
+# `--mcp` helper is the same binary with an argument, and a shell that merely
+# mentions the path must not count either.
 voly_app_pid() { ps -axo pid=,args= | grep -E "Voly\.app/Contents/MacOS/Voly$" | awk '{print $1}' | head -1; }
 
-if voly_running; then
+# A helper left open by an AI client doesn't manage anything by itself, so it
+# doesn't count; the app does.
+if [ -n "$(voly_app_pid)" ]; then
     echo "A Voly is already running. Quit it first: only one can run at a time." >&2
     exit 2
 fi
@@ -142,10 +148,11 @@ def wait_for(condition, seconds):
         time.sleep(1)
     return condition()
 
-def launch(route):
+def launch(route, **environment):
     subprocess.run(["xcrun", "simctl", "terminate", udid, bundle], capture_output=True)
     subprocess.run(["xcrun", "simctl", "launch", udid, bundle], capture_output=True, check=True,
-                   env={**os.environ, "SIMCTL_CHILD_VOLY_SAMPLE_ROUTE": route})
+                   env={**os.environ, "SIMCTL_CHILD_VOLY_SAMPLE_ROUTE": route,
+                        **{"SIMCTL_CHILD_" + key: value for key, value in environment.items()}})
 
 def view_id(text, pattern):
     match = re.search(pattern, text)
@@ -174,6 +181,7 @@ check("list_apps: this Voly sees only the simulator it was confined to",
 launch("localize")
 listed = wait_for(lambda: (lambda r: r if bundle in r.text and "Inspectable apps:" in r.text else None)(call("list_apps")), 40)
 check("list_apps: the launched app is inspectable", bool(listed), call("list_apps").text)
+check("list_apps: an app with the current agent is not marked as outdated", "older Voly agent" not in call("list_apps").text)
 
 screen = call("get_screen")
 check("get_screen: header names app, size and top view controller",
@@ -279,10 +287,24 @@ check("an unknown view id is an error that says what to do", stale.is_error and 
 unknown = rpc("tools/call", {"name": "no_such_tool", "arguments": {}})
 check("an unknown tool is a protocol error", unknown.get("error", {}).get("code") == -32602, json.dumps(unknown))
 
+old_agent = os.environ.get("VOLY_TEST_OLD_AGENT")
+if old_agent:
+    # The launch bridge leaves a launch alone that already carries an agent,
+    # so this process runs the old one — like an app started before an update.
+    launch("localize", DYLD_INSERT_LIBRARIES=old_agent)
+    marked = wait_for(lambda: (lambda r: r if "older Voly agent" in r.text else None)(call("list_apps")), 40)
+    check("an app still running an older agent is marked in list_apps", bool(marked), call("list_apps").text)
+    refused = call("get_screen")
+    check("reading its screen is refused with what to do about it",
+          refused.is_error and "from before Voly was updated" in refused.text and "relaunch_app" in refused.text, refused.text)
+    check("what the older agent can do still works", len(call("screenshot").images) == 1)
+    # relaunch_app, next, is the way out: it must come back with the current agent.
+
 relaunched = call("relaunch_app", bundle_id=bundle)
 check("relaunch_app: the app comes back inspectable", not relaunched.is_error and "Now inspectable" in relaunched.text, relaunched.text)
 fresh = wait_for(lambda: (lambda r: r if "SampleApp" in r.text and not r.is_error else None)(call("get_screen", max_depth=2)), 40)
 check("get_screen works on the relaunched process", bool(fresh), call("get_screen", max_depth=2).text + "\n" + call("list_apps").text)
+check("the relaunched app is not marked as outdated", "older Voly agent" not in call("list_apps").text)
 
 server.stdin.close()
 check("the helper exits when the client closes its stream", server.wait(timeout=15) == 0)

@@ -16,6 +16,8 @@ public struct MCPToolbox: MCPToolProviding {
     private let formatter: ScreenDescriptionFormatter
     /// How long an app gets to answer one command.
     private let commandTimeout: Duration
+    /// Which apps can describe their screen, as far as it has been found out.
+    private let screenSupport = ScreenSupport()
 
     public init(
         inspector: MCPInspecting,
@@ -107,10 +109,23 @@ public struct MCPToolbox: MCPToolProviding {
                 couple of seconds of launch.
                 """)
         } else {
+            let outdated = await appsWithOutdatedAgent(among: overview.apps)
             lines.append("Inspectable apps:")
-            for app in overview.apps { lines.append("- " + Self.describe(app)) }
+            for app in overview.apps {
+                lines.append("- " + Self.describe(app)
+                    + (outdated.contains(app.id) ? "  [older Voly agent: relaunch to read its screen]" : ""))
+            }
             if overview.apps.count > 1 {
                 lines.append("Pass app=<bundle id> to a tool to pick one; without it the app shown in Voly is used.")
+            }
+            if !outdated.isEmpty {
+                lines.append("""
+                    An app marked "older Voly agent" was launched before Voly was updated and still runs the \
+                    agent it started with, so get_screen, get_view and find_views don't work on it yet. \
+                    Launching it again fixes that: Run from Xcode (keeps the debugger), or relaunch_app (ends \
+                    an attached debug session and the app's current state). screenshot and get_app_state work \
+                    on it as it is.
+                    """)
             }
         }
         return .text(lines.joined(separator: "\n"))
@@ -156,9 +171,9 @@ public struct MCPToolbox: MCPToolProviding {
 
     /// One command, with a bound on how long the app may take: an app
     /// stopped at a breakpoint never answers.
-    private func send(_ command: Command, to app: MCPApp) async throws -> Response {
+    private func send(_ command: Command, to app: MCPApp, timeout: Duration? = nil) async throws -> Response {
         let inspector = self.inspector
-        let timeout = commandTimeout
+        let timeout = timeout ?? commandTimeout
         return try await withCheckedThrowingContinuation { continuation in
             let gate = OnceGate()
             Task {
@@ -181,17 +196,66 @@ public struct MCPToolbox: MCPToolProviding {
         }
     }
 
+    // MARK: - Apps still running an older agent
+
+    /// A request no agent can fulfil, which still tells the two kinds
+    /// apart: a current agent looks for the view and says it doesn't exist,
+    /// one from before screen descriptions can't even read the request.
+    /// Nothing in the app is touched either way.
+    private static let screenSupportProbe = Command.describeScreen(ScreenDescriptionRequest(
+        rootID: .max, maxDepth: 0, checkLayout: false, includeAccessibility: false
+    ))
+
+    /// Nil when it can't be told right now (the app didn't answer).
+    private func canDescribeScreen(_ app: MCPApp) async -> Bool? {
+        if let known = screenSupport[app.id] { return known }
+        let answer: Bool?
+        do {
+            _ = try await send(Self.screenSupportProbe, to: app, timeout: .seconds(3))
+            answer = true
+        } catch InspectorError.objectGone {
+            answer = true
+        } catch InspectorError.internal {
+            answer = false
+        } catch {
+            answer = nil
+        }
+        if let answer { screenSupport[app.id] = answer }
+        return answer
+    }
+
+    private func appsWithOutdatedAgent(among apps: [MCPApp]) async -> Set<String> {
+        await withTaskGroup(of: String?.self) { group in
+            for app in apps {
+                group.addTask { await canDescribeScreen(app) == false ? app.id : nil }
+            }
+            var outdated: Set<String> = []
+            for await id in group {
+                if let id { outdated.insert(id) }
+            }
+            return outdated
+        }
+    }
+
+    private static func outdatedAgentMessage(_ app: MCPApp) -> String {
+        """
+        \(app.name) is still running the Voly agent it was launched with, from before Voly was updated, and \
+        that agent can't describe screens. Launch the app again to load the current agent: Run it again from \
+        Xcode (keeps the debugger), or call relaunch_app (ends an attached debug session and the app's \
+        current state). If VolyAgent is linked into the app as a Swift package instead, update the package. \
+        screenshot and get_app_state work on the app as it is.
+        """
+    }
+
     private func describeScreen(_ request: ScreenDescriptionRequest, in app: MCPApp) async throws -> ScreenDescription {
+        // Known already: say so without bothering the app again.
+        if screenSupport[app.id] == false { throw ToolError(Self.outdatedAgentMessage(app)) }
         let response: Response
         do {
             response = try await send(.describeScreen(request), to: app)
         } catch InspectorError.internal(let detail) {
-            // An agent from before this command existed can't decode it.
-            throw ToolError("""
-                \(app.name) couldn't describe its screen (\(detail)). If the Voly agent in it is older than \
-                this Voly — it was linked into the app as a package, or the app was launched by an earlier \
-                Voly — relaunch the app (relaunch_app) or update the VolyAgent package.
-                """)
+            if await canDescribeScreen(app) == false { throw ToolError(Self.outdatedAgentMessage(app)) }
+            throw ToolError("\(app.name) couldn't describe its screen: \(detail)")
         }
         guard case .screenDescription(let screen) = response else {
             throw ToolError("\(app.name) gave an unexpected answer.")
@@ -1002,6 +1066,27 @@ struct Arguments {
             return number
         }
         throw ToolError("\(key) must be an id number as shown after # (e.g. 13).")
+    }
+}
+
+/// What has been learned about each app's agent, by app id. An id belongs
+/// to one process, so an entry never goes stale: a relaunched app is a new
+/// id.
+private final class ScreenSupport: @unchecked Sendable {
+    private let lock = NSLock()
+    private var known: [String: Bool] = [:]
+
+    subscript(appID: String) -> Bool? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return known[appID]
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            known[appID] = newValue
+        }
     }
 }
 

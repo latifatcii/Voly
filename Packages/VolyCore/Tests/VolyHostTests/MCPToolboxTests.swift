@@ -347,11 +347,80 @@ final class MCPToolboxTests: XCTestCase {
         XCTAssertTrue(text.contains("[secure]"), text)
     }
 
-    func test_an_agent_too_old_to_describe_the_screen_is_explained() async throws {
-        inspector.answer = { _, _ in throw InspectorError.internal("The data couldn’t be read because it isn’t in the correct format.") }
+    // MARK: Apps still running an older agent
+
+    /// What an agent from before screen descriptions answers to one.
+    private static let cannotDecode = InspectorError.internal("The data couldn’t be read because it isn’t in the correct format.")
+
+    private func describeCommandsSent() -> Int {
+        inspector.sent.filter {
+            if case .describeScreen = $0.command { return true } else { return false }
+        }.count
+    }
+
+    func test_list_apps_marks_an_app_whose_agent_cannot_describe_screens() async throws {
+        inspector.appList = [FakeInspector.shop, FakeInspector.notes]
+        inspector.answer = { command, appID in
+            guard case .describeScreen(let request) = command else { return .ack }
+            XCTAssertEqual(request.rootID, .max, "the check must not walk or change anything in the app")
+            XCTAssertFalse(request.includeAccessibility)
+            if appID == "peer-shop" { throw Self.cannotDecode }
+            throw InspectorError.objectGone(.max)       // a current agent: "no such view"
+        }
+        let text = try await call("list_apps").text
+        XCTAssertTrue(text.contains("bundle=com.example.shop  pid=100  simulator=iPhone 16  [older Voly agent: relaunch to read its screen]"), text)
+        XCTAssertFalse(text.contains("bundle=com.example.notes  pid=200  simulator=iPhone 16  ["), text)
+        XCTAssertTrue(text.contains("Run from Xcode") && text.contains("relaunch_app"), text)
+    }
+
+    func test_list_apps_says_nothing_when_every_agent_is_current_or_silent() async throws {
+        inspector.appList = [FakeInspector.shop, FakeInspector.notes]
+        inspector.answer = { _, appID in
+            if appID == "peer-shop" { throw InspectorError.objectGone(.max) }
+            try await Task.sleep(for: .seconds(30))     // paused in the debugger: unknown, not outdated
+            return .ack
+        }
+        let started = Date()
+        let text = try await call("list_apps").text
+        XCTAssertFalse(text.contains("older Voly agent"), text)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 10)
+    }
+
+    func test_reading_the_screen_of_an_outdated_app_explains_and_stops_asking_it() async throws {
+        inspector.answer = { command, _ in
+            if case .describeScreen = command { throw Self.cannotDecode }
+            return .ack
+        }
+        // One toolbox throughout: what it learns about an app is remembered.
+        let tools = toolbox()
+        let first = await tools.call("get_screen", arguments: [:])
+        XCTAssertEqual(first?.isError, true)
+        XCTAssertTrue(first?.text.contains("from before Voly was updated") ?? false, first?.text ?? "")
+        XCTAssertTrue(first?.text.contains("Run it again from Xcode") ?? false)
+        XCTAssertTrue(first?.text.contains("relaunch_app") ?? false)
+        let sentAfterFirst = describeCommandsSent()
+
+        for tool in ["get_screen", "find_views", "get_view"] {
+            let again = await tools.call(tool, arguments: ["view": 3, "text": "cart"])
+            XCTAssertEqual(again?.isError, true, tool)
+            XCTAssertTrue(again?.text.contains("from before Voly was updated") ?? false, tool)
+        }
+        XCTAssertEqual(describeCommandsSent(), sentAfterFirst, "an app known to be outdated is not asked again")
+
+        // What an older agent can do still goes through.
+        let state = await tools.call("get_app_state", arguments: [:])
+        XCTAssertEqual(state?.isError, false)
+    }
+
+    func test_a_failure_inside_a_current_agent_is_not_mistaken_for_an_old_one() async throws {
+        inspector.answer = { command, _ in
+            guard case .describeScreen(let request) = command else { return .ack }
+            if request.rootID == .max { throw InspectorError.objectGone(.max) }
+            throw InspectorError.internal("layout pass failed")
+        }
         let result = try await call("get_screen")
         XCTAssertTrue(result.isError)
-        XCTAssertTrue(result.text.contains("older than this Voly") && result.text.contains("relaunch_app"), result.text)
+        XCTAssertEqual(result.text, "Shop couldn't describe its screen: layout pass failed")
     }
 
     func test_a_view_that_is_gone_says_to_read_the_screen_again() async throws {

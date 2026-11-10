@@ -99,6 +99,7 @@ Good to know:
 - **Local only.** The agent starts `Voly --mcp`, which talks to the running Voly over a socket in `~/Library/Developer/Voly/` that only your user can open. Nothing listens on the network.
 - **You decide how much.** Menu bar → **AI Agents** has one switch for inspecting and one for changing the app. With the second off, agents can look but not touch. A small **Agent** mark in Voly's footer shows when one is at work.
 - **Voly starts when it is needed.** Having the server configured doesn't launch anything; the first tool call starts Voly if it isn't running. Apps launched after that are inspectable.
+- **After updating Voly, relaunch apps that were already running.** A running app keeps the agent it was launched with. `list_apps` marks such apps, and they need one more launch (Run from Xcode is enough) before their screen can be read.
 - **Changes are live, not saved.** `set_property` and `set_constraint` change the running app only — the agent still has to make the real change in your source.
 - **An agent sees what you can see in Voly**, including the app's `UserDefaults`. Text typed into secure text fields is withheld.
 - **SwiftUI** content is reported through its accessibility elements: text, role and frame, but not font or color. To read it, Voly switches on application accessibility in that simulator the first time an agent asks — the same switch Xcode's Accessibility Inspector uses.
