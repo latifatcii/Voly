@@ -108,8 +108,11 @@ struct InspectorShell: View {
     @ViewBuilder
     private var tabContent: some View {
         switch pane.currentTab {
+        case .simulators:
+            SimulatorsTab(session: session)
         case .hierarchy:
-            HierarchyTab(session: session, measurement: session.measurement)
+            HierarchyTab(session: session, measurement: session.measurement,
+                         onShowSimulators: { pane.currentTab = .simulators })
         case .layout:
             if session.state.selectedViewID != nil {
                 LayoutTab(session: session)

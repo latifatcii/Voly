@@ -1,7 +1,7 @@
 import SwiftUI
 import VolyHost
 
-/// Top of the Tree tab: booted simulators with their runtime-integration
+/// The Sims tab's content: booted simulators with their runtime-integration
 /// switch and running apps, any other discovered agents, and manual connect.
 struct PeerListView: View {
     @Bindable var session: InspectorSession

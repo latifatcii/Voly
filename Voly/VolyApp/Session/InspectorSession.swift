@@ -27,6 +27,7 @@ final class InspectorSession {
     private static let maxPooledConnections = 8
     /// Peers with a background connection attempt in flight.
     private var connectingPeerIDs: Set<ConnectionManager.Peer.ID> = []
+    private var pendingPickTransition: Task<Void, Never>?
     private var selectedPeer: ConnectionManager.Peer?
     /// Booted simulators and their per-simulator runtime integration.
     let simulators = VolySimulatorManager()
@@ -346,24 +347,46 @@ final class InspectorSession {
     /// Pick mode is switched on in *every* connected app, not just the one
     /// being inspected: clicking a view in any simulator selects it, and if
     /// it belongs to another app the inspector switches to that app.
-    func enterPickMode() async {
-        _ = hoverMonitor.start()
-        state.pickModeActive = true
-        for pooled in clients.values {
-            _ = try? await pooled.send(.enterPickMode)
+    ///
+    /// - Parameter announceMissingAccessibility: false when pick mode comes
+    ///   on by itself (showing the inspector), so that never nags.
+    func enterPickMode(announceMissingAccessibility: Bool = true) async {
+        await pickTransition { [self] in
+            guard !state.pickModeActive else { return }
+            _ = hoverMonitor.start(announceIfUntrusted: announceMissingAccessibility)
+            state.pickModeActive = true
+            for pooled in clients.values {
+                _ = try? await pooled.send(.enterPickMode)
+            }
         }
     }
 
     func exitPickMode() async {
-        hoverMonitor.stop()
-        state.pickModeActive = false
-        for pooled in clients.values {
-            _ = try? await pooled.send(.exitPickMode)
-            _ = try? await pooled.send(.clearMeasure)
+        await pickTransition { [self] in
+            guard state.pickModeActive else { return }
+            hoverMonitor.stop()
+            state.pickModeActive = false
+            for pooled in clients.values {
+                _ = try? await pooled.send(.exitPickMode)
+                _ = try? await pooled.send(.clearMeasure)
+            }
+            measurement.reset()
+            lastMeasurementSummary = nil
+            await clearSelection()
         }
-        measurement.reset()
-        lastMeasurementSummary = nil
-        await clearSelection()
+    }
+
+    /// Entering and leaving pick mode each talk to every connected app. Run
+    /// them strictly one after another, so a quick hide-then-show can't
+    /// leave some apps in pick mode and others out of it.
+    private func pickTransition(_ body: @escaping @MainActor () async -> Void) async {
+        let previous = pendingPickTransition
+        let task = Task { @MainActor in
+            await previous?.value
+            await body()
+        }
+        pendingPickTransition = task
+        await task.value
     }
 
     /// Live hit-test + measurement + draw on the agent, in one round-trip.

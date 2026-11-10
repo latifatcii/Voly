@@ -97,6 +97,12 @@ final class AppCoordinator {
         simulators.isInspectorVisible = true
         Task { @MainActor [weak self] in await self?.simulators.refresh() }
         startObservingAttachment()
+        // Showing Voly means "I want to look at something": start in pick
+        // mode so the next click on a simulator selects a view. Hiding
+        // leaves it again (see `exitInteractiveModes`).
+        Task { @MainActor [weak self] in
+            await self?.session.enterPickMode(announceMissingAccessibility: false)
+        }
     }
 
     func hideInspector() {
@@ -114,10 +120,7 @@ final class AppCoordinator {
     /// them off.
     private func exitInteractiveModes() {
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            if self.session.state.pickModeActive {
-                await self.session.exitPickMode()
-            }
+            await self?.session.exitPickMode()
         }
     }
 
