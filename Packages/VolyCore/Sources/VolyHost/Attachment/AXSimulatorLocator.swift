@@ -7,9 +7,15 @@ import OSLog
 
 nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", category: "AXSimulatorLocator")
 
-/// Production `SimulatorLocator` backed by the macOS Accessibility API.
-/// Requires the user to grant Accessibility permission for Voly in
-/// System Settings → Privacy & Security → Accessibility.
+/// Production `SimulatorLocator`.
+///
+/// Both lookups target the simulator the user is working in — the device
+/// window most recently focused — not just any Simulator window.
+/// - The window *frame* (for docking) comes from the window server and
+///   needs no permission.
+/// - The iOS *screen region* inside it (for hover measurement) comes from
+///   the Accessibility API and needs Voly to be granted Accessibility in
+///   System Settings → Privacy & Security.
 public final class AXSimulatorLocator: SimulatorLocator, @unchecked Sendable {
     private static let simulatorBundleID = "com.apple.iphonesimulator"
 
@@ -22,12 +28,21 @@ public final class AXSimulatorLocator: SimulatorLocator, @unchecked Sendable {
             return nil
         }
 
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        if let frontmost = SimulatorWindowPicker.frontmostDeviceWindow(
+            in: SimulatorWindowPicker.onScreenWindows(), simulatorPID: app.processIdentifier
+        ) {
+            return SimulatorWindowPicker.cocoaFrame(for: frontmost.bounds, primaryScreenHeight: primaryHeight)
+        }
+
+        // Nothing usable from the window server (e.g. an unexpected window
+        // layout): fall back to Accessibility, if it is granted.
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
 
         var windowsRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
               let windows = windowsRef as? [AXUIElement],
-              let window = windows.first(where: { isWindowUsable($0) }) ?? windows.first
+              let window = activeWindow(of: axApp, pid: app.processIdentifier, among: windows)
         else {
             return nil
         }
@@ -66,7 +81,7 @@ public final class AXSimulatorLocator: SimulatorLocator, @unchecked Sendable {
             log.info("iosScreenRegionInScreen: AXWindows attribute unavailable (Accessibility denied?)")
             return nil
         }
-        guard let window = windows.first(where: { isWindowUsable($0) }) ?? windows.first else {
+        guard let window = activeWindow(of: axApp, pid: app.processIdentifier, among: windows) else {
             log.info("iosScreenRegionInScreen: no usable simulator window (found \(windows.count) window(s))")
             return nil
         }
@@ -190,6 +205,31 @@ public final class AXSimulatorLocator: SimulatorLocator, @unchecked Sendable {
                 walkAX(child, windowRect: windowRect, best: &best, depth: depth + 1)
             }
         }
+    }
+
+    /// The Accessibility element for the simulator window the user is
+    /// working in: the one matching the frontmost device window, else the
+    /// app's focused or main window, else the first usable one.
+    private func activeWindow(of axApp: AXUIElement, pid: pid_t, among windows: [AXUIElement]) -> AXUIElement? {
+        if let frontmost = SimulatorWindowPicker.frontmostDeviceWindow(
+            in: SimulatorWindowPicker.onScreenWindows(), simulatorPID: pid
+        ) {
+            let match = windows.first { window in
+                guard let frame = windowFrameTopLeft(window) else { return false }
+                return abs(frame.minX - frontmost.bounds.minX) < 2 && abs(frame.minY - frontmost.bounds.minY) < 2
+                    && abs(frame.width - frontmost.bounds.width) < 2 && abs(frame.height - frontmost.bounds.height) < 2
+            }
+            if let match { return match }
+        }
+        for attribute in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+            var ref: CFTypeRef?
+            if AXUIElementCopyAttributeValue(axApp, attribute as CFString, &ref) == .success,
+               let value = ref, CFGetTypeID(value) == AXUIElementGetTypeID() {
+                let window = value as! AXUIElement
+                if isWindowUsable(window) { return window }
+            }
+        }
+        return windows.first(where: { isWindowUsable($0) }) ?? windows.first
     }
 
     private func isWindowUsable(_ window: AXUIElement) -> Bool {

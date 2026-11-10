@@ -10,6 +10,7 @@
 //   volyctl send <udid> <bundle-id> '<command json>'      e.g. '{"navigationState":{}}'
 //   volyctl screenshot <udid> <bundle-id> app|view:<id> <out.png>
 //   volyctl source <udid> <bundle-id> <ClassName>
+//   volyctl simulator-window
 
 #if os(macOS)
 import Foundation
@@ -213,6 +214,14 @@ func run(_ arguments: [String]) async throws {
         let upright = try SimulatorScreenshot.upright(png: raw, orientation: orientation)
         try upright.png.write(to: URL(fileURLWithPath: arguments[3]))
         print("\(orientation.rawValue) \(upright.pixelWidth)x\(upright.pixelHeight)")
+
+    case "simulator-window":
+        // Which simulator window Voly would dock next to right now.
+        if let frame = AXSimulatorLocator().frontmostSimulatorFrame() {
+            print("frontmost simulator window (Cocoa coordinates): \(frame)")
+        } else {
+            print("no simulator device window on the current Space")
+        }
 
     case "source":
         guard arguments.count >= 4 else { throw Failure("usage: volyctl source <udid> <bundle-id> <ClassName>") }

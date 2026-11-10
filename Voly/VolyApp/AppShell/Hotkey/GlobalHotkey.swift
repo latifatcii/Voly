@@ -15,7 +15,10 @@ final class GlobalHotkey {
     // the instance is torn down cleanly by `deinit`.
     private var ref: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
-    private let id: UInt32 = 1
+    /// Unique per instance: several hotkeys share one event target, and
+    /// each handler must only answer for its own.
+    private let id: UInt32
+    private static var nextID: UInt32 = 1
     private let onFire: () -> Void
 
     /// - Returns: nil if registration fails (another app owns the combo).
@@ -25,6 +28,8 @@ final class GlobalHotkey {
         onFire: @escaping () -> Void
     ) {
         self.onFire = onFire
+        self.id = Self.nextID
+        Self.nextID += 1
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -44,7 +49,9 @@ final class GlobalHotkey {
                     MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID
                 )
                 let me = Unmanaged<GlobalHotkey>.fromOpaque(userData).takeUnretainedValue()
-                if hotKeyID.id == me.id { me.onFire() }
+                // Not ours: let the next handler (another hotkey) have it.
+                guard hotKeyID.id == me.id else { return OSStatus(eventNotHandledErr) }
+                me.onFire()
                 return noErr
             },
             1, &eventType, selfPointer, &localHandler
@@ -76,8 +83,58 @@ final class GlobalHotkey {
     }
 }
 
+/// A hotkey that only exists while one of the given apps is frontmost.
+///
+/// Used for ⌘E: next to the Simulator it shows and hides Voly, but in Xcode,
+/// Finder and everything else ⌘E keeps its own meaning, because the hotkey
+/// isn't registered there at all.
+@MainActor
+final class FrontmostAppHotkey {
+    private let keyCode: UInt32
+    private let modifiers: UInt32
+    private let bundleIdentifiers: Set<String>
+    private let onFire: () -> Void
+    private var hotkey: GlobalHotkey?
+    private var observer: NSObjectProtocol?
+
+    init(keyCode: UInt32, modifiers: UInt32, whileFrontmost bundleIdentifiers: Set<String>, onFire: @escaping () -> Void) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.bundleIdentifiers = bundleIdentifiers
+        self.onFire = onFire
+        observer = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.update() }
+        }
+        update()
+    }
+
+    deinit {
+        if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+    }
+
+    private func update() {
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let wanted = frontmost.map(bundleIdentifiers.contains) ?? false
+        if wanted, hotkey == nil {
+            hotkey = GlobalHotkey(keyCode: keyCode, modifiers: modifiers, onFire: onFire)
+            if hotkey == nil {
+                log.warning("scoped hotkey could not be registered while \(frontmost ?? "?", privacy: .public) is frontmost")
+            }
+        } else if !wanted {
+            hotkey = nil
+        }
+    }
+}
+
 enum HotkeyDefaults {
-    // ⌃⌥⌘V
+    // ⌃⌥⌘V — works everywhere.
     static let keyCode: UInt32 = UInt32(kVK_ANSI_V)
     static let modifiers: UInt32 = UInt32(controlKey | optionKey | cmdKey)
+
+    // ⌘E — only while the Simulator (or Voly itself) is frontmost.
+    static let simulatorKeyCode: UInt32 = UInt32(kVK_ANSI_E)
+    static let simulatorModifiers: UInt32 = UInt32(cmdKey)
+    static let simulatorBundleIdentifier = "com.apple.iphonesimulator"
 }

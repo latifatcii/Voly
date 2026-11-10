@@ -15,6 +15,7 @@ final class AppCoordinator {
     private let locator: SimulatorLocator
     private var simulators: VolySimulatorManager { session.simulators }
     private var hotkey: GlobalHotkey?
+    private var simulatorHotkey: FrontmostAppHotkey?
     private var attachmentObservation: Task<Void, Never>?
     private var relaunchInFlight = false
 
@@ -57,6 +58,16 @@ final class AppCoordinator {
         }
         if hotkey == nil {
             log.warning("Global hotkey registration failed; menu-bar icon still toggles Voly.")
+        }
+        // ⌘E next to the Simulator. Scoped, so ⌘E elsewhere is untouched.
+        var scopedApps: Set<String> = [HotkeyDefaults.simulatorBundleIdentifier]
+        if let own = Bundle.main.bundleIdentifier { scopedApps.insert(own) }
+        simulatorHotkey = FrontmostAppHotkey(
+            keyCode: HotkeyDefaults.simulatorKeyCode,
+            modifiers: HotkeyDefaults.simulatorModifiers,
+            whileFrontmost: scopedApps
+        ) { [weak self] in
+            self?.toggleInspector()
         }
 
         // Simulator discovery + restoring per-simulator runtime integration
@@ -123,6 +134,9 @@ final class AppCoordinator {
             self?.stopObservingAttachment()
         }
         menuBar.onToggle = { [weak self] in self?.toggleInspector() }
+        // ⌘E typed into the inspector itself (it can be key while another
+        // app is frontmost, where the scoped hotkey isn't registered).
+        window.onToggleShortcut = { [weak self] in self?.toggleInspector() }
         menuBar.onQuit = { [weak self] in self?.quit() }
         menuBar.onAbout = { NSApp.orderFrontStandardAboutPanel(nil) }
         menuBar.onRelaunchRunningApp = { [weak self] in self?.relaunchRunningApp() }

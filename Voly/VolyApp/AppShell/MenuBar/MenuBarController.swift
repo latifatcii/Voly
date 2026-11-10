@@ -53,6 +53,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         showHideItem.target = self
         showHideItem.action = #selector(showHideSelected)
+        // Shown as a hint; the working shortcut is the Simulator-scoped
+        // hotkey (and ⌃⌥⌘V everywhere).
+        showHideItem.keyEquivalent = "e"
+        showHideItem.keyEquivalentModifierMask = [.command]
         menu.addItem(showHideItem)
 
         menu.addItem(.separator())

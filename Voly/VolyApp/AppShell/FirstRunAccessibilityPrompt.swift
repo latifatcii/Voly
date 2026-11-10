@@ -13,11 +13,12 @@ enum FirstRunAccessibilityPrompt {
         if AccessibilityTrust.isTrusted(prompt: false) { return }
 
         let alert = NSAlert()
-        alert.messageText = "Let Voly follow the Simulator"
+        alert.messageText = "Let Voly measure under the cursor"
         alert.informativeText = """
-            Voly uses macOS Accessibility to read the Simulator's window position \
-            so it can dock next to it automatically. Without this permission Voly \
-            still works, but it opens at a fixed position.
+            Voly uses macOS Accessibility to track the cursor over the Simulator \
+            for live measurements while picking. Without this permission everything \
+            else still works, including docking next to the Simulator and selecting \
+            views by clicking.
             """
         alert.addButton(withTitle: "Open Settings…")
         alert.addButton(withTitle: "Not Now")
