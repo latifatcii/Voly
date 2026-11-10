@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Voly app icon, simplified for the 16 and 32 pixel renditions:
+       bigger eyes, no stars, plain glowing screen. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#343F7A"/>
+      <stop offset="1" stop-color="#0E1230"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="640" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A4EEFF"/>
+      <stop offset="1" stop-color="#4C8DFF"/>
+    </linearGradient>
+    <clipPath id="shape">
+      <rect x="100" y="100" width="824" height="824" rx="185.4"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#shape)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#sky)"/>
+
+    <!-- bear -->
+    <circle cx="299" cy="380" r="116" fill="#FFFFFF"/>
+    <circle cx="725" cy="380" r="116" fill="#FFFFFF"/>
+    <ellipse cx="512" cy="600" rx="327" ry="287" fill="#FFFFFF"/>
+    <circle cx="387" cy="552" r="54" fill="#1B2236"/>
+    <circle cx="637" cy="552" r="54" fill="#1B2236"/>
+
+    <!-- phone -->
+    <rect x="150" y="640" width="724" height="420" rx="92" fill="url(#screen)"/>
+
+    <!-- paws -->
+    <ellipse cx="300" cy="640" rx="84" ry="60" fill="#FFFFFF"/>
+    <ellipse cx="724" cy="640" rx="84" ry="60" fill="#FFFFFF"/>
+  </g>
+</svg>

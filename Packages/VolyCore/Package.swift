@@ -31,7 +31,7 @@ let package = Package(
         ),
         .target(
             name: "VolyHost",
-            dependencies: ["VolyProtocol", "VolyModels"],
+            dependencies: ["VolyProtocol", "VolyModels", "VolyCodables"],
             path: "Sources/VolyHost"
         ),
         // macOS command-line client for scripting the simulator integration
@@ -48,7 +48,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VolyHostTests",
-            dependencies: ["VolyHost"],
+            dependencies: ["VolyHost", "VolyProtocol", "VolyModels", "VolyCodables"],
             path: "Tests/VolyHostTests",
             resources: [.copy("Fixtures")]
         ),

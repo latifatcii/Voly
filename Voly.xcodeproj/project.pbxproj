@@ -27,6 +27,7 @@
 		6FD85E8FC768AE38E4CC3B1A /* ConstraintNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB09255AAFB6781CDE9D5A7 /* ConstraintNode.swift */; };
 		764E53BDBB9992277CBD6842 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 220DCB948C91BD5F58BC0331 /* Network.framework */; };
 		80062E0C332A2A675333647B /* ObjectRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4736ACE6E71AB4889998E3E /* ObjectRegistry.swift */; };
+		930F661A39D74F8FBA8A6AC1 /* ScreenDescription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933A75557248051868BCCE4C /* ScreenDescription.swift */; };
 		9DF924CBE44BC47F877277B6 /* VolyHost in Frameworks */ = {isa = PBXBuildFile; productRef = D3A352E6DB13E632E88428C7 /* VolyHost */; };
 		9F922403DFB2794C9303B73C /* ViewNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F78A333E379AFBEAC081EAA0 /* ViewNode.swift */; };
 		A1C3F9D2E84B56F07A2B1C3D /* HierarchySnapshot+HitTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */; };
@@ -47,6 +48,7 @@
 		DACD14D1A81B10D1FE18066F /* VolyNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE4094748F331F3E782D7DA /* VolyNavigationController.swift */; };
 		DCD509FE14BAB0EB7E1E747A /* MutationExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6996815536348FB1CD302E4 /* MutationExecutor.swift */; };
 		E4DF655999BF4E0681FB9588 /* ScreenshotRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1C6C1FF210A37D90B94D89 /* ScreenshotRenderer.swift */; };
+		E60027BC3EF15C79A92F9490 /* ScreenDescriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4409E825807A9062FD6EC1E8 /* ScreenDescriber.swift */; };
 		E6D40A0A556DF4CA5714BA58 /* PortFilePublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563B4AC86FEF448212080910 /* PortFilePublisher.swift */; };
 		E821B2D523591B4480E5283F /* OverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 585151A81D22151E6502C052 /* OverlayHost.swift */; };
 		E8376DDF96B4427AABC16EEE /* HierarchySnapshot+WindowLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */; };
@@ -83,6 +85,7 @@
 		21C413D684DC454EC01B4E5C /* VolyLocalizationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VolyLocalizationManager.swift; sourceTree = "<group>"; };
 		220DCB948C91BD5F58BC0331 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
 		2A8B11EBF80E11FEB34E0F08 /* PickEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PickEngine.swift; sourceTree = "<group>"; };
+		4409E825807A9062FD6EC1E8 /* ScreenDescriber.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenDescriber.swift; sourceTree = "<group>"; };
 		4A3383E4DD47E8FC99E34510 /* RuntimeFeatures.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RuntimeFeatures.swift; sourceTree = "<group>"; };
 		4C44277A0D21FDDE43857235 /* RuntimeScanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RuntimeScanner.swift; sourceTree = "<group>"; };
 		563B4AC86FEF448212080910 /* PortFilePublisher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PortFilePublisher.swift; sourceTree = "<group>"; };
@@ -97,6 +100,7 @@
 		886232C60EC15895E7D5B13D /* CommandDispatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CommandDispatcher.swift; sourceTree = "<group>"; };
 		8D4A290CB66FFF5DE195A2D6 /* URLExecutor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = URLExecutor.swift; sourceTree = "<group>"; };
 		8DCC7C54D22AC2DB8C4002B0 /* SnapshotBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SnapshotBuilder.swift; sourceTree = "<group>"; };
+		933A75557248051868BCCE4C /* ScreenDescription.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenDescription.swift; sourceTree = "<group>"; };
 		9823DBE4517DD27871E3AC87 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FrameMeasurement.swift; sourceTree = "<group>"; };
 		9F6B712C5AA0932CAF210A72 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -213,6 +217,7 @@
 			children = (
 				B795FF470C0F42B181962F54 /* LayerProps+CALayer.swift */,
 				8DCC7C54D22AC2DB8C4002B0 /* SnapshotBuilder.swift */,
+				4409E825807A9062FD6EC1E8 /* ScreenDescriber.swift */,
 			);
 			path = Snapshot;
 			sourceTree = "<group>";
@@ -403,6 +408,7 @@
 				9B4B491FA40A4808A59D42AF /* FrameMeasurement.swift */,
 				F98649F5725641C5B70D44AB /* HierarchySnapshot+WindowLookup.swift */,
 				B2D4E0F1A95C67018B3C2D4E /* HierarchySnapshot+HitTest.swift */,
+				933A75557248051868BCCE4C /* ScreenDescription.swift */,
 				4A3383E4DD47E8FC99E34510 /* RuntimeFeatures.swift */,
 			);
 			path = VolyModels;
@@ -683,6 +689,8 @@
 				38195BB429E5E25B9AE1E893 /* Framing.swift in Sources */,
 				B04A9501C0474D941BE00E6B /* Messages.swift in Sources */,
 				EE830DA32EE43254EDCD9FAF /* VolyAgentLoader.m in Sources */,
+				E60027BC3EF15C79A92F9490 /* ScreenDescriber.swift in Sources */,
+				930F661A39D74F8FBA8A6AC1 /* ScreenDescription.swift in Sources */,
 				EE22020A84CC8BF2084A23BF /* LocalizationOverrideStore.swift in Sources */,
 				B8B26A599D9505E0244CEDDC /* LocalizedStringIndex.swift in Sources */,
 				B61685CA516054EB8F903619 /* VolyLocalizationManager.swift in Sources */,

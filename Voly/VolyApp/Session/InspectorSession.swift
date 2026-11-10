@@ -33,6 +33,8 @@ final class InspectorSession {
     let simulators = VolySimulatorManager()
     let sourceNavigator = VolySourceNavigator()
     let screenshots = VolyScreenshotManager()
+    /// AI agents' way in (MCP). Started by the app delegate.
+    let agentAccess = MCPService()
     var lastError: String?
     var lastMeasurementSummary: MeasurementSummary?
 
@@ -78,11 +80,20 @@ final class InspectorSession {
         await leaveActiveAgent()
         selectedPeer = peer
 
+        // An agent serves one connection and drops it when another arrives,
+        // so a second attempt would cut off the first. If one is already on
+        // its way for this app (a background connect, an AI agent's
+        // request), use what it brings.
+        for _ in 0..<50 where clients[peer.id] == nil && connectingPeerIDs.contains(peer.id) {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
         if let pooled = clients[peer.id] {
             await activate(pooled, peerID: peer.id)
             return
         }
         state.connectionStatus = .connecting
+        connectingPeerIDs.insert(peer.id)
+        defer { connectingPeerIDs.remove(peer.id) }
         let client = WebSocketClient()
         do {
             try await client.connect(to: peer.endpoint, authToken: peer.token, expectedPID: peer.pid)
@@ -231,7 +242,10 @@ final class InspectorSession {
 
     private func pollPortFiles() async {
         do {
-            let devices = try await SimInventory().listDevices(bootedOnly: true)
+            var devices = try await SimInventory().listDevices(bootedOnly: true)
+            #if DEBUG
+            if let only = ScriptedRun.simulators { devices = devices.filter { only.contains($0.udid) } }
+            #endif
             let agents = portFileWatcher.scan(deviceUDIDs: devices.map(\.udid))
             connections.updateFileDiscoveredPeers(agents)
             // The user navigates in the simulator too; keep the Dismiss/Pop
@@ -699,6 +713,53 @@ final class InspectorSession {
     private func resolveScreenshotSimulator() async -> String? {
         if let udid = activeSimulatorUDID { return udid }
         return try? await SimInventory().listDevices(bootedOnly: true).first?.udid
+    }
+
+    // MARK: - AI agent access
+
+    /// Look for agents now rather than at the next poll.
+    func refreshDiscovery() async {
+        await pollPortFiles()
+    }
+
+    /// Send a command to any discovered app, connecting to it first if
+    /// needed. Unlike the inspector's own operations this doesn't change
+    /// which app the window is showing.
+    func send(_ command: Command, toPeer peerID: String) async throws -> Response {
+        if clients[peerID] == nil, let peer = connections.peers.first(where: { $0.id == peerID }) {
+            await connectInBackground(peer)
+            // Another attempt was already under way: give it a moment.
+            for _ in 0..<30 where clients[peerID] == nil && connectingPeerIDs.contains(peerID) {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+        guard let client = clients[peerID] else { throw WebSocketClient.ClientError.notConnected }
+        return try await client.send(command)
+    }
+
+    /// Something other than the inspector changed the app: show its
+    /// current state if it is the one on screen.
+    func reloadAfterExternalChange(peerID: String) async {
+        guard peerID == state.activePeerID else { return }
+        await refreshHierarchy()
+        if let id = state.selectedViewID {
+            await loadProperties(for: id)
+            await loadConstraints(for: id)
+        }
+        await refreshRuntimeState()
+    }
+
+    /// Select a view on someone else's behalf, switching the inspector to
+    /// its app first.
+    func select(_ id: ObjectID, inPeer peerID: String) async throws {
+        if state.activePeerID != peerID {
+            guard let peer = connections.peers.first(where: { $0.id == peerID }) else {
+                throw WebSocketClient.ClientError.notConnected
+            }
+            await connect(to: peer)
+            guard state.activePeerID == peerID else { throw WebSocketClient.ClientError.notConnected }
+        }
+        await select(id)
     }
 
     // MARK: - Events

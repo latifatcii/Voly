@@ -10,6 +10,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let relaunchItem = NSMenuItem(title: "Relaunch Running App with Voly…", action: nil, keyEquivalent: "")
     private let integrationItem = NSMenuItem(title: "Runtime Integration", action: nil, keyEquivalent: "")
     private let integrationMenu = NSMenu()
+    private let agentsItem = NSMenuItem(title: "AI Agents", action: nil, keyEquivalent: "")
+    private let agentsMenu = NSMenu()
 
     var onToggle: () -> Void
     var onQuit: () -> Void
@@ -21,6 +23,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Whether every booted simulator is integrated automatically.
     var integratesAllSimulatorsProvider: () -> Bool = { true }
     var onSetIntegratesAllSimulators: (Bool) -> Void = { _ in }
+    /// What AI agents may do through Voly (MCP), read each time the submenu opens.
+    var agentAccess: MCPService?
 
     var isInspectorVisible: Bool = false {
         didSet { showHideItem.title = isInspectorVisible ? "Hide Inspector" : "Show Inspector" }
@@ -72,6 +76,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         relaunchItem.keyEquivalentModifierMask = [.command, .option]
         menu.addItem(relaunchItem)
 
+        agentsMenu.delegate = self
+        agentsItem.submenu = agentsMenu
+        menu.addItem(agentsItem)
+
         menu.addItem(.separator())
 
         let aboutItem = NSMenuItem(title: "About Voly", action: #selector(aboutSelected), keyEquivalent: "")
@@ -86,6 +94,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     // MARK: - NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === agentsMenu {
+            rebuildAgentsMenu()
+            return
+        }
         guard menu === integrationMenu else { return }
         menu.removeAllItems()
         let allItem = NSMenuItem(
@@ -123,6 +135,74 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             }
             menu.addItem(item)
         }
+    }
+
+    // MARK: - AI agents
+
+    private func rebuildAgentsMenu() {
+        agentsMenu.removeAllItems()
+        guard let access = agentAccess else { return }
+
+        let inspect = NSMenuItem(
+            title: "Allow Agents to Inspect Apps", action: #selector(agentInspectSelected(_:)), keyEquivalent: ""
+        )
+        inspect.target = self
+        inspect.state = access.isEnabled ? .on : .off
+        inspect.toolTip = "Let AI coding agents (Claude Code, Cursor, Codex, …) read the view tree, properties, constraints and screenshots of apps Voly is connected to. Local only."
+        agentsMenu.addItem(inspect)
+
+        let change = NSMenuItem(
+            title: "Allow Agents to Change the App", action: #selector(agentChangesSelected(_:)), keyEquivalent: ""
+        )
+        change.target = access.isEnabled ? self : nil
+        change.state = access.isEnabled && access.allowsChanges ? .on : .off
+        change.isEnabled = access.isEnabled
+        change.toolTip = "Also let agents change the running app: view properties, constraints, navigation, language, user defaults, relaunching. Nothing is written to your source."
+        agentsMenu.addItem(change)
+
+        agentsMenu.addItem(.separator())
+        for (title, text) in [
+            ("Copy Setup Command for Claude Code", MCPRelay.claudeCodeSetupCommand),
+            ("Copy Setup Command for Codex", MCPRelay.codexSetupCommand),
+            ("Copy Configuration for Other Agents", MCPRelay.genericConfiguration),
+        ] {
+            let item = NSMenuItem(title: title, action: #selector(copyAgentSetupSelected(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = text
+            item.toolTip = text
+            agentsMenu.addItem(item)
+        }
+
+        agentsMenu.addItem(.separator())
+        let status = NSMenuItem(title: Self.describe(access), action: nil, keyEquivalent: "")
+        status.isEnabled = false
+        agentsMenu.addItem(status)
+    }
+
+    private static func describe(_ access: MCPService) -> String {
+        if let error = access.listenError { return "Not available: \(error)" }
+        guard let last = access.lastToolCall else { return "No agent has asked for anything yet" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        let when = Date().timeIntervalSince(last.date) < 5
+            ? "just now"
+            : formatter.localizedString(for: last.date, relativeTo: Date())
+        let count = access.toolCallCount
+        return "Last request: \(last.name), \(when) (\(count) so far)"
+    }
+
+    @objc private func agentInspectSelected(_ sender: NSMenuItem) {
+        agentAccess?.isEnabled = sender.state != .on
+    }
+
+    @objc private func agentChangesSelected(_ sender: NSMenuItem) {
+        agentAccess?.allowsChanges = sender.state != .on
+    }
+
+    @objc private func copyAgentSetupSelected(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     @objc private func integrationSelected(_ sender: NSMenuItem) {

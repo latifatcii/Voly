@@ -51,6 +51,9 @@ final class ConnectionManager {
 
     func startBrowsing() {
         guard !isBrowsing else { return }
+        #if DEBUG
+        guard ScriptedRun.simulators == nil else { return }
+        #endif
         log.info("startBrowsing for \(ProtocolVersion.bonjourServiceType, privacy: .public)")
         let descriptor = NWBrowser.Descriptor.bonjour(type: ProtocolVersion.bonjourServiceType, domain: nil)
         let browser = NWBrowser(for: descriptor, using: .tcp)

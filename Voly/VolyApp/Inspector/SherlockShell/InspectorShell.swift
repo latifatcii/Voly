@@ -121,6 +121,7 @@ struct InspectorShell: View {
             }
             .font(VolyTheme.small)
             .help(statusHelp)
+            AgentActivityBadge(access: session.agentAccess)
             Spacer(minLength: 6)
             RuntimeActionsBar(session: session)
             Button {

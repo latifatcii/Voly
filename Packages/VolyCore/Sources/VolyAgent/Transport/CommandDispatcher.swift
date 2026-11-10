@@ -208,6 +208,15 @@ public final class CommandDispatcher {
 
         case .navigate(let action):
             return .navigationResult(navigation.perform(action))
+
+        case .describeScreen(let request):
+            if request.includeAccessibility, ScreenDescriber.enableApplicationAccessibility() {
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            var describer = ScreenDescriber(registry: registry)
+            return .screenDescription(
+                try describer.describe(request, topViewController: navigation.state().topViewController)
+            )
         }
     }
 
