@@ -2,10 +2,10 @@ import SwiftUI
 
 struct NoSelectionView: View {
     var body: some View {
-        ContentUnavailableView(
-            "Select a view",
-            systemImage: "cursorarrow.motionlines",
-            description: Text("Pick a view in the hierarchy to inspect it.")
+        VolyEmptyState(
+            symbol: "cursorarrow.rays",
+            title: "No view selected",
+            message: "Click a view in a simulator, or choose one in the view tree."
         )
     }
 }

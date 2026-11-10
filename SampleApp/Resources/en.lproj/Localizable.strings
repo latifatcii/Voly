@@ -1,0 +1,18 @@
+/* Localization demo — the keys Voly's language override is exercised against. */
+"loc.title" = "Localization";
+"loc.greeting" = "Welcome to Voly";
+"loc.subtitle" = "Switch languages from the inspector";
+"loc.modern" = "Loaded with String(localized:)";
+"loc.button.details" = "Show Details";
+"loc.button.present" = "Present Sheet";
+"loc.placeholder.name" = "Your name";
+"loc.segment.first" = "First";
+"loc.segment.second" = "Second";
+"loc.items.format" = "You have %d new messages";
+"loc.swiftui.greeting" = "Hello from SwiftUI";
+"loc.detail.title" = "Details";
+"loc.detail.body" = "This screen was pushed onto the stack.";
+"loc.sheet.title" = "Sheet";
+"loc.sheet.body" = "This sheet was presented modally.";
+"loc.sheet.close" = "Close";
+"loc.sheet.more" = "More";

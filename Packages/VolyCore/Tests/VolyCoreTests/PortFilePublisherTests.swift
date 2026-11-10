@@ -86,4 +86,20 @@ final class PortFilePublisherTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: nested.appendingPathComponent("voly.port").path))
     }
+
+    func test_publish_writes_token_and_simulator_readable_only_by_the_owner() throws {
+        let publisher = PortFilePublisher(directory: tempDir)
+        try publisher.publish(
+            port: 51000, pid: 77, bundleIdentifier: "com.test.App", processName: "App",
+            token: "s3cret", simulatorUDID: "SIM-1"
+        )
+        let url = tempDir.appendingPathComponent(PortFilePublisher.fileName)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let record = try decoder.decode(PortFilePublisher.Record.self, from: Data(contentsOf: url))
+        XCTAssertEqual(record.token, "s3cret")
+        XCTAssertEqual(record.simulatorUDID, "SIM-1")
+        let permissions = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(permissions?.intValue, 0o600)
+    }
 }

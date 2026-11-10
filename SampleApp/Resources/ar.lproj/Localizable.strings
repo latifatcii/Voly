@@ -1,0 +1,17 @@
+"loc.title" = "الترجمة";
+"loc.greeting" = "مرحبًا بك في Voly";
+"loc.subtitle" = "بدّل اللغات من المفتش";
+"loc.modern" = "تم التحميل عبر String(localized:)";
+"loc.button.details" = "عرض التفاصيل";
+"loc.button.present" = "عرض الورقة";
+"loc.placeholder.name" = "اسمك";
+"loc.segment.first" = "الأول";
+"loc.segment.second" = "الثاني";
+"loc.items.format" = "لديك %d رسائل جديدة";
+"loc.swiftui.greeting" = "مرحبًا من SwiftUI";
+"loc.detail.title" = "التفاصيل";
+"loc.detail.body" = "تم دفع هذه الشاشة إلى المكدس.";
+"loc.sheet.title" = "ورقة";
+"loc.sheet.body" = "تم عرض هذه الورقة بشكل مشروط.";
+"loc.sheet.close" = "إغلاق";
+"loc.sheet.more" = "المزيد";

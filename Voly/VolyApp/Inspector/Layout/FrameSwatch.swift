@@ -14,18 +14,19 @@ struct FrameSwatch: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 2)
-                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(VolyTheme.field)
+                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(VolyTheme.hairline, lineWidth: 1))
                 .frame(width: cellSize, height: cellSize)
             let rect = FrameSwatchGeometry.swatchRect(
                 child: child, parent: parent, cell: cell
             )
             if rect.width > 0, rect.height > 0 {
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.accentColor.opacity(0.18))
+                    .fill(VolyTheme.selection.opacity(0.28))
                     .overlay(
                         RoundedRectangle(cornerRadius: 1.5)
-                            .stroke(Color.accentColor.opacity(0.7), lineWidth: 1)
+                            .strokeBorder(VolyTheme.selection, style: StrokeStyle(lineWidth: 1, dash: [2, 1.5]))
                     )
                     .frame(width: rect.width, height: rect.height)
                     .offset(x: rect.minX, y: rect.minY)

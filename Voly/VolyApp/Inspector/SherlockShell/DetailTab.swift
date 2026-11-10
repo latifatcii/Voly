@@ -1,27 +1,39 @@
 import SwiftUI
 
 enum DetailTab: String, CaseIterable, Identifiable, Hashable {
-    case hierarchy, layout, props, userDefaults, urlTester
+    case simulators, hierarchy, layout, props, userDefaults, urlTester
 
     var id: String { rawValue }
 
-    var label: String {
-        switch self {
-        case .hierarchy: return "Tree"
-        case .layout: return "Layout"
-        case .props: return "Props"
-        case .userDefaults: return "UD"
-        case .urlTester: return "URL"
-        }
-    }
-
     var symbol: String {
         switch self {
+        case .simulators: return "iphone"
         case .hierarchy: return "list.bullet.indent"
-        case .layout: return "square.3.layers.3d.down.left"
+        case .layout: return "ruler"
         case .props: return "slider.horizontal.3"
         case .userDefaults: return "tray.full"
         case .urlTester: return "link"
+        }
+    }
+
+    /// Full name, shown as the tab's tooltip (the tab itself is an icon).
+    var title: String {
+        switch self {
+        case .simulators: return "Simulators"
+        case .hierarchy: return "View Tree"
+        case .layout: return "Layout"
+        case .props: return "Properties"
+        case .userDefaults: return "User Defaults"
+        case .urlTester: return "URL Tester"
+        }
+    }
+
+    /// Tabs whose content concerns the selected view (as opposed to the
+    /// simulators or the app as a whole).
+    var isAboutSelection: Bool {
+        switch self {
+        case .hierarchy, .layout, .props: return true
+        case .simulators, .userDefaults, .urlTester: return false
         }
     }
 
@@ -29,7 +41,7 @@ enum DetailTab: String, CaseIterable, Identifiable, Hashable {
     var requiresSelection: Bool {
         switch self {
         case .layout, .props: return true
-        case .hierarchy, .userDefaults, .urlTester: return false
+        case .simulators, .hierarchy, .userDefaults, .urlTester: return false
         }
     }
 }

@@ -9,12 +9,11 @@ struct LayoutTab: View {
     var body: some View {
         ScrollView {
             if let node = selectedNode() {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 14) {
                     viewSection(node)
                     constraintsSection(node)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(VolyTheme.gutter)
             } else {
                 EmptyView()
             }
@@ -50,55 +49,61 @@ struct LayoutTab: View {
         return false
     }
 
-    @ViewBuilder
     private func viewSection(_ node: ViewNode) -> some View {
-        SectionHeader("View")
-        VStack(alignment: .leading, spacing: 12) {
-            let frame = rect(from: node.frame)
-            let bounds = rect(from: node.bounds)
-            row(label: "Frame",
-                swatchChild: frame,
-                swatchParent: parentFrame(of: node),
-                rect: frame)
-            row(label: "Bounds",
-                swatchChild: bounds,
-                swatchParent: bounds,
-                rect: bounds)
+        let frame = rect(from: node.frame)
+        let bounds = rect(from: node.bounds)
+        return VolySection("View") {
+            VStack(alignment: .leading, spacing: 10) {
+                geometryRow("Frame", child: frame, parent: parentFrame(of: node), rect: frame)
+                VolyTheme.hairline.frame(height: 1)
+                geometryRow("Bounds", child: bounds, parent: bounds, rect: bounds)
+            }
+            .volyCard()
         }
     }
 
-    private func row(label: String, swatchChild: CGRect, swatchParent: CGRect, rect: CGRect) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label).font(.caption).foregroundStyle(.secondary)
-                FrameSwatch(child: swatchChild, parent: swatchParent, cellSize: 48)
+    /// Label, a to-scale swatch of the rect inside its container, and the
+    /// four numbers in two columns.
+    private func geometryRow(_ label: String, child: CGRect, parent: CGRect, rect: CGRect) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text(label)
+                .foregroundStyle(VolyTheme.dim)
+                .frame(width: 52, alignment: .trailing)
+            FrameSwatch(child: child, parent: parent, cellSize: 52)
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
+                GridRow {
+                    number("x", rect.minX)
+                    number("y", rect.minY)
+                }
+                GridRow {
+                    number("w", rect.width)
+                    number("h", rect.height)
+                }
             }
-            VStack(alignment: .leading, spacing: 2) {
-                labeledNumber("X", rect.minX)
-                labeledNumber("Y", rect.minY)
-                labeledNumber("W", rect.width)
-                labeledNumber("H", rect.height)
-            }
-            Spacer()
+            Spacer(minLength: 0)
         }
     }
 
-    private func labeledNumber(_ label: String, _ value: CGFloat) -> some View {
-        HStack(spacing: 6) {
-            Text("\(label):")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .leading)
+    private func number(_ label: String, _ value: CGFloat) -> some View {
+        HStack(spacing: 5) {
+            Text(label)
+                .font(VolyTheme.code())
+                .foregroundStyle(VolyTheme.dim)
             Text(Self.format(Double(value)))
-                .font(.system(size: 12, design: .monospaced))
+                .font(VolyTheme.code())
+                .textSelection(.enabled)
         }
+        .frame(minWidth: 74, alignment: .leading)
     }
 
     @ViewBuilder
     private func constraintsSection(_ node: ViewNode) -> some View {
         if !session.state.constraints.isEmpty {
-            SectionHeader("Constraints")
-            VStack(alignment: .leading, spacing: 10) {
+            VolySection("Constraints") {
+                Text("\(session.state.constraints.count)")
+                    .font(VolyTheme.code(10.5))
+                    .foregroundStyle(VolyTheme.faint)
+            } content: {
                 ForEach(session.state.constraints) { c in
                     ConstraintCard(
                         constraint: c,
@@ -114,18 +119,10 @@ struct LayoutTab: View {
 
     private static func format(_ value: Double) -> String {
         let formatter = NumberFormatter()
+        // Code-style numbers: a decimal point regardless of the Mac's region.
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.maximumFractionDigits = 3
         formatter.minimumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
-    }
-}
-
-private struct SectionHeader: View {
-    let title: String
-    init(_ title: String) { self.title = title }
-    var body: some View {
-        Text(title)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.primary)
     }
 }

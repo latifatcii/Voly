@@ -8,6 +8,10 @@ public enum InspectorError: Error, Codable, Sendable, Equatable {
     case unsupportedValue
     case invalidCommand(String)
     case `internal`(String)
+    /// The connection has not presented the agent's session token.
+    case unauthorized
+    /// The feature exists but can't run in this process (see message).
+    case unavailable(String)
 
     public var humanDescription: String {
         switch self {
@@ -16,6 +20,8 @@ public enum InspectorError: Error, Codable, Sendable, Equatable {
         case .unsupportedValue: return "Value could not be converted for this property."
         case .invalidCommand(let c): return "Invalid command: \(c)"
         case .internal(let m): return "Internal error: \(m)"
+        case .unauthorized: return "The agent rejected this connection (missing or wrong session token)."
+        case .unavailable(let m): return m
         }
     }
 }

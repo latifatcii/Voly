@@ -39,5 +39,16 @@ final class SampleSceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = VolyAgent.wrap(original: root)
         self.window = window
         window.makeKeyAndVisible()
+
+        // Scripted runs can't rotate a headless simulator; let them ask for
+        // an interface orientation instead.
+        switch ProcessInfo.processInfo.environment["VOLY_SAMPLE_ORIENTATION"] {
+        case "landscapeRight":
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        case "landscapeLeft":
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeLeft))
+        default:
+            break
+        }
     }
 }

@@ -114,4 +114,36 @@ final class AutoAttachInstallerTests: XCTestCase {
             // success
         }
     }
+
+    // MARK: - legacy cleanup
+
+    func test_removeLegacyInstall_unsets_a_value_this_voly_set() async throws {
+        let shell = RecordingShell()
+        shell.stubbedStdout = ["getenv:SIMCTL_CHILD_DYLD_INSERT_LIBRARIES": ourPath + "\n"]
+        let removed = try await AutoAttachInstaller(bundledDylibPath: ourPath, shell: shell).removeLegacyInstall()
+        XCTAssertTrue(removed)
+        XCTAssertEqual(shell.invocations.last?.arguments, ["unsetenv", "SIMCTL_CHILD_DYLD_INSERT_LIBRARIES"])
+    }
+
+    func test_removeLegacyInstall_unsets_a_value_from_another_voly_location() async throws {
+        let shell = RecordingShell()
+        shell.stubbedStdout = ["getenv:SIMCTL_CHILD_DYLD_INSERT_LIBRARIES": "/Users/x/Old/Voly.app/Contents/Resources/VolyAgent.dylib\n"]
+        let removed = try await AutoAttachInstaller(bundledDylibPath: ourPath, shell: shell).removeLegacyInstall()
+        XCTAssertTrue(removed)
+    }
+
+    func test_removeLegacyInstall_leaves_other_tools_alone() async throws {
+        let shell = RecordingShell()
+        shell.stubbedStdout = ["getenv:SIMCTL_CHILD_DYLD_INSERT_LIBRARIES": "/opt/other/libTool.dylib\n"]
+        let removed = try await AutoAttachInstaller(bundledDylibPath: ourPath, shell: shell).removeLegacyInstall()
+        XCTAssertFalse(removed)
+        XCTAssertFalse(shell.invocations.contains { $0.arguments.first == "unsetenv" })
+    }
+
+    func test_removeLegacyInstall_is_a_no_op_when_nothing_is_set() async throws {
+        let shell = RecordingShell()
+        let removed = try await AutoAttachInstaller(bundledDylibPath: ourPath, shell: shell).removeLegacyInstall()
+        XCTAssertFalse(removed)
+        XCTAssertEqual(shell.invocations.map(\.arguments.first), ["getenv"])
+    }
 }

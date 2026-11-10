@@ -19,6 +19,10 @@ public final class PortFilePublisher {
         public let bundleIdentifier: String
         public let processName: String
         public let issuedAt: Date
+        /// Session token the host must present in its handshake. The file is
+        /// written 0600 inside the app's own sandbox container.
+        public let token: String?
+        public let simulatorUDID: String?
     }
 
     public static let fileName = "voly.port"
@@ -35,14 +39,23 @@ public final class PortFilePublisher {
 
     private var fileURL: URL { directory.appendingPathComponent(Self.fileName) }
 
-    public func publish(port: UInt16, pid: Int32, bundleIdentifier: String, processName: String) throws {
+    public func publish(
+        port: UInt16,
+        pid: Int32,
+        bundleIdentifier: String,
+        processName: String,
+        token: String? = nil,
+        simulatorUDID: String? = nil
+    ) throws {
         let record = Record(
             protocolVersion: Self.currentProtocolVersion,
             pid: pid,
             port: port,
             bundleIdentifier: bundleIdentifier,
             processName: processName,
-            issuedAt: clock()
+            issuedAt: clock(),
+            token: token,
+            simulatorUDID: simulatorUDID
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -52,6 +65,9 @@ public final class PortFilePublisher {
             at: directory, withIntermediateDirectories: true
         )
         try data.write(to: fileURL, options: [.atomic])
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: fileURL.path
+        )
         log.notice("published port file at \(self.fileURL.path, privacy: .public)")
     }
 

@@ -1,0 +1,17 @@
+"loc.title" = "Localisation";
+"loc.greeting" = "Bienvenue dans Voly";
+"loc.subtitle" = "Changez de langue depuis l’inspecteur";
+"loc.modern" = "Chargé avec String(localized:)";
+"loc.button.details" = "Afficher les détails";
+"loc.button.present" = "Présenter la feuille";
+"loc.placeholder.name" = "Votre nom";
+"loc.segment.first" = "Premier";
+"loc.segment.second" = "Second";
+"loc.items.format" = "Vous avez %d nouveaux messages";
+"loc.swiftui.greeting" = "Bonjour depuis SwiftUI";
+"loc.detail.title" = "Détails";
+"loc.detail.body" = "Cet écran a été empilé.";
+"loc.sheet.title" = "Feuille";
+"loc.sheet.body" = "Cette feuille a été présentée en modal.";
+"loc.sheet.close" = "Fermer";
+"loc.sheet.more" = "Plus";

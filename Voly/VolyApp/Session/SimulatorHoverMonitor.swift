@@ -39,9 +39,15 @@ final class SimulatorHoverMonitor {
     /// Called by `InspectorSession.enterPickMode`. Returns false if
     /// Accessibility permission is not granted; the caller should silently
     /// proceed with click-only pick (no hover measurement).
-    func start() -> Bool {
+    ///
+    /// - Parameter announceIfUntrusted: explain the missing permission (and
+    ///   prompt once per session). Off when pick mode starts by itself, so
+    ///   merely showing Voly never nags about a permission that only hover
+    ///   measurement needs.
+    func start(announceIfUntrusted: Bool = true) -> Bool {
         if !AccessibilityTrust.isTrusted(prompt: false) {
             log.error("start: Accessibility not trusted — cannot monitor cursor")
+            guard announceIfUntrusted else { return false }
             session?.lastError = "Voly needs Accessibility to track the cursor for live measurements. Grant Voly in System Settings → Privacy & Security → Accessibility, then restart Voly. Clicks still work without it."
             if !hasPromptedThisSession {
                 hasPromptedThisSession = true

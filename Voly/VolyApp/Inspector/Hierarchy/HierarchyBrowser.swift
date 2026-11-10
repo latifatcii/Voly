@@ -9,9 +9,8 @@ struct HierarchyBrowser: View {
     var body: some View {
         VStack(spacing: 0) {
             SearchField(text: $searchText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-            Divider()
+                .padding(.horizontal, VolyTheme.gutter)
+                .padding(.vertical, 8)
             if let snapshot = session.state.hierarchy {
                 ScrollViewReader { proxy in
                     List(selection: Binding(
@@ -23,14 +22,19 @@ struct HierarchyBrowser: View {
                         }
                     )) {
                         ForEach(snapshot.scenes) { scene in
-                            Section(header: Text(scene.title ?? scene.role).font(.caption).bold()) {
+                            Section(header: Text(sceneTitle(scene))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(VolyTheme.dim)) {
                                 ForEach(scene.windowsInline) { window in
                                     NodeRow(node: window, searchText: searchText, session: session, measurement: measurement)
                                 }
+                                .listRowSeparator(.hidden)
                             }
                         }
                     }
-                    .listStyle(.sidebar)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .environment(\.defaultMinListRowHeight, 22)
                     .onChange(of: session.state.selectedViewID) { _, newID in
                         revealSelection(id: newID, proxy: proxy)
                     }
@@ -42,10 +46,10 @@ struct HierarchyBrowser: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    "No Hierarchy",
-                    systemImage: "rectangle.3.group",
-                    description: Text("Connect to a running VolyAgent-enabled app.")
+                VolyEmptyState(
+                    symbol: "rectangle.3.group",
+                    title: "Loading views…",
+                    message: "Waiting for the app's view tree."
                 )
             }
         }
@@ -54,6 +58,13 @@ struct HierarchyBrowser: View {
             measurement.pinnedID = nil
             return .handled
         }
+    }
+
+    /// `UIWindowSceneSessionRoleApplication` → "Application scene".
+    private func sceneTitle(_ scene: SceneNode) -> String {
+        if let title = scene.title, !title.isEmpty { return title }
+        let role = scene.role.replacingOccurrences(of: "UIWindowSceneSessionRole", with: "")
+        return role.isEmpty ? "Scene" : "\(role) scene"
     }
 
     private func revealSelection(id: ObjectID?, proxy: ScrollViewProxy) {
@@ -82,6 +93,12 @@ private struct NodeRow: View {
         // expandedNodeIDs programmatically doesn't re-render the DisclosureGroup.
         let isExpanded = session.state.expandedNodeIDs.contains(node.id)
         let hasChildren = !node.childIDs.isEmpty
+        // Drawn by us rather than left to the list: the panel is usually
+        // not the key window (the Simulator is), and the selection must
+        // stay obvious then.
+        let highlight = RoundedRectangle(cornerRadius: 5)
+            .fill(session.state.selectedViewID == node.id ? VolyTheme.selection.opacity(0.26) : .clear)
+            .padding(.horizontal, 6)
         if hasChildren {
             DisclosureGroup(isExpanded: Binding(
                 get: { isExpanded },
@@ -110,10 +127,12 @@ private struct NodeRow: View {
             }
             .tag(node.id)
             .id(node.id)
+            .listRowBackground(highlight)
         } else {
             rowLabel
                 .tag(node.id)
                 .id(node.id)
+                .listRowBackground(highlight)
         }
     }
 
@@ -159,24 +178,30 @@ private struct NodeLabel: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: iconName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 10.5))
+                .foregroundStyle(VolyTheme.dim)
+                .frame(width: 14)
             Text(node.className)
-                .fontDesign(.monospaced)
-                .font(.caption)
+                .font(VolyTheme.code())
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .opacity(node.isHidden ? 0.5 : 1)
             if let aid = node.accessibilityIdentifier, !aid.isEmpty {
-                Text("#\(aid)").font(.caption2).foregroundStyle(.tertiary)
+                Text("#\(aid)")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(VolyTheme.dim)
+                    .lineLimit(1)
             }
             Spacer(minLength: 0)
             if isPinned {
                 Image(systemName: "pin.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .font(.system(size: 9))
+                    .foregroundStyle(VolyTheme.measurement)
             }
             if node.isHidden {
                 Image(systemName: "eye.slash")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 9))
+                    .foregroundStyle(VolyTheme.dim)
             }
         }
     }
@@ -197,17 +222,24 @@ private struct NodeLabel: View {
 private struct SearchField: View {
     @Binding var text: String
     var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Class or accessibility id", text: $text)
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(VolyTheme.dim)
+            TextField("", text: $text,
+                      prompt: Text("Filter by class or accessibility id").foregroundStyle(VolyTheme.faint))
                 .textFieldStyle(.plain)
+                .font(VolyTheme.body)
             if !text.isEmpty {
                 Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(VolyTheme.dim)
+                    .help("Clear filter")
             }
         }
-        .padding(6)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(VolyTheme.field, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(VolyTheme.hairline, lineWidth: 1))
     }
 }

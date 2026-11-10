@@ -24,6 +24,8 @@ public final class VolyAgentRuntime: PreviewHostProvider {
     public private(set) var urls: URLExecutor!
     public private(set) var dispatcher: CommandDispatcher!
     public private(set) var source: DefaultSourceInfoProvider!
+    public private(set) var localization: VolyLocalizationManager!
+    public private(set) var navigation: VolyNavigationController!
 
     public weak var previewHost: PreviewHostVC?
 
@@ -36,6 +38,11 @@ public final class VolyAgentRuntime: PreviewHostProvider {
     private var portFilePublisher: PortFilePublisher?
     private var bootstrapped = false
     private var mode: Mode = .sdk
+    /// Injected agents require this token in the handshake; nil (SDK mode,
+    /// discovered over Bonjour) keeps the open LAN behaviour.
+    private var authToken: String?
+    /// The one connection that has presented `authToken`.
+    private var authenticatedConnectionID: UInt64?
 
     public func bootstrap(mode: Mode = .sdk) {
         guard !bootstrapped else { return }
@@ -50,6 +57,11 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         self.defaults = UserDefaultsProvider()
         self.urls = URLExecutor()
         self.source = DefaultSourceInfoProvider()
+        self.localization = VolyLocalizationManager()
+        self.navigation = VolyNavigationController()
+        if mode == .injected {
+            self.authToken = Self.makeToken()
+        }
         self.dispatcher = CommandDispatcher(
             registry: registry,
             snapshots: snapshots,
@@ -59,7 +71,10 @@ public final class VolyAgentRuntime: PreviewHostProvider {
             defaults: defaults,
             urls: urls,
             preview: self,
-            source: source
+            source: source,
+            localization: localization,
+            navigation: navigation,
+            injectionMode: mode == .injected ? .injected : .sdk
         )
         startServer()
         observePickNotifications()
@@ -74,7 +89,9 @@ public final class VolyAgentRuntime: PreviewHostProvider {
         let advertise = (mode == .sdk)
         let shouldPublishPortFile = (mode == .injected)
         Task {
-            try? await server.start(advertise: advertise)
+            // Injected agents are simulator-only and reached from the host
+            // Mac over loopback; they never listen on the LAN.
+            try? await server.start(advertise: advertise, loopbackOnly: shouldPublishPortFile)
             if shouldPublishPortFile {
                 await self.publishPortFileIfReady()
             }
@@ -84,7 +101,7 @@ public final class VolyAgentRuntime: PreviewHostProvider {
 
     private func publishPortFileIfReady() async {
         // Poll briefly for the listener to bind.
-        for _ in 0..<20 {
+        for _ in 0..<40 {
             if let port = await server?.boundPort {
                 let publisher = PortFilePublisher()
                 let pid = ProcessInfo.processInfo.processIdentifier
@@ -93,7 +110,9 @@ public final class VolyAgentRuntime: PreviewHostProvider {
                 do {
                     try publisher.publish(
                         port: port, pid: pid,
-                        bundleIdentifier: bundleID, processName: processName
+                        bundleIdentifier: bundleID, processName: processName,
+                        token: authToken,
+                        simulatorUDID: ProcessInfo.processInfo.environment["SIMULATOR_UDID"]
                     )
                     self.portFilePublisher = publisher
                     installTerminationObserver()
@@ -120,10 +139,53 @@ public final class VolyAgentRuntime: PreviewHostProvider {
     }
 
     private func pumpIncoming(server: WebSocketServer) async {
-        for await envelope in server.incoming {
-            let response = await dispatcher.handle(envelope: envelope)
-            try? await server.send(response)
+        for await message in server.incoming {
+            var rejectedHandshake = false
+            let response = await dispatcher.handle(envelope: message.envelope) { command in
+                do {
+                    try self.authorize(command, connectionID: message.connectionID)
+                } catch {
+                    if case .handshake = command { rejectedHandshake = true }
+                    throw error
+                }
+            }
+            try? await server.send(response, to: message.connectionID)
+            if rejectedHandshake {
+                log.error("handshake with wrong or missing token — dropping connection")
+                await server.dropConnection(message.connectionID)
+            }
         }
+    }
+
+    /// With a token configured, a connection must open with a handshake that
+    /// carries it; until then every command is refused.
+    private func authorize(_ command: Command, connectionID: UInt64) throws {
+        guard let authToken else { return }
+        if case .handshake(let request) = command {
+            guard let presented = request.authToken, Self.constantTimeEquals(presented, authToken) else {
+                throw InspectorError.unauthorized
+            }
+            authenticatedConnectionID = connectionID
+            return
+        }
+        guard authenticatedConnectionID == connectionID else {
+            throw InspectorError.unauthorized
+        }
+    }
+
+    private static func makeToken() -> String {
+        var generator = SystemRandomNumberGenerator()
+        return (0..<4)
+            .map { _ in String(generator.next() as UInt64, radix: 16) }
+            .joined()
+    }
+
+    private static func constantTimeEquals(_ lhs: String, _ rhs: String) -> Bool {
+        let a = Array(lhs.utf8), b = Array(rhs.utf8)
+        guard a.count == b.count else { return false }
+        var difference: UInt8 = 0
+        for index in a.indices { difference |= a[index] ^ b[index] }
+        return difference == 0
     }
 
     private func observePickNotifications() {
@@ -149,7 +211,9 @@ public final class VolyAgentRuntime: PreviewHostProvider {
                     let event = Event.selectionChanged(id)
                     if let envelope = try? Framing.encodeEvent(event, id: 0) {
                         do {
-                            try await server.send(envelope)
+                            // Events only go to a client that has authenticated.
+                            if self.authToken != nil, self.authenticatedConnectionID == nil { return }
+                            try await server.send(envelope, to: self.authenticatedConnectionID)
                             log.notice("selectionChanged(\(id)) event sent")
                         } catch {
                             log.error("failed to send selectionChanged event: \(String(describing: error), privacy: .public)")

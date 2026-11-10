@@ -1,4 +1,5 @@
 import SwiftUI
+import VolyHost
 import VolyModels
 import VolyProtocol
 
@@ -30,10 +31,8 @@ struct ConstraintCard: View {
             header
             if isEditing { editor }
         }
-        .padding(12)
-        .background(Color(nsColor: .controlBackgroundColor),
-                    in: RoundedRectangle(cornerRadius: 8))
-        .opacity(constraint.isActive ? 1.0 : 0.6)
+        .volyCard(padding: 9)
+        .opacity(constraint.isActive ? 1.0 : 0.55)
         .onChange(of: constraint.constant) { _, newValue in
             if !isEditing { constantText = Self.format(newValue) }
         }
@@ -47,62 +46,64 @@ struct ConstraintCard: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(constraint.summary)
-                .font(.system(size: 12, design: .monospaced))
+        let presentation = ConstraintPresentation(constraint)
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(presentation.label)
+                .foregroundStyle(VolyTheme.dim)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(width: VolyTheme.labelWidth, alignment: .trailing)
+            Text(presentation.value)
+                .font(VolyTheme.code())
                 .strikethrough(!constraint.isActive)
                 .lineLimit(2)
+                .textSelection(.enabled)
+                .help(constraint.summary)
             Spacer(minLength: 0)
+            if constraint.priority < 1000 {
+                VolyChip(text: "@\(Int(constraint.priority))")
+                    .help("Priority \(Int(constraint.priority))")
+            }
             if constraint.isSystemGenerated {
-                Text("system")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.15),
-                                in: Capsule())
-                    .foregroundStyle(.secondary)
+                VolyChip(text: "system")
             }
             Button(isEditing ? "Done" : "Edit") {
                 if isEditing { commitAll() }
                 isEditing.toggle()
             }
-            .buttonStyle(.borderless)
-            .font(.caption)
+            .buttonStyle(VolyTextButtonStyle())
         }
     }
 
     private var editor: some View {
         VStack(alignment: .leading, spacing: 6) {
-            labeledField("Constant", text: $constantText, onCommit: commitConstant)
-            labeledField("Priority", text: $priorityText, onCommit: commitPriority)
-            HStack {
-                Text("Multiplier")
-                    .font(.caption).frame(width: 80, alignment: .leading)
-                    .foregroundStyle(.secondary)
-                Text(Self.format(constraint.multiplier))
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .help("Multiplier is read-only; Auto Layout can't change it after creation.")
-                Spacer()
+            VolyRow(label: "Constant") {
+                TextField("", text: $constantText)
+                    .volyField()
+                    .frame(maxWidth: 150)
+                    .onSubmit(commitConstant)
             }
-            Toggle("Active", isOn: $active)
-                .toggleStyle(.checkbox)
-                .onChange(of: active) { _, newValue in
-                    send(.init(isActive: newValue))
-                }
-        }
-    }
-
-    private func labeledField(_ label: String, text: Binding<String>, onCommit: @escaping () -> Void) -> some View {
-        HStack {
-            Text(label)
-                .font(.caption).frame(width: 80, alignment: .leading)
-                .foregroundStyle(.secondary)
-            TextField("", text: text)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 140)
-                .onSubmit(onCommit)
-            Spacer()
+            VolyRow(label: "Priority") {
+                TextField("", text: $priorityText)
+                    .volyField()
+                    .frame(maxWidth: 150)
+                    .onSubmit(commitPriority)
+            }
+            VolyRow(label: "Multiplier") {
+                Text(Self.format(constraint.multiplier))
+                    .font(VolyTheme.code())
+                    .foregroundStyle(VolyTheme.faint)
+                    .padding(.horizontal, 7)
+                    .help("Multiplier is read-only; Auto Layout can't change it after creation.")
+            }
+            VolyRow(label: "") {
+                Toggle("Active", isOn: $active)
+                    .toggleStyle(.checkbox)
+                    .controlSize(.small)
+                    .onChange(of: active) { _, newValue in
+                        send(.init(isActive: newValue))
+                    }
+            }
         }
     }
 
@@ -131,6 +132,8 @@ struct ConstraintCard: View {
 
     private static func format(_ value: Double) -> String {
         let formatter = NumberFormatter()
+        // Code-style numbers: a decimal point regardless of the Mac's region.
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.maximumFractionDigits = 3
         formatter.minimumFractionDigits = 0
         return formatter.string(from: NSNumber(value: value)) ?? "\(value)"

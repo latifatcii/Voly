@@ -19,6 +19,10 @@ public final class CommandDispatcher {
     public let urls: URLExecutor
     public let preview: PreviewHostProvider
     public let source: SourceInfoProvider
+    public let localization: VolyLocalizationManager
+    public let navigation: VolyNavigationController
+    /// How this agent got into the process; reported in the handshake.
+    public let injectionMode: AgentCapabilities.InjectionMode
 
     public init(
         registry: ObjectRegistry,
@@ -29,7 +33,10 @@ public final class CommandDispatcher {
         defaults: UserDefaultsProvider,
         urls: URLExecutor,
         preview: PreviewHostProvider,
-        source: SourceInfoProvider
+        source: SourceInfoProvider,
+        localization: VolyLocalizationManager,
+        navigation: VolyNavigationController,
+        injectionMode: AgentCapabilities.InjectionMode
     ) {
         self.registry = registry
         self.snapshots = snapshots
@@ -40,11 +47,20 @@ public final class CommandDispatcher {
         self.urls = urls
         self.preview = preview
         self.source = source
+        self.localization = localization
+        self.navigation = navigation
+        self.injectionMode = injectionMode
     }
 
-    public func handle(envelope: MessageEnvelope) async -> MessageEnvelope {
+    /// - Parameter authorize: throws to refuse a command before it runs
+    ///   (the runtime uses this to require an authenticated connection).
+    public func handle(
+        envelope: MessageEnvelope,
+        authorize: (Command) throws -> Void = { _ in }
+    ) async -> MessageEnvelope {
         do {
             let command = try Framing.decodeCommand(envelope)
+            try authorize(command)
             let response = try await handle(command)
             return try Framing.encodeResponse(response, id: envelope.id)
         } catch let error as InspectorError {
@@ -69,7 +85,10 @@ public final class CommandDispatcher {
                 agentName: "VolyAgent",
                 agentVersion: "0.1.0",
                 bundleIdentifier: bundle.bundleIdentifier,
-                processName: ProcessInfo.processInfo.processName
+                processName: ProcessInfo.processInfo.processName,
+                pid: ProcessInfo.processInfo.processIdentifier,
+                simulatorUDID: ProcessInfo.processInfo.environment["SIMULATOR_UDID"],
+                capabilities: capabilities
             )
             return .handshakeAccepted(accepted)
 
@@ -166,7 +185,41 @@ public final class CommandDispatcher {
 
         case .measureHover(let anchorID, let x, let y, let sceneID):
             return measureHover(anchorID: anchorID, x: x, y: y, sceneID: sceneID)
+
+        case .localizationState:
+            return .localization(localization.state())
+
+        case .setLocalizationOverride(let request):
+            return .localization(try localization.apply(request))
+
+        case .refreshLocalizedUI:
+            return .localization(localization.refresh())
+
+        case .captureScreenshot(let target):
+            // Voly's highlight lives in its own overlay window, which the
+            // renderer skips, so no need to hide it first.
+            return .screenshot(try await ScreenshotRenderer.capture(target, registry: registry))
+
+        case .screenInfo:
+            return .screenInfo(ScreenshotRenderer.screenInfo())
+
+        case .navigationState:
+            return .navigationState(navigation.state())
+
+        case .navigate(let action):
+            return .navigationResult(navigation.perform(action))
         }
+    }
+
+    private var capabilities: AgentCapabilities {
+        AgentCapabilities(
+            injectionMode: injectionMode,
+            previewHost: preview.previewHost != nil,
+            localization: true,
+            screenshots: true,
+            navigation: true,
+            sourceSymbols: true
+        )
     }
 
     /// Live hit-test + measurement + draw, in one round-trip.
@@ -248,7 +301,8 @@ public final class DefaultSourceInfoProvider: SourceInfoProvider {
             className: className,
             moduleName: moduleName.isEmpty ? nil : moduleName,
             dsymUUID: nil,
-            guessedRelativePath: ClassIndex.shared.path(for: className)
+            guessedRelativePath: ClassIndex.shared.path(for: className),
+            candidates: SourceCandidateResolver.candidates(for: object)
         )
     }
 }

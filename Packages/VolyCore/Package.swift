@@ -34,6 +34,13 @@ let package = Package(
             dependencies: ["VolyProtocol", "VolyModels"],
             path: "Sources/VolyHost"
         ),
+        // macOS command-line client for scripting the simulator integration
+        // and agents end to end (see scripts/integration-test.sh).
+        .executableTarget(
+            name: "volyctl",
+            dependencies: ["VolyHost", "VolyProtocol", "VolyModels"],
+            path: "Sources/volyctl"
+        ),
         .testTarget(
             name: "VolyCoreTests",
             dependencies: ["VolyAgent", "VolyProtocol", "VolyModels", "VolyCodables"],

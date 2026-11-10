@@ -21,6 +21,7 @@ public final class PortFileWatcher {
         let bundleIdentifier: String
         let processName: String
         let issuedAt: Date
+        let token: String?
     }
 
     public let devicesRoot: URL
@@ -57,6 +58,8 @@ public final class PortFileWatcher {
                 guard let data = try? Data(contentsOf: fileURL) else { continue }
                 do {
                     let rec = try decoder.decode(Record.self, from: data)
+                    // An agent that published before its listener was ready.
+                    guard rec.port != 0 else { continue }
                     guard isPidAlive(rec.pid) else {
                         // Clean up the file on disk so subsequent scans don't
                         // re-log the same stale record every tick. willTerminate
@@ -72,7 +75,8 @@ public final class PortFileWatcher {
                         processName: rec.processName,
                         pid: rec.pid,
                         port: rec.port,
-                        issuedAt: rec.issuedAt
+                        issuedAt: rec.issuedAt,
+                        token: rec.token
                     ))
                 } catch {
                     log.info("skipping malformed port file at \(fileURL.path, privacy: .public): \(String(describing: error), privacy: .public)")

@@ -32,10 +32,19 @@ public struct HandshakeRequest: Codable, Sendable {
     public let clientName: String
     public let clientVersion: String
     public let protocolVersion: Int
-    public init(clientName: String, clientVersion: String, protocolVersion: Int = ProtocolVersion.current) {
+    /// Session token read from the agent's port file. Injected agents refuse
+    /// every command until a handshake carries the matching token.
+    public let authToken: String?
+    public init(
+        clientName: String,
+        clientVersion: String,
+        protocolVersion: Int = ProtocolVersion.current,
+        authToken: String? = nil
+    ) {
         self.clientName = clientName
         self.clientVersion = clientVersion
         self.protocolVersion = protocolVersion
+        self.authToken = authToken
     }
 }
 
@@ -46,13 +55,32 @@ public struct HandshakeAccepted: Codable, Sendable {
     public let agentVersion: String
     public let bundleIdentifier: String?
     public let processName: String
-    public init(protocolVersion: Int, sessionID: UUID, agentName: String, agentVersion: String, bundleIdentifier: String?, processName: String) {
+    /// Identity of the process that answered, so the host can check it is
+    /// talking to the app it meant to (ports get reused across relaunches).
+    public let pid: Int32?
+    /// `SIMULATOR_UDID` of the hosting simulator; nil on a physical device.
+    public let simulatorUDID: String?
+    public let capabilities: AgentCapabilities?
+    public init(
+        protocolVersion: Int,
+        sessionID: UUID,
+        agentName: String,
+        agentVersion: String,
+        bundleIdentifier: String?,
+        processName: String,
+        pid: Int32? = nil,
+        simulatorUDID: String? = nil,
+        capabilities: AgentCapabilities? = nil
+    ) {
         self.protocolVersion = protocolVersion
         self.sessionID = sessionID
         self.agentName = agentName
         self.agentVersion = agentVersion
         self.bundleIdentifier = bundleIdentifier
         self.processName = processName
+        self.pid = pid
+        self.simulatorUDID = simulatorUDID
+        self.capabilities = capabilities
     }
 }
 
@@ -139,6 +167,15 @@ public enum Command: Codable, Sendable {
     /// `FrameMeasurement.compute` + `.measure(overlay:)` sequence, which fed
     /// stale snapshot windowFrames into the overlay.
     case measureHover(anchorID: ObjectID, x: Double, y: Double, sceneID: ObjectID)
+    case localizationState
+    /// Set, change or (with `language == nil`) clear the language override.
+    case setLocalizationOverride(LocalizationOverrideRequest)
+    /// Re-apply known localized strings to visible controls.
+    case refreshLocalizedUI
+    case captureScreenshot(ScreenshotTarget)
+    case screenInfo
+    case navigationState
+    case navigate(NavigationAction)
 }
 
 public enum Response: Codable, Sendable {
@@ -155,6 +192,11 @@ public enum Response: Codable, Sendable {
     case urlResult(success: Bool, error: String?)
     case previewApplied(PreviewConfig.Applied)
     case sourceInfo(SourceInfo)
+    case localization(LocalizationState)
+    case screenshot(ScreenshotImage)
+    case screenInfo(ScreenInfo)
+    case navigationState(NavigationState)
+    case navigationResult(NavigationResult)
     case ack
     case pong
     case error(InspectorError)

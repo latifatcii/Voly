@@ -10,3 +10,6 @@ Pods/
 .superpowers/
 .vscode/
 *.pbxproj.bak*
+# Internal notes, specs and tool state stay local
+docs/
+.claude/

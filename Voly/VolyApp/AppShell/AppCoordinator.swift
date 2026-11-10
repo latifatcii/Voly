@@ -13,19 +13,11 @@ final class AppCoordinator {
     private let menuBar: MenuBarController
     private let attachment: SimulatorAttachment
     private let locator: SimulatorLocator
-    private let autoAttach: AutoAttachInstaller
-    private let runningApps = RunningAppsLocator()
-    private let launcher = SimctlLauncher()
-    private let inventory = SimInventory()
-    private let portFileWatcher = PortFileWatcher()
+    private var simulators: VolySimulatorManager { session.simulators }
     private var hotkey: GlobalHotkey?
+    private var simulatorHotkey: FrontmostAppHotkey?
     private var attachmentObservation: Task<Void, Never>?
-    private var toggleInFlight = false
-    private var attachInFlight = false
-    /// Cooldown per bundle id — don't rip-relaunch the same app faster than this.
-    private static let autoReattachCooldown: TimeInterval = 5
-    private var autoReattachTimer: Timer?
-    private var lastReattachAttempt: [String: Date] = [:]
+    private var relaunchInFlight = false
 
     init(session: InspectorSession) {
         self.session = session
@@ -38,23 +30,11 @@ final class AppCoordinator {
             voly: .voly,
             screenProvider: Self.screen(for:)
         )
-        self.autoAttach = AutoAttachInstaller(
-            bundledDylibPath: Self.bundledDylibPath()
-        )
         self.menuBar = MenuBarController(
-            onToggle: {}, onQuit: {}, onAbout: {}, onToggleAutoAttach: {}, onAttachRunningApp: {}
+            onToggle: {}, onQuit: {}, onAbout: {}, onRelaunchRunningApp: {}
         )
 
         wireCallbacks()
-    }
-
-    /// Resolves `Voly.app/Contents/Resources/VolyAgent.dylib`. The dylib is
-    /// embedded by the Voly target's "Embed VolyAgent.dylib" run-script
-    /// phase — its absence is a programmer error.
-    private static func bundledDylibPath() -> String {
-        let url = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/Resources/VolyAgent.dylib")
-        return url.path
     }
 
     /// Return the visible frame of the screen that contains the Simulator,
@@ -79,13 +59,21 @@ final class AppCoordinator {
         if hotkey == nil {
             log.warning("Global hotkey registration failed; menu-bar icon still toggles Voly.")
         }
-
-        // Auto-attach install + nudge + reflect state in menu bar. Fire-and-
-        // forget; failures log but don't block the rest of startup.
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.installAutoAttachOnStart()
+        // ⌘E next to the Simulator. Scoped, so ⌘E elsewhere is untouched.
+        var scopedApps: Set<String> = [HotkeyDefaults.simulatorBundleIdentifier]
+        if let own = Bundle.main.bundleIdentifier { scopedApps.insert(own) }
+        simulatorHotkey = FrontmostAppHotkey(
+            keyCode: HotkeyDefaults.simulatorKeyCode,
+            modifiers: HotkeyDefaults.simulatorModifiers,
+            whileFrontmost: scopedApps
+        ) { [weak self] in
+            self?.toggleInspector()
         }
+
+        // Simulator discovery + restoring per-simulator runtime integration
+        // the user had turned on. Fire-and-forget; failures surface in the
+        // simulator list, they don't block the rest of startup.
+        simulators.start()
     }
 
     func toggleInspector() {
@@ -106,7 +94,15 @@ final class AppCoordinator {
         )
         window.show(at: seed.frame)
         menuBar.isInspectorVisible = true
+        simulators.isInspectorVisible = true
+        Task { @MainActor [weak self] in await self?.simulators.refresh() }
         startObservingAttachment()
+        // Showing Voly means "I want to look at something": start in pick
+        // mode so the next click on a simulator selects a view. Hiding
+        // leaves it again (see `exitInteractiveModes`).
+        Task { @MainActor [weak self] in
+            await self?.session.enterPickMode(announceMissingAccessibility: false)
+        }
     }
 
     func hideInspector() {
@@ -114,6 +110,7 @@ final class AppCoordinator {
         attachment.stop()
         window.hide()
         menuBar.isInspectorVisible = false
+        simulators.isInspectorVisible = false
         stopObservingAttachment()
     }
 
@@ -123,10 +120,7 @@ final class AppCoordinator {
     /// them off.
     private func exitInteractiveModes() {
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            if self.session.state.pickModeActive {
-                await self.session.exitPickMode()
-            }
+            await self?.session.exitPickMode()
         }
     }
 
@@ -134,181 +128,96 @@ final class AppCoordinator {
         NSApp.terminate(nil)
     }
 
-    /// Flip between enabled and disabled. Called from the menu bar item.
-    /// Serialized by `toggleInFlight` so a rapid double-click can't
-    /// interleave two shell dispatches.
-    func toggleAutoAttach() {
-        guard !toggleInFlight else { return }
-        toggleInFlight = true
-        Task { @MainActor [weak self] in
-            defer { self?.toggleInFlight = false }
-            guard let self else { return }
-            do {
-                let current = try await self.autoAttach.currentState()
-                switch current {
-                case .enabled:
-                    try await self.autoAttach.uninstall()
-                    StaleProcessNudge.resetEpoch()
-                    self.stopAutoReattachPolling()
-                case .disabled, .foreign:
-                    try await self.autoAttach.ensureInstalled()
-                    StaleProcessNudge.runIfNeeded()
-                    self.startAutoReattachPolling()
-                }
-                await self.refreshAutoAttachMenuState()
-            } catch {
-                log.error("toggleAutoAttach failed: \(String(describing: error), privacy: .public)")
-            }
-        }
-    }
-
-    /// Install if needed, then refresh the menu bar + nudge on startup.
-    /// Called once from `start()`.
-    private func installAutoAttachOnStart() async {
-        do {
-            try await autoAttach.ensureInstalled()
-            await refreshAutoAttachMenuState()
-            let state = try await autoAttach.currentState()
-            if case .enabled = state {
-                StaleProcessNudge.runIfNeeded()
-                startAutoReattachPolling()
-            }
-        } catch {
-            log.error("autoAttach install on start failed: \(String(describing: error), privacy: .public)")
-            menuBar.isAutoAttachEnabled = false
-        }
-    }
-
-    // MARK: - Auto-reattach poll
-    //
-    // Xcode's debug launch (⌘R) speaks directly to CoreSimulator's XPC service
-    // and doesn't inherit `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES`, so our
-    // launchctl-based auto-attach is a no-op for Xcode-launched apps. This
-    // timer closes that gap: if a user app is running in the booted sim but
-    // doesn't have a Voly port file, relaunch it via simctl (with the env
-    // var) so the dylib gets injected. Kills the Xcode debug session —
-    // expected tradeoff; user can toggle auto-attach off for debug sessions.
-
-    private func startAutoReattachPolling() {
-        guard autoReattachTimer == nil else { return }
-        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                await self?.pollAndReattach()
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        autoReattachTimer = timer
-        log.notice("auto-reattach polling started")
-    }
-
-    private func stopAutoReattachPolling() {
-        autoReattachTimer?.invalidate()
-        autoReattachTimer = nil
-        lastReattachAttempt.removeAll(keepingCapacity: true)
-        log.notice("auto-reattach polling stopped")
-    }
-
-    private func pollAndReattach() async {
-        guard menuBar.isAutoAttachEnabled else { return }
-        let dylibURL = URL(fileURLWithPath: Self.bundledDylibPath())
-        do {
-            let devices = try await inventory.listDevices(bootedOnly: true)
-            guard let device = devices.first else { return }
-            let running = try await runningApps.listRunningUserApps(deviceUDID: device.udid)
-            guard !running.isEmpty else { return }
-            let attached = portFileWatcher.scan(deviceUDIDs: [device.udid])
-            let attachedPids = Set(attached.map(\.pid))
-            let now = Date()
-            for app in running where !attachedPids.contains(app.pid) {
-                if let last = lastReattachAttempt[app.bundleIdentifier],
-                   now.timeIntervalSince(last) < Self.autoReattachCooldown {
-                    continue
-                }
-                lastReattachAttempt[app.bundleIdentifier] = now
-                log.notice("auto-reattach: \(app.bundleIdentifier, privacy: .public) (pid=\(app.pid)) unattached — relaunching via simctl")
-                _ = try? await launcher.launch(
-                    deviceUDID: device.udid,
-                    bundleIdentifier: app.bundleIdentifier,
-                    dylibPath: dylibURL
-                )
-            }
-        } catch {
-            log.info("auto-reattach poll failed: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    /// Read current installer state and reflect it into the menu bar
-    /// checkmark. Swallows errors (menu just shows Off in that case).
-    private func refreshAutoAttachMenuState() async {
-        do {
-            let state = try await autoAttach.currentState()
-            if case .enabled = state {
-                menuBar.isAutoAttachEnabled = true
-            } else {
-                menuBar.isAutoAttachEnabled = false
-            }
-        } catch {
-            log.error("autoAttach state refresh failed: \(String(describing: error), privacy: .public)")
-            menuBar.isAutoAttachEnabled = false
-        }
-    }
-
     private func wireCallbacks() {
         window.onClose = { [weak self] in
             self?.exitInteractiveModes()
             self?.menuBar.isInspectorVisible = false
+            self?.simulators.isInspectorVisible = false
             self?.attachment.stop()
             self?.stopObservingAttachment()
         }
         menuBar.onToggle = { [weak self] in self?.toggleInspector() }
+        // ⌘E typed into the inspector itself (it can be key while another
+        // app is frontmost, where the scoped hotkey isn't registered).
+        window.onToggleShortcut = { [weak self] in self?.toggleInspector() }
         menuBar.onQuit = { [weak self] in self?.quit() }
         menuBar.onAbout = { NSApp.orderFrontStandardAboutPanel(nil) }
-        menuBar.onToggleAutoAttach = { [weak self] in self?.toggleAutoAttach() }
-        menuBar.onAttachRunningApp = { [weak self] in self?.attachRunningApp() }
+        menuBar.onRelaunchRunningApp = { [weak self] in self?.relaunchRunningApp() }
+        menuBar.simulatorsProvider = { [weak self] in self?.simulators.simulators ?? [] }
+        menuBar.onSetIntegration = { [weak self] udid, enabled in
+            self?.setIntegration(enabled: enabled, for: udid)
+        }
+        menuBar.integratesAllSimulatorsProvider = { [weak self] in
+            self?.simulators.preference.allSimulators ?? true
+        }
+        menuBar.onSetIntegratesAllSimulators = { [weak self] all in
+            Task { @MainActor [weak self] in await self?.simulators.setIntegratesAllSimulators(all) }
+        }
     }
 
-    /// Find the user's running sim app and relaunch it via direct simctl with
-    /// SIMCTL_CHILD_DYLD_INSERT_LIBRARIES set to VolyAgent.dylib. Xcode's debug
-    /// launch replaces DYLD_INSERT_LIBRARIES wholesale and ignores our
-    /// launchctl setenv value, so we need this manual re-launch path.
-    func attachRunningApp() {
-        guard !attachInFlight else { return }
-        attachInFlight = true
+    /// Menu-bar entry point for the per-simulator switch.
+    func setIntegration(enabled: Bool, for udid: String) {
         Task { @MainActor [weak self] in
-            defer { self?.attachInFlight = false }
             guard let self else { return }
-            do {
-                let devices = try await self.inventory.listDevices(bootedOnly: true)
-                guard let device = devices.first else {
-                    self.showAlert(
-                        title: "No booted simulator",
-                        info: "Boot a simulator and launch your app, then try again."
-                    )
-                    return
-                }
-                let apps = try await self.runningApps.listRunningUserApps(deviceUDID: device.udid)
-                guard let target = apps.first else {
-                    self.showAlert(
-                        title: "No running app found",
-                        info: "Run your app in the simulator, then try Attach again."
-                    )
-                    return
-                }
-                log.notice("relaunching \(target.bundleIdentifier, privacy: .public) with VolyAgent injected")
-                _ = try await self.launcher.launch(
-                    deviceUDID: device.udid,
-                    bundleIdentifier: target.bundleIdentifier,
-                    dylibPath: URL(fileURLWithPath: Self.bundledDylibPath())
-                )
-            } catch {
-                log.error("attachRunningApp failed: \(String(describing: error), privacy: .public)")
-                self.showAlert(
-                    title: "Attach failed",
-                    info: error.localizedDescription
-                )
+            await self.simulators.setIntegration(enabled: enabled, for: udid)
+            if let error = self.simulators.simulators.first(where: { $0.id == udid })?.error {
+                self.showAlert(title: "Runtime integration", info: error)
             }
         }
     }
+
+    /// Explicit, user-requested relaunch of an app that was already running
+    /// before integration was enabled (or that is excluded from it). This is
+    /// the only path that terminates an app, and it asks first because it
+    /// ends the app's current state and any attached debug session.
+    func relaunchRunningApp() {
+        guard !relaunchInFlight else { return }
+        relaunchInFlight = true
+        Task { @MainActor [weak self] in
+            defer { self?.relaunchInFlight = false }
+            guard let self else { return }
+            await self.simulators.refresh()
+            let candidates = self.simulators.simulators.flatMap { simulator in
+                simulator.runningApps.filter { !$0.isInstrumented }.map { (simulator, $0) }
+            }
+            guard let (simulator, app) = candidates.first else {
+                self.showAlert(
+                    title: "Nothing to relaunch",
+                    info: "Every running app in the booted simulators already has the Voly agent, or no app is running. Show the inspector to see each app's status."
+                )
+                return
+            }
+            let alert = NSAlert()
+            alert.messageText = "Relaunch \(app.bundleIdentifier) with Voly?"
+            alert.informativeText = """
+                The app on \(simulator.device.name) will be terminated and launched again with the Voly agent. \
+                Its current state is lost and an attached Xcode debug session will end.
+
+                To avoid this, enable Runtime Integration for the simulator: apps launched afterwards \
+                (including from Xcode) are inspectable without a relaunch.
+                """
+            alert.addButton(withTitle: "Relaunch")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            do {
+                try await self.simulators.relaunch(bundleIdentifier: app.bundleIdentifier, on: simulator.id)
+            } catch {
+                log.error("relaunch failed: \(String(describing: error), privacy: .public)")
+                self.showAlert(title: "Relaunch failed", info: error.localizedDescription)
+            }
+        }
+    }
+
+    #if DEBUG
+    /// Scripted smoke runs only: PNG of the inspector panel's content view.
+    func writeInspectorSnapshot(to url: URL) {
+        guard let view = window.panel.contentView,
+              let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+        else { return }
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        try? bitmap.representation(using: .png, properties: [:])?.write(to: url)
+    }
+    #endif
 
     private func showAlert(title: String, info: String) {
         let alert = NSAlert()
