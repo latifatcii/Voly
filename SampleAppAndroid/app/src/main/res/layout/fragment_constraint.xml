@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/constraint_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/constraint_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/constraint_title"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Fixed size. -->
+    <ImageView
+        android:id="@+id/constraint_avatar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginTop="16dp"
+        android:background="@color/swatch_blue"
+        android:contentDescription="@string/constraint_avatar_description"
+        android:padding="12dp"
+        android:src="@drawable/ic_star"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/constraint_title"
+        app:tint="@android:color/white" />
+
+    <TextView
+        android:id="@+id/constraint_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:text="@string/constraint_name"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        app:layout_constraintStart_toEndOf="@id/constraint_avatar"
+        app:layout_constraintTop_toTopOf="@id/constraint_avatar" />
+
+    <!-- 0dp (match constraint) width between the avatar and the parent's end. -->
+    <TextView
+        android:id="@+id/constraint_caption"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/constraint_caption"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/constraint_name"
+        app:layout_constraintTop_toBottomOf="@id/constraint_name" />
+
+    <!-- Bottom edge of whichever is taller: the avatar or the caption. -->
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/constraint_barrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="constraint_avatar,constraint_caption" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/constraint_guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.5" />
+
+    <Button
+        android:id="@+id/constraint_left_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="8dp"
+        android:text="@string/constraint_left"
+        app:layout_constraintEnd_toStartOf="@id/constraint_guideline"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/constraint_barrier" />
+
+    <Button
+        android:id="@+id/constraint_right_button"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="@string/constraint_right"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/constraint_guideline"
+        app:layout_constraintTop_toTopOf="@id/constraint_left_button" />
+
+    <!-- 0dp wide with a 16:9 ratio, left half only. -->
+    <View
+        android:id="@+id/constraint_ratio_box"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:background="@color/swatch_amber"
+        app:layout_constraintDimensionRatio="16:9"
+        app:layout_constraintEnd_toStartOf="@id/constraint_guideline"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/constraint_left_button" />
+
+    <!-- Fixed size, centered between the edges with a horizontal bias. -->
+    <TextView
+        android:id="@+id/constraint_biased_box"
+        android:layout_width="96dp"
+        android:layout_height="48dp"
+        android:background="@color/swatch_green"
+        android:gravity="center"
+        android:text="@string/constraint_biased"
+        android:textColor="@android:color/white"
+        app:layout_constraintBottom_toTopOf="@id/constraint_bottom_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.8"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/constraint_ratio_box"
+        app:layout_constraintVertical_bias="0.3" />
+
+    <TextView
+        android:id="@+id/constraint_bottom_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/constraint_bottom"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

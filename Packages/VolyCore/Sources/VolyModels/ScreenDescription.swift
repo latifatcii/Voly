@@ -132,12 +132,17 @@ public struct LayoutDetails: Codable, Sendable, Hashable {
     public let compressionResistanceVertical: Float
     public let safeAreaInsets: UIEdgeInsetsCodable
     public let layoutMargins: UIEdgeInsetsCodable
+    /// The layout inputs in the platform's own words, when the fields above
+    /// don't describe them — Android has layout params, padding and
+    /// margins rather than intrinsic size and hugging priorities.
+    public let summary: String?
 
     public init(
         bounds: CGRectCodable, usesAutoLayout: Bool, intrinsicWidth: Double?, intrinsicHeight: Double?,
         huggingHorizontal: Float, huggingVertical: Float,
         compressionResistanceHorizontal: Float, compressionResistanceVertical: Float,
-        safeAreaInsets: UIEdgeInsetsCodable, layoutMargins: UIEdgeInsetsCodable
+        safeAreaInsets: UIEdgeInsetsCodable, layoutMargins: UIEdgeInsetsCodable,
+        summary: String? = nil
     ) {
         self.bounds = bounds
         self.usesAutoLayout = usesAutoLayout
@@ -149,6 +154,7 @@ public struct LayoutDetails: Codable, Sendable, Hashable {
         self.compressionResistanceVertical = compressionResistanceVertical
         self.safeAreaInsets = safeAreaInsets
         self.layoutMargins = layoutMargins
+        self.summary = summary
     }
 }
 

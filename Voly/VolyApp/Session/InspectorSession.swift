@@ -31,6 +31,8 @@ final class InspectorSession {
     private var selectedPeer: ConnectionManager.Peer?
     /// Booted simulators and their per-simulator runtime integration.
     let simulators = VolySimulatorManager()
+    /// Android emulators and the agents attached to the apps running in them.
+    let android = AndroidDeviceManager()
     let sourceNavigator = VolySourceNavigator()
     let screenshots = VolyScreenshotManager()
     /// AI agents' way in (MCP). Started by the app delegate.
@@ -55,6 +57,10 @@ final class InspectorSession {
         guard startDiscovery else { return }
         startFileDiscoveryLoop()
         connections.startBrowsing()
+        android.policyProvider = { [weak self] in self?.simulators.policy ?? InjectionPolicy() }
+        android.onAgentsChanged = { [weak self] agents in
+            self?.connections.updateAndroidPeers(agents)
+        }
         connections.onPeerAppeared = { [weak self] peer in
             guard let self, self.autoConnectEnabled else { return }
             if !self.hasAutoConnected, self.state.connectionStatus == .disconnected {
@@ -63,7 +69,7 @@ final class InspectorSession {
                 Task { [weak self] in
                     await self?.connect(to: peer)
                 }
-            } else if peer.deviceUDID != nil {
+            } else if peer.deviceUDID != nil || peer.androidSerial != nil {
                 // Every other instrumented simulator app is connected in the
                 // background, so picking a view in any of them can bring it
                 // into the inspector without a click here first.
@@ -548,6 +554,18 @@ final class InspectorSession {
         state.agent?.simulatorUDID ?? selectedPeer?.deviceUDID
     }
 
+    /// The inspector is driving an Android app.
+    var isActiveAgentAndroid: Bool {
+        state.agent?.isAndroid ?? (client != nil && selectedPeer?.androidSerial != nil)
+    }
+
+    /// adb serial of the emulator or device the active Android app runs on.
+    var activeAndroidSerial: String? {
+        guard client != nil, isActiveAgentAndroid else { return nil }
+        return selectedPeer?.androidSerial
+            ?? state.activePeerID.flatMap { id in connections.peers.first { $0.id == id }?.androidSerial }
+    }
+
     /// Localization + navigation state for the newly active agent.
     private func refreshRuntimeState() async {
         await refreshLocalizationState()
@@ -672,6 +690,12 @@ final class InspectorSession {
         do {
             let image: VolyScreenshotManager.Capture
             switch mode {
+            case .fullSimulator where activeAndroidSerial != nil:
+                // The emulator's display through adb; it comes as shown, already upright.
+                guard let serial = activeAndroidSerial else { throw VolyScreenshotManager.CaptureError.noSimulator }
+                let png = try await android.screenshot(serial: serial)
+                let size = PNGSize.read(png)
+                image = .init(png: png, pixelWidth: size?.width ?? 0, pixelHeight: size?.height ?? 0)
             case .fullSimulator:
                 guard let udid = await resolveScreenshotSimulator() else {
                     throw VolyScreenshotManager.CaptureError.noSimulator

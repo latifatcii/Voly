@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">عيّنة Voly</string>
+
+    <string name="demo_constraint_title">تخطيط القيود</string>
+    <string name="demo_constraint_subtitle">عناصر مقيّدة ببعضها</string>
+    <string name="demo_forms_title">عناصر النماذج</string>
+    <string name="demo_forms_subtitle">حقول إدخال ومفاتيح وأزرار</string>
+    <string name="demo_localization_title">الترجمة</string>
+    <string name="demo_localization_subtitle">نصوص مترجمة واتجاه من اليمين إلى اليسار</string>
+    <string name="demo_problems_title">مشاكل التخطيط</string>
+    <string name="demo_problems_subtitle">عناصر مقتطعة ومخفية وبلا حجم</string>
+    <string name="demo_gallery_title">المعرض</string>
+    <string name="demo_gallery_subtitle">شبكة من الخلايا الملوّنة</string>
+    <string name="demo_compose_title">Compose</string>
+    <string name="demo_compose_subtitle">شاشة مبنية بـ Jetpack Compose</string>
+    <string name="demo_dialogs_title">مربعات الحوار</string>
+    <string name="demo_dialogs_subtitle">تنبيه وورقة سفلية وقائمة منبثقة</string>
+    <string name="demo_prefs_title">التفضيلات</string>
+    <string name="demo_prefs_subtitle">قيم SharedPreferences</string>
+
+    <string name="loc_heading">مرحبًا بك في Voly</string>
+    <string name="loc_greeting">مرحبًا، %1$s!</string>
+    <string name="loc_current_locale">اللغة الحالية: %1$s</string>
+    <string name="loc_long_text">هذه الفقرة طويلة عن قصد. وُضعت هنا لترى كيف يمتد النص المترجم على عدة أسطر، وكم يطول أو يقصر في لغة أخرى، وكيف ينعكس التخطيط عندما تُكتب اللغة من اليمين إلى اليسار.</string>
+    <plurals name="loc_items_count">
+        <item quantity="zero">لا توجد عناصر في سلتك</item>
+        <item quantity="one">عنصر واحد في سلتك</item>
+        <item quantity="two">عنصران في سلتك</item>
+        <item quantity="few">%d عناصر في سلتك</item>
+        <item quantity="many">%d عنصرًا في سلتك</item>
+        <item quantity="other">%d عنصر في سلتك</item>
+    </plurals>
+    <string name="loc_language_label">لغة التطبيق</string>
+    <string name="loc_language_system">النظام</string>
+    <string name="loc_show_details">عرض التفاصيل</string>
+    <string name="loc_detail_title">تفاصيل مترجمة</string>
+
+    <string name="detail_default_title">التفاصيل</string>
+    <string name="detail_default_body">هذه شاشة التفاصيل. إنها نشاط ثانٍ مع زر للرجوع إلى الأعلى.</string>
+</resources>

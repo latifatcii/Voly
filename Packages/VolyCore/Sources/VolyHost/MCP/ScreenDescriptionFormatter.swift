@@ -30,14 +30,17 @@ public struct ScreenDescriptionFormatter: Sendable {
 
     // MARK: - Whole screen
 
-    public func header(for screen: ScreenDescription, simulator: String?) -> String {
+    public func header(for screen: ScreenDescription, simulator: String?, platform: MCPPlatform = .iOS) -> String {
         var first = screen.appName
         if let bundle = screen.bundleIdentifier { first += " (\(bundle))" }
         if let simulator { first += " in \(simulator)" }
-        var second = "Screen \(Self.number(screen.screenSize.width))×\(Self.number(screen.screenSize.height)) pt"
+        let android = platform == .android
+        var second = "Screen \(Self.number(screen.screenSize.width))×\(Self.number(screen.screenSize.height)) \(android ? "dp" : "pt")"
             + " @\(Self.number(screen.scale))x, \(screen.orientation.rawValue), \(screen.appearance) mode"
-            + ", text size \(screen.contentSizeCategory)."
-        if let top = screen.topViewController { second += " Top view controller: \(Self.shortClassName(top))." }
+            + (android ? ", font scale \(screen.contentSizeCategory)." : ", text size \(screen.contentSizeCategory).")
+        if let top = screen.topViewController {
+            second += android ? " Top screen: \(Self.shortClassName(top))." : " Top view controller: \(Self.shortClassName(top))."
+        }
         return first + "\n" + second
     }
 
@@ -46,6 +49,20 @@ public struct ScreenDescriptionFormatter: Sendable {
         Lines starting with ~ are accessibility elements inside a view (how SwiftUI content appears). \
         ⚠ marks a likely layout problem. Use a #id with get_view, screenshot or set_property.
         """
+
+    /// The same, in Android's words: frames are dp from the display's
+    /// top-left corner, `id=` is the view's `android:id`, and `~` lines are
+    /// Jetpack Compose semantics nodes.
+    public static let androidLegend = """
+        One line per view: Class #id x,y width×height (dp, from the display's top-left corner), then what it \
+        shows; id= is the view's android:id and vc= the activity or fragment it is the root of. \
+        Lines starting with ~ are semantics nodes inside a view (how Jetpack Compose content appears). \
+        ⚠ marks a likely layout problem. Use a #id with get_view, screenshot or set_property.
+        """
+
+    public static func legend(for platform: MCPPlatform) -> String {
+        platform == .android ? androidLegend : legend
+    }
 
     /// The view tree, cut by depth if it would exceed the budget.
     public func tree(for screen: ScreenDescription) -> Tree {

@@ -115,6 +115,18 @@ private final class MCPSessionBridge: MCPInspecting {
         let simulators = session.simulators.simulators
         return session.connections.peers.map { peer in
             let isShown = session.state.activePeerID == peer.id
+            if let serial = peer.androidSerial {
+                return MCPApp(
+                    id: peer.id,
+                    name: peer.displayName,
+                    bundleIdentifier: peer.bundleIdentifier,
+                    pid: peer.pid,
+                    simulatorUDID: serial,
+                    simulatorName: session.android.device(serial: serial)?.displayName,
+                    isShownInVoly: isShown,
+                    platform: .android
+                )
+            }
             return MCPApp(
                 id: peer.id,
                 name: peer.displayName,
@@ -130,6 +142,7 @@ private final class MCPSessionBridge: MCPInspecting {
     func overview() async -> MCPOverview {
         guard let session else { return MCPOverview(simulators: [], apps: []) }
         await session.simulators.refreshAndWait(includingRunningApps: true)
+        await session.android.refreshAndWait()
         await session.refreshDiscovery()
         let simulators = session.simulators.simulators.map { simulator in
             MCPSimulator(
@@ -141,7 +154,8 @@ private final class MCPSessionBridge: MCPInspecting {
                 appsWithoutAgent: simulator.runningApps.filter { !$0.isInstrumented }.map(\.bundleIdentifier)
             )
         }
-        return MCPOverview(simulators: simulators, apps: await apps())
+        let androidDevices = session.android.snapshot.devices.map(AndroidMCP.simulator)
+        return MCPOverview(simulators: simulators + androidDevices, apps: await apps())
     }
 
     private static func describe(_ simulator: VolySimulatorManager.Simulator) -> String {
@@ -191,7 +205,16 @@ private final class MCPSessionBridge: MCPInspecting {
 
     func relaunch(bundleIdentifier: String, simulatorUDID: String) async throws {
         guard let session else { throw WebSocketClient.ClientError.notConnected }
+        if session.android.isAndroidDevice(simulatorUDID) {
+            try await session.android.relaunch(package: bundleIdentifier, on: simulatorUDID)
+            return
+        }
         try await session.simulators.relaunch(bundleIdentifier: bundleIdentifier, on: simulatorUDID)
+    }
+
+    func captureDisplay(of app: MCPApp) async throws -> Data? {
+        guard app.platform == .android, let serial = app.simulatorUDID, let session else { return nil }
+        return try await session.android.screenshot(serial: serial)
     }
 
     func noteToolCall(_ name: String) async {

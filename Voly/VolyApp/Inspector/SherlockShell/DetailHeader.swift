@@ -73,6 +73,8 @@ struct SelectionContextStrip: View {
     let node: ViewNode
     @Bindable var measurement: MeasurementPane
     let lastSummary: MeasurementSummary?
+    /// What distances are counted in: `pt`, or `dp` for an Android app.
+    var unit = "pt"
     let source: SourceLookupState
     let onOpenSource: (SourceLocation) -> Void
 
@@ -110,7 +112,7 @@ struct SelectionContextStrip: View {
             Image(systemName: "ruler")
                 .font(.system(size: 10))
                 .foregroundStyle(VolyTheme.measurement)
-            Text(Self.summaryText(summary))
+            Text(Self.summaryText(summary, unit: unit))
                 .font(VolyTheme.code(11))
                 .foregroundStyle(VolyTheme.text)
             Spacer(minLength: 0)
@@ -126,15 +128,16 @@ struct SelectionContextStrip: View {
         }
     }
 
-    private static func summaryText(_ s: MeasurementSummary) -> String {
+    /// - Parameter unit: `pt`, or `dp` for an Android app.
+    private static func summaryText(_ s: MeasurementSummary, unit: String) -> String {
         switch s.kind {
         case .sameView:    return "same view"
         case .overlap:     return "overlap"
         case .crossWindow: return "different windows"
         case .sideBySide, .containment:
             var parts: [String] = []
-            if let h = s.horizontal { parts.append("↔ \(Int(h.rounded())) pt") }
-            if let v = s.vertical   { parts.append("↕ \(Int(v.rounded())) pt") }
+            if let h = s.horizontal { parts.append("↔ \(Int(h.rounded())) \(unit)") }
+            if let v = s.vertical   { parts.append("↕ \(Int(v.rounded())) \(unit)") }
             return parts.joined(separator: "   ")
         }
     }

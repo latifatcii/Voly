@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings of the demo screens that are deliberately left untranslated. -->
+<resources>
+    <string name="long_sample_text">The quick brown fox jumps over the lazy dog, then keeps running across the whole screen and far beyond the edge of this label, so this text can never fit in the space it was given.</string>
+
+    <!-- Constraint demo -->
+    <string name="constraint_title">ConstraintLayout</string>
+    <string name="constraint_avatar_description">Avatar</string>
+    <string name="constraint_name">Ada Lovelace</string>
+    <string name="constraint_caption">0dp wide: stretches from the avatar to the parent\'s end</string>
+    <string name="constraint_left">Left of guideline</string>
+    <string name="constraint_right">Right of guideline</string>
+    <string name="constraint_biased">bias 0.8</string>
+    <string name="constraint_bottom">Pinned to the bottom, centered</string>
+
+    <!-- Form controls -->
+    <string name="forms_name_hint">Full name</string>
+    <string name="forms_password_hint">Password</string>
+    <string name="forms_switch">Notifications</string>
+    <string name="forms_checkbox">I agree to the terms</string>
+    <string name="forms_volume_value">Volume: %1$d</string>
+    <string name="forms_radio_small">Small</string>
+    <string name="forms_radio_medium">Medium</string>
+    <string name="forms_radio_large">Large</string>
+    <string-array name="forms_spinner_entries">
+        <item>Mercury</item>
+        <item>Venus</item>
+        <item>Earth</item>
+        <item>Mars</item>
+    </string-array>
+    <string name="forms_submit">Submit</string>
+    <string name="forms_disabled">Disabled</string>
+    <string name="forms_star_description">Star</string>
+    <string name="forms_status_idle">Not submitted</string>
+    <string name="forms_status_submitted">Submitted: name=%1$s, switch=%2$s, planet=%3$s</string>
+
+    <!-- Localization -->
+    <string name="loc_lang_en">English</string>
+    <string name="loc_lang_tr">Türkçe</string>
+    <string name="loc_lang_fr">Français</string>
+    <string name="loc_lang_ar">العربية</string>
+
+    <!-- Layout problems -->
+    <string name="problems_zero_label">0dp without weight →</string>
+    <string name="problems_offscreen">Off-screen (translationX)</string>
+    <string name="problems_translucent">alpha 0.4</string>
+    <string name="problems_invisible">Invisible, still takes space</string>
+    <string name="problems_gone">Gone, takes no space</string>
+    <string name="problems_rounded">Rounded shape with stroke</string>
+    <string name="problems_card">Card: 8dp elevation, 16dp corners</string>
+    <string name="problems_plain_card">Plain card: 16dp corners</string>
+    <string name="problems_overlap_back">Back</string>
+    <string name="problems_overlap_front">Front (overlaps)</string>
+    <string name="problems_tiny">×</string>
+
+    <!-- Gallery -->
+    <string name="gallery_cell_label">Cell %1$d</string>
+
+    <!-- Compose -->
+    <string name="compose_title">Compose demo</string>
+    <string name="compose_button">Clicked %1$d times</string>
+    <string name="compose_toggles_state">switch=%1$s, checkbox=%2$s</string>
+    <string name="compose_note_label">Note</string>
+    <string name="compose_row">Lazy row %1$d</string>
+
+    <!-- Dialogs -->
+    <string name="dialogs_alert">Show alert dialog</string>
+    <string name="dialogs_sheet">Show bottom sheet</string>
+    <string name="dialogs_popup">Show popup menu</string>
+    <string name="dialogs_result_idle">Nothing chosen yet</string>
+    <string name="dialogs_result_ok">Alert: OK</string>
+    <string name="dialogs_result_cancel">Alert: Cancel</string>
+    <string name="dialogs_result_menu">Menu: %1$s</string>
+    <string name="dialogs_alert_title">Delete draft?</string>
+    <string name="dialogs_alert_message">This is a MaterialAlertDialogBuilder dialog.</string>
+    <string name="sheet_title">Bottom sheet</string>
+    <string name="sheet_message">This is a BottomSheetDialogFragment.</string>
+    <string name="sheet_close">Close</string>
+    <string name="popup_copy">Copy</string>
+    <string name="popup_share">Share</string>
+    <string name="popup_delete">Delete</string>
+
+    <!-- Preferences -->
+    <string name="prefs_counter_label">counter (Int)</string>
+    <string name="prefs_increment">Increment</string>
+    <string name="prefs_flag">flag_enabled (Boolean)</string>
+    <string name="prefs_name_hint">display_name (String)</string>
+    <string name="prefs_scale_label">text_scale (Float)</string>
+    <string name="prefs_last_saved_label">last_saved_at (Long)</string>
+    <string name="prefs_favorites_label">favorite_demos (String set)</string>
+    <string name="prefs_reset">Reset to initial values</string>
+</resources>

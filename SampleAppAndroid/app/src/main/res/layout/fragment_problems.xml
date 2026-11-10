@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Every view here is wrong on purpose; the comments say how. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/problems_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/problems_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Truncated: one line, fixed 180dp width, text far too long. -->
+        <TextView
+            android:id="@+id/problems_truncated_single"
+            android:layout_width="180dp"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/long_sample_text" />
+
+        <!-- Truncated: needs more than the two lines it is allowed. -->
+        <TextView
+            android:id="@+id/problems_truncated_multi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:text="@string/long_sample_text" />
+
+        <LinearLayout
+            android:id="@+id/problems_zero_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/problems_zero_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/problems_zero_label" />
+
+            <!-- Zero size: 0dp width in a LinearLayout, but no layout_weight. -->
+            <View
+                android:id="@+id/problems_zero_width"
+                android:layout_width="0dp"
+                android:layout_height="24dp"
+                android:background="@color/swatch_red"
+                tools:ignore="Suspicious0dp" />
+        </LinearLayout>
+
+        <!-- Laid out normally, then drawn 2000dp to the side: off-screen. -->
+        <TextView
+            android:id="@+id/problems_offscreen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/swatch_purple"
+            android:padding="8dp"
+            android:text="@string/problems_offscreen"
+            android:textColor="@android:color/white"
+            android:translationX="2000dp" />
+
+        <TextView
+            android:id="@+id/problems_translucent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:alpha="0.4"
+            android:background="@color/swatch_blue"
+            android:padding="8dp"
+            android:text="@string/problems_translucent"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/problems_invisible"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/swatch_green"
+            android:padding="8dp"
+            android:text="@string/problems_invisible"
+            android:visibility="invisible" />
+
+        <TextView
+            android:id="@+id/problems_gone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/swatch_amber"
+            android:padding="8dp"
+            android:text="@string/problems_gone"
+            android:visibility="gone" />
+
+        <!-- Background is a GradientDrawable (shape XML) with corners and a stroke. -->
+        <TextView
+            android:id="@+id/problems_rounded_stroke"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_rounded_stroke"
+            android:padding="16dp"
+            android:text="@string/problems_rounded"
+            android:textColor="@android:color/black" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/problems_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp">
+
+            <TextView
+                android:id="@+id/problems_card_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="@string/problems_card" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- A plain CardView paints its rounded background itself, without a Material shape. -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/problems_plain_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="@string/problems_plain_card" />
+        </androidx.cardview.widget.CardView>
+
+        <!-- Overlap: the front view covers part of the back one. -->
+        <FrameLayout
+            android:id="@+id/problems_overlap_frame"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:layout_marginTop="16dp">
+
+            <TextView
+                android:id="@+id/problems_overlap_back"
+                android:layout_width="160dp"
+                android:layout_height="48dp"
+                android:background="@color/swatch_blue"
+                android:gravity="center"
+                android:text="@string/problems_overlap_back"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/problems_overlap_front"
+                android:layout_width="160dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="96dp"
+                android:layout_marginTop="20dp"
+                android:background="@color/swatch_red"
+                android:gravity="center"
+                android:text="@string/problems_overlap_front"
+                android:textColor="@android:color/white" />
+        </FrameLayout>
+
+        <!-- Touch target far below 48dp. -->
+        <TextView
+            android:id="@+id/problems_tiny_button"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginTop="12dp"
+            android:background="@color/swatch_amber"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="@string/problems_tiny" />
+    </LinearLayout>
+</ScrollView>

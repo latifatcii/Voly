@@ -46,6 +46,8 @@ struct PeerListView: View {
                 }
             }
 
+            AndroidDevicesSection(session: session)
+
             let others = otherPeers
             if !others.isEmpty {
                 VolySection("Other agents") {
@@ -280,6 +282,8 @@ struct PeerListView: View {
     private var otherPeers: [ConnectionManager.Peer] {
         let listed = Set(simulators.simulators.map(\.id))
         return session.connections.peers.filter { peer in
+            // Android apps have their own section.
+            guard peer.androidSerial == nil else { return false }
             guard let udid = peer.deviceUDID else { return true }
             return !listed.contains(udid)
         }

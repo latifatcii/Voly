@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Translated in values-tr, values-fr and values-ar. Demo-only strings live in donottranslate.xml. -->
+<resources>
+    <string name="app_name">Voly Sample</string>
+
+    <string name="demo_constraint_title">Constraint layout</string>
+    <string name="demo_constraint_subtitle">Views constrained to each other</string>
+    <string name="demo_forms_title">Form controls</string>
+    <string name="demo_forms_subtitle">Inputs, toggles and buttons</string>
+    <string name="demo_localization_title">Localization</string>
+    <string name="demo_localization_subtitle">Translated strings and right-to-left</string>
+    <string name="demo_problems_title">Layout problems</string>
+    <string name="demo_problems_subtitle">Truncated, hidden and zero-size views</string>
+    <string name="demo_gallery_title">Gallery</string>
+    <string name="demo_gallery_subtitle">A grid of colored cells</string>
+    <string name="demo_compose_title">Compose</string>
+    <string name="demo_compose_subtitle">A Jetpack Compose screen</string>
+    <string name="demo_dialogs_title">Dialogs</string>
+    <string name="demo_dialogs_subtitle">Alert, bottom sheet and popup menu</string>
+    <string name="demo_prefs_title">Preferences</string>
+    <string name="demo_prefs_subtitle">SharedPreferences values</string>
+
+    <string name="loc_heading">Welcome to Voly</string>
+    <string name="loc_greeting">Hello, %1$s!</string>
+    <string name="loc_current_locale">Current locale: %1$s</string>
+    <string name="loc_long_text">This paragraph is intentionally long. It is here so you can see how a translated text wraps over several lines, how much longer or shorter it becomes in another language, and how the layout mirrors when the language is written from right to left.</string>
+    <plurals name="loc_items_count">
+        <item quantity="one">%d item in your cart</item>
+        <item quantity="other">%d items in your cart</item>
+    </plurals>
+    <string name="loc_language_label">App language</string>
+    <string name="loc_language_system">System</string>
+    <string name="loc_show_details">Show details</string>
+    <string name="loc_detail_title">Localized details</string>
+
+    <string name="detail_default_title">Details</string>
+    <string name="detail_default_body">This is the detail screen. It is a second activity with an Up button.</string>
+</resources>

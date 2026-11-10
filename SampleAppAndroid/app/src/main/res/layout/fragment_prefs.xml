@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/prefs_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/prefs_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Default file: <package>_preferences -->
+        <LinearLayout
+            android:id="@+id/prefs_counter_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/prefs_counter_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/prefs_counter_label" />
+
+            <TextView
+                android:id="@+id/prefs_counter_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+            <Button
+                android:id="@+id/prefs_increment_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/prefs_increment" />
+        </LinearLayout>
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/prefs_flag_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/prefs_flag" />
+
+        <EditText
+            android:id="@+id/prefs_name_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/prefs_name_hint"
+            android:importantForAutofill="no"
+            android:inputType="text" />
+
+        <!-- Second file: voly_sample_settings -->
+        <LinearLayout
+            android:id="@+id/prefs_scale_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/prefs_scale_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:labelFor="@id/prefs_scale_seekbar"
+                android:text="@string/prefs_scale_label" />
+
+            <TextView
+                android:id="@+id/prefs_scale_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- progress / 100 = text_scale -->
+        <SeekBar
+            android:id="@+id/prefs_scale_seekbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="200"
+            android:min="50"
+            android:minHeight="48dp" />
+
+        <LinearLayout
+            android:id="@+id/prefs_last_saved_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/prefs_last_saved_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/prefs_last_saved_label" />
+
+            <TextView
+                android:id="@+id/prefs_last_saved_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/prefs_favorites_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/prefs_favorites_label" />
+
+        <!-- The labels are the literal values stored in the set. -->
+        <LinearLayout
+            android:id="@+id/prefs_favorites_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            tools:ignore="HardcodedText">
+
+            <CheckBox
+                android:id="@+id/prefs_fav_constraint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="constraint" />
+
+            <CheckBox
+                android:id="@+id/prefs_fav_forms"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="forms" />
+
+            <CheckBox
+                android:id="@+id/prefs_fav_gallery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="gallery" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/prefs_reset_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/prefs_reset" />
+
+        <!-- What is actually stored: default file, blank line, voly_sample_settings. -->
+        <TextView
+            android:id="@+id/prefs_dump"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>

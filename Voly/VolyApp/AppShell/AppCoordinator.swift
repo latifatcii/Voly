@@ -22,7 +22,8 @@ final class AppCoordinator {
     init(session: InspectorSession) {
         self.session = session
         self.window = InspectorWindowController(session: session)
-        let locator = AXSimulatorLocator()
+        // Docks next to an Android emulator window too, when one is in front.
+        let locator = DeviceWindowLocator()
         self.locator = locator
         self.attachment = SimulatorAttachment(
             locator: locator,
@@ -65,7 +66,9 @@ final class AppCoordinator {
         simulatorHotkey = FrontmostAppHotkey(
             keyCode: HotkeyDefaults.simulatorKeyCode,
             modifiers: HotkeyDefaults.simulatorModifiers,
-            whileFrontmost: scopedApps
+            whileFrontmost: scopedApps,
+            // The Android Emulator has no bundle identifier to list.
+            orWhen: AndroidEmulatorApp.isEmulator
         ) { [weak self] in
             self?.toggleInspector()
         }
@@ -74,6 +77,9 @@ final class AppCoordinator {
         // the user had turned on. Fire-and-forget; failures surface in the
         // simulator list, they don't block the rest of startup.
         simulators.start()
+        // Android emulators: does nothing unless adb is installed and its
+        // server is already running.
+        session.android.start()
     }
 
     func toggleInspector() {

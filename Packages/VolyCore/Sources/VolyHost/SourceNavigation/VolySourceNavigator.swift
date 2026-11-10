@@ -97,6 +97,10 @@ public struct VolySourceNavigator: Sendable {
     // MARK: - Resolve
 
     public func resolve(_ info: SourceInfo) async -> SourceLookup {
+        // An Android app has no debug info to ask; its classes are found by name.
+        if info.isAndroid {
+            return await AndroidSourceResolver(searchFiles: searchFiles, readFile: readFile).resolve(info)
+        }
         let candidates = info.candidates ?? []
         guard !candidates.isEmpty else {
             // Nothing app-defined on or around the selection.
@@ -232,8 +236,13 @@ public struct VolySourceNavigator: Sendable {
 
     // MARK: - Open
 
-    /// Open in Xcode, at `line` when there is one.
+    /// Open in Xcode, at `line` when there is one. Kotlin, Java and Android
+    /// resource files go to Android Studio instead.
     public func open(_ location: SourceLocation) async throws {
+        if Self.isAndroidSource(location.path) {
+            try await openInAndroidStudio(location)
+            return
+        }
         var arguments: [String] = []
         if let line = location.line { arguments += ["--line", String(line)] }
         arguments.append(location.path)
@@ -243,6 +252,36 @@ public struct VolySourceNavigator: Sendable {
         guard result.exitCode == 0 else {
             throw NSError(domain: "VolySourceNavigator", code: Int(result.exitCode), userInfo: [
                 NSLocalizedDescriptionKey: "xed could not open \(location.path): "
+                    + (String(data: result.stderr, encoding: .utf8) ?? ""),
+            ])
+        }
+    }
+
+    static func isAndroidSource(_ path: String) -> Bool {
+        let lowered = path.lowercased()
+        return lowered.hasSuffix(".kt") || lowered.hasSuffix(".java")
+            || (lowered.hasSuffix(".xml") && lowered.contains("/res/"))
+    }
+
+    /// Android Studio takes `--line N <file>` like the other JetBrains IDEs;
+    /// `open -na` hands it to the running instance. Without Android Studio
+    /// the file opens in whatever the Mac uses for it.
+    private func openInAndroidStudio(_ location: SourceLocation) async throws {
+        let open = URL(fileURLWithPath: "/usr/bin/open")
+        let studio = ["/Applications/Android Studio.app", NSHomeDirectory() + "/Applications/Android Studio.app"]
+            .first(where: fileExists)
+        var arguments: [String]
+        if let studio {
+            arguments = ["-na", studio, "--args"]
+            if let line = location.line { arguments += ["--line", String(line)] }
+            arguments.append(location.path)
+        } else {
+            arguments = [location.path]
+        }
+        let result = try await shell.run(executable: open, arguments: arguments, environment: nil)
+        guard result.exitCode == 0 else {
+            throw NSError(domain: "VolySourceNavigator", code: Int(result.exitCode), userInfo: [
+                NSLocalizedDescriptionKey: "Could not open \(location.path): "
                     + (String(data: result.stderr, encoding: .utf8) ?? ""),
             ])
         }

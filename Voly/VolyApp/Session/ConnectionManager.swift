@@ -14,6 +14,8 @@ final class ConnectionManager {
     enum Source: Hashable {
         case bonjour
         case portFile(deviceUDID: String)
+        /// An Android app, reached through a port adb forwards to its agent.
+        case android(serial: String)
     }
 
     struct Peer: Identifiable, Hashable {
@@ -32,6 +34,12 @@ final class ConnectionManager {
             if case .portFile(let udid) = source { return udid }
             return nil
         }
+
+        /// adb serial of the emulator or device, for an Android app.
+        var androidSerial: String? {
+            if case .android(let serial) = source { return serial }
+            return nil
+        }
     }
 
     private(set) var peers: [Peer] = []
@@ -46,6 +54,7 @@ final class ConnectionManager {
 
     private var bonjourPeers: [Peer] = []
     private var filePeers: [Peer] = []
+    private var androidPeers: [Peer] = []
 
     // MARK: - Bonjour
 
@@ -115,10 +124,29 @@ final class ConnectionManager {
         recomputeAndAnnounce()
     }
 
+    // MARK: - Android agents
+
+    /// Replace the Android peer set with the agents currently attached.
+    func updateAndroidPeers(_ agents: [AndroidAgentEndpoint]) {
+        androidPeers = agents.map { agent in
+            // Same handle the MCP tools use; the pid makes a relaunch a new peer.
+            Peer(
+                id: AndroidMCP.appID(agent),
+                displayName: agent.label,
+                endpoint: .hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: agent.port) ?? .any),
+                source: .android(serial: agent.serial),
+                bundleIdentifier: agent.package,
+                pid: agent.pid,
+                token: agent.token
+            )
+        }
+        recomputeAndAnnounce()
+    }
+
     // MARK: - Merge
 
     private func recomputeAndAnnounce() {
-        let merged = bonjourPeers + filePeers
+        let merged = bonjourPeers + filePeers + androidPeers
         self.peers = merged
 
         for peer in merged where !announcedPeers.contains(peer.id) {

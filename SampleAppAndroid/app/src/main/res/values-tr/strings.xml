@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Voly Örnek</string>
+
+    <string name="demo_constraint_title">Kısıtlama düzeni</string>
+    <string name="demo_constraint_subtitle">Birbirine bağlanmış görünümler</string>
+    <string name="demo_forms_title">Form denetimleri</string>
+    <string name="demo_forms_subtitle">Girişler, anahtarlar ve düğmeler</string>
+    <string name="demo_localization_title">Yerelleştirme</string>
+    <string name="demo_localization_subtitle">Çevrilmiş metinler ve sağdan sola düzen</string>
+    <string name="demo_problems_title">Düzen sorunları</string>
+    <string name="demo_problems_subtitle">Kesilmiş, gizli ve sıfır boyutlu görünümler</string>
+    <string name="demo_gallery_title">Galeri</string>
+    <string name="demo_gallery_subtitle">Renkli hücrelerden oluşan bir ızgara</string>
+    <string name="demo_compose_title">Compose</string>
+    <string name="demo_compose_subtitle">Bir Jetpack Compose ekranı</string>
+    <string name="demo_dialogs_title">İletişim kutuları</string>
+    <string name="demo_dialogs_subtitle">Uyarı, alt sayfa ve açılır menü</string>
+    <string name="demo_prefs_title">Tercihler</string>
+    <string name="demo_prefs_subtitle">SharedPreferences değerleri</string>
+
+    <string name="loc_heading">Voly\'ye hoş geldiniz</string>
+    <string name="loc_greeting">Merhaba, %1$s!</string>
+    <string name="loc_current_locale">Geçerli dil: %1$s</string>
+    <string name="loc_long_text">Bu paragraf bilerek uzun tutuldu. Çevrilmiş bir metnin birkaç satıra nasıl yayıldığını, başka bir dilde ne kadar uzadığını ya da kısaldığını ve dil sağdan sola yazıldığında düzenin nasıl aynalandığını görebilmeniz için burada.</string>
+    <plurals name="loc_items_count">
+        <item quantity="one">Sepetinizde %d ürün var</item>
+        <item quantity="other">Sepetinizde %d ürün var</item>
+    </plurals>
+    <string name="loc_language_label">Uygulama dili</string>
+    <string name="loc_language_system">Sistem</string>
+    <string name="loc_show_details">Ayrıntıları göster</string>
+    <string name="loc_detail_title">Yerelleştirilmiş ayrıntılar</string>
+
+    <string name="detail_default_title">Ayrıntılar</string>
+    <string name="detail_default_body">Bu ayrıntı ekranı. Yukarı düğmesi olan ikinci bir etkinliktir.</string>
+</resources>
