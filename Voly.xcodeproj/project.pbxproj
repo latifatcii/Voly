@@ -47,6 +47,7 @@
 		D095A54A980D8E5C25BEBC38 /* LayerProps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D0A5ECB60BAC41E5F077AB /* LayerProps.swift */; };
 		DACD14D1A81B10D1FE18066F /* VolyNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE4094748F331F3E782D7DA /* VolyNavigationController.swift */; };
 		DCD509FE14BAB0EB7E1E747A /* MutationExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6996815536348FB1CD302E4 /* MutationExecutor.swift */; };
+		7A3E91C2D45F60B8E1924C07 /* TextStyleKeeper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F8B04D6A91C37E5B60D48A3 /* TextStyleKeeper.swift */; };
 		E4DF655999BF4E0681FB9588 /* ScreenshotRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1C6C1FF210A37D90B94D89 /* ScreenshotRenderer.swift */; };
 		E60027BC3EF15C79A92F9490 /* ScreenDescriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4409E825807A9062FD6EC1E8 /* ScreenDescriber.swift */; };
 		E6D40A0A556DF4CA5714BA58 /* PortFilePublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563B4AC86FEF448212080910 /* PortFilePublisher.swift */; };
@@ -113,6 +114,7 @@
 		B36F062D6E3492DD5C34FA99 /* Framing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Framing.swift; sourceTree = "<group>"; };
 		B4B7299DCC910828A0ED9532 /* VolyAgent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VolyAgent.swift; sourceTree = "<group>"; };
 		B6996815536348FB1CD302E4 /* MutationExecutor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MutationExecutor.swift; sourceTree = "<group>"; };
+		2F8B04D6A91C37E5B60D48A3 /* TextStyleKeeper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TextStyleKeeper.swift; sourceTree = "<group>"; };
 		B795FF470C0F42B181962F54 /* LayerProps+CALayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "LayerProps+CALayer.swift"; sourceTree = "<group>"; };
 		BA9301694EE44677850F1997 /* VolyAgentLoader.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = VolyAgentLoader.h; sourceTree = "<group>"; };
 		C6E4A3E5BA6DC5AED6BC0DEC /* UserDefaultsProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsProvider.swift; sourceTree = "<group>"; };
@@ -435,6 +437,7 @@
 			isa = PBXGroup;
 			children = (
 				B6996815536348FB1CD302E4 /* MutationExecutor.swift */,
+				2F8B04D6A91C37E5B60D48A3 /* TextStyleKeeper.swift */,
 			);
 			path = Mutation;
 			sourceTree = "<group>";
@@ -662,6 +665,7 @@
 				6CBE3658B36661136FFA1556 /* VolyAgentInjection.swift in Sources */,
 				EA0364947366642CEF3240BF /* UserDefaultsProvider.swift in Sources */,
 				DCD509FE14BAB0EB7E1E747A /* MutationExecutor.swift in Sources */,
+				7A3E91C2D45F60B8E1924C07 /* TextStyleKeeper.swift in Sources */,
 				4B5AA9B6C146F85A360C7EFD /* PreviewHostVC.swift in Sources */,
 				80062E0C332A2A675333647B /* ObjectRegistry.swift in Sources */,
 				CC3E024B9687E46F9E3CB015 /* RuntimeScanner.swift in Sources */,

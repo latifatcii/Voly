@@ -13,9 +13,11 @@ import VolyProtocol
 @MainActor
 public final class MutationExecutor {
     unowned let registry: ObjectRegistry
+    let texts: TextStyleKeeper
 
     public init(registry: ObjectRegistry) {
         self.registry = registry
+        self.texts = TextStyleKeeper()
     }
 
     public func applyProperty(_ request: SetPropertyRequest) throws {
@@ -32,7 +34,7 @@ public final class MutationExecutor {
             try LayerOps.apply(request.change, to: view.layer)
         case .custom:
             guard let view = target as? UIView else { throw InspectorError.objectGone(request.objectID) }
-            try CustomOps.apply(request.change, to: view)
+            try CustomOps.apply(request.change, to: view, texts: texts)
         }
     }
 
@@ -120,7 +122,7 @@ enum LayerOps {
 
 @MainActor
 enum CustomOps {
-    static func apply(_ change: PropertyChange, to view: UIView) throws {
+    static func apply(_ change: PropertyChange, to view: UIView, texts: TextStyleKeeper) throws {
         if let setter = CustomInspectableRegistry.shared.setter(for: view, named: change.property) {
             setter(view, change.value)
             view.setNeedsLayout()
@@ -130,6 +132,12 @@ enum CustomOps {
         let sel = NSSelectorFromString("set\(change.property.volyCapitalizedFirst):")
         guard view.responds(to: sel) else {
             throw InspectorError.unsupportedProperty(change.property)
+        }
+        // Text is the one value whose plain setter restyles what it replaces;
+        // set it so that the font and the rest of the styling stay as they are.
+        if case .string(let text) = change.value, texts.setText(text, property: change.property, on: view) {
+            view.setNeedsLayout()
+            return
         }
         switch change.value {
         case .string(let s): view.setValue(s, forKey: change.property)

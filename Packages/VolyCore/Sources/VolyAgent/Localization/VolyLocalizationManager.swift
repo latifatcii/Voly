@@ -33,8 +33,12 @@ public final class VolyLocalizationManager {
     /// Languages whose strings may currently be on screen: the app's own
     /// resolution plus every override applied this session.
     private var displayedLanguages: Set<String> = []
+    /// Refreshed text keeps the styling of the text it replaces.
+    private let texts: TextStyleKeeper
 
-    public init() {}
+    public init() {
+        self.texts = TextStyleKeeper()
+    }
 
     // MARK: - State
 
@@ -262,7 +266,9 @@ public final class VolyLocalizationManager {
             return
         case let field as UITextField:
             // Placeholder only — `text` is the user's input.
-            if let new = translate(field.placeholder) { field.placeholder = new }
+            if let new = translate(field.placeholder), !texts.setText(new, property: "placeholder", on: field) {
+                field.placeholder = new
+            }
             return
         case let segmented as UISegmentedControl:
             for segment in 0..<segmented.numberOfSegments {
@@ -273,14 +279,16 @@ public final class VolyLocalizationManager {
             return
         case let textView as UITextView:
             if !textView.isEditable, Self.hasUniformAttributes(textView.attributedText),
-               let new = translate(textView.text) {
+               let new = translate(textView.text), !texts.setText(new, property: "text", on: textView) {
                 textView.text = new
             }
             return
         case let label as UILabel:
-            // Setting `text` keeps label-level styling but would flatten a
-            // multi-run attributed string, so those are left alone.
-            if Self.hasUniformAttributes(label.attributedText), let new = translate(label.text) {
+            // A translation replaces the whole string, which would flatten a
+            // multi-run attributed string, so those are left alone. A single
+            // run keeps its styling (line height, letter spacing, …).
+            if Self.hasUniformAttributes(label.attributedText), let new = translate(label.text),
+               !texts.setText(new, property: "text", on: label) {
                 label.text = new
             }
             return
@@ -295,8 +303,15 @@ public final class VolyLocalizationManager {
     private func refresh(button: UIButton, translate: (String?) -> String?) {
         if var configuration = button.configuration {
             var changed = false
-            if let new = translate(configuration.title) { configuration.title = new; changed = true }
-            if let new = translate(configuration.subtitle) { configuration.subtitle = new; changed = true }
+            // Assigning `title` would drop the attributes of an attributed title.
+            if let new = translate(configuration.title) {
+                TextStyleKeeper.setTitle(new, in: &configuration)
+                changed = true
+            }
+            if let new = translate(configuration.subtitle) {
+                TextStyleKeeper.setSubtitle(new, in: &configuration)
+                changed = true
+            }
             if changed { button.configuration = configuration }
             return
         }
