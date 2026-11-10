@@ -126,19 +126,122 @@ final class AndroidDiscoveryTests: XCTestCase {
     }
 
     func test_the_running_servers_own_adb_is_preferred() {
+        // adb starts its server under the bare name, whatever path the client ran from.
         let processes = """
-            /sbin/launchd
-            /Users/John Doe/Library/Android/sdk/platform-tools/adb -L tcp:5037 fork-server server --reply-fd 4
-            /Applications/Android Studio.app/Contents/MacOS/studio
-            grep adb fork-server server
+              1 /sbin/launchd
+            412 grep adb fork-server server
+            734 adb -L tcp:5037 fork-server server --reply-fd 4
+            801 /Applications/Android Studio.app/Contents/MacOS/studio
             """
+        let files: [Int32: String] = [
+            412: "/usr/bin/grep", 734: "/Users/John Doe/Library/Android/sdk/platform-tools/adb",
+        ]
+        XCTAssertEqual(AdbLocator.serverProcessIDs(processList: processes), [734])
         XCTAssertEqual(
-            AdbLocator.serverExecutable(processList: processes, isExecutable: { _ in true })?.path,
+            AdbLocator.serverExecutable(
+                processList: processes, executablePath: { files[$0] }, isExecutable: { _ in true }
+            )?.path,
             "/Users/John Doe/Library/Android/sdk/platform-tools/adb"
         )
-        XCTAssertNil(AdbLocator.serverExecutable(processList: processes, isExecutable: { _ in false }))
-        XCTAssertNil(AdbLocator.serverExecutable(processList: "/usr/bin/adb devices\n", isExecutable: { _ in true }))
+        XCTAssertNil(AdbLocator.serverExecutable(
+            processList: processes, executablePath: { files[$0] }, isExecutable: { _ in false }
+        ))
+        XCTAssertNil(AdbLocator.serverExecutable(
+            processList: processes, executablePath: { _ in nil }, isExecutable: { _ in true }
+        ))
     }
+
+    func test_a_server_started_by_its_full_path_is_recognised_too() {
+        let processes = "  95 /Users/John Doe/sdk/platform-tools/adb -L tcp:5037 fork-server server --reply-fd 4\n"
+        XCTAssertEqual(AdbLocator.serverProcessIDs(processList: processes), [95])
+    }
+
+    func test_other_adb_commands_are_not_the_server() {
+        XCTAssertEqual(AdbLocator.serverProcessIDs(processList: "  12 /usr/bin/adb devices\n  13 adb logcat\n"), [])
+        XCTAssertEqual(AdbLocator.serverProcessIDs(processList: "  14 notadb -L tcp:5037 fork-server server\n"), [])
+    }
+
+    func test_the_file_a_process_runs_is_read_from_the_system() throws {
+        // Started under another name, as adb's server is: the name in the
+        // command line is not where the file is.
+        let sleeper = Process()
+        sleeper.executableURL = URL(fileURLWithPath: "/bin/sh")
+        sleeper.arguments = ["-c", "exec -a adb /bin/sleep 30"]
+        try sleeper.run()
+        defer { sleeper.terminate() }
+        var path: String?
+        for _ in 0..<50 where path != "/bin/sleep" {
+            path = AdbLocator.executablePath(ofProcess: sleeper.processIdentifier)
+            usleep(20_000)
+        }
+        XCTAssertEqual(path, "/bin/sleep")
+        XCTAssertNil(AdbLocator.executablePath(ofProcess: 0x7FFF_FFF0))
+    }
+
+    func test_a_process_that_only_quotes_the_servers_command_line_is_passed_over() {
+        // A shell that started the server by hand is listed too, and first.
+        let processes = """
+            77 /bin/zsh -c exec x/adb -L tcp:5037 fork-server server
+            78 adb -L tcp:5037 fork-server server --reply-fd 4
+            """
+        let files: [Int32: String] = [77: "/bin/zsh", 78: "/sdk/platform-tools/adb"]
+        XCTAssertEqual(
+            AdbLocator.serverExecutable(
+                processList: processes, executablePath: { files[$0] }, isExecutable: { _ in true }
+            )?.path,
+            "/sdk/platform-tools/adb"
+        )
+        XCTAssertNil(AdbLocator.serverExecutable(
+            processList: "77 /bin/zsh -c exec x/adb -L tcp:5037 fork-server server\n",
+            executablePath: { files[$0] }, isExecutable: { _ in true }
+        ))
+    }
+
+    func test_running_a_command_collects_output_larger_than_a_pipe() async throws {
+        let shell = AdbClient(executable: URL(fileURLWithPath: "/bin/sh"))
+        let output = try await shell.run(["-c", "seq 1 60000; echo done >&2"], timeout: 20)
+        XCTAssertTrue(output.succeeded)
+        XCTAssertEqual(output.text.split(separator: "\n").count, 60000)
+        XCTAssertEqual(output.errorText, "done")
+    }
+
+    func test_an_executable_that_is_gone_is_an_error_not_a_hang() async {
+        let missing = AdbClient(executable: URL(fileURLWithPath: "/nonexistent/platform-tools/adb"))
+        do {
+            _ = try await missing.run(["devices"], timeout: 5)
+            XCTFail("expected an error")
+        } catch {}
+    }
+
+    func test_emulators_are_inspected_unless_switched_off_and_devices_only_once_switched_on() {
+        var policy = AndroidDevicePolicy()
+        XCTAssertTrue(policy.wants("emulator-5554"))
+        XCTAssertFalse(policy.wants("R58M12ABCDE"))
+        // An emulator reached over the network has no name that says what it is.
+        XCTAssertFalse(policy.wants("192.168.56.101:5555"))
+
+        policy.set(true, for: "R58M12ABCDE")
+        policy.set(false, for: "emulator-5554")
+        XCTAssertTrue(policy.wants("R58M12ABCDE"))
+        XCTAssertFalse(policy.wants("emulator-5554"))
+        XCTAssertEqual(policy, AndroidDevicePolicy(enabled: ["R58M12ABCDE"], disabled: ["emulator-5554"]))
+
+        policy.set(false, for: "R58M12ABCDE")
+        policy.set(true, for: "emulator-5554")
+        XCTAssertFalse(policy.wants("R58M12ABCDE"))
+        XCTAssertTrue(policy.wants("emulator-5554"))
+    }
+
+    #if canImport(AppKit)
+    func test_only_the_android_sdks_own_qemu_counts_as_the_emulator() {
+        let sdk = "/Users/me/Library/Android/sdk/emulator/qemu/darwin-aarch64"
+        XCTAssertTrue(AndroidEmulatorApp.isEmulator(executablePath: "\(sdk)/qemu-system-aarch64"))
+        XCTAssertTrue(AndroidEmulatorApp.isEmulator(executablePath: "\(sdk)/qemu-system-aarch64-headless"))
+        // Somebody's Linux machine in QEMU from Homebrew.
+        XCTAssertFalse(AndroidEmulatorApp.isEmulator(executablePath: "/opt/homebrew/bin/qemu-system-aarch64"))
+        XCTAssertFalse(AndroidEmulatorApp.isEmulator(executablePath: "/Users/me/Library/Android/sdk/emulator/emulator"))
+    }
+    #endif
 
     func test_png_size_is_read_from_the_header() {
         XCTAssertEqual(PNGSize.read(AndroidFixtures.onePixelPNG)?.width, 1)

@@ -70,3 +70,19 @@ jobs:
         run: AndroidAgent/build.sh "$RUNNER_TEMP/agent"
       - name: Built files
         run: ls -l "$RUNNER_TEMP/agent"
+      - name: The agent in the repository is what its version file says
+        run: scripts/check-android-agent.sh
+      # What ships is Voly/AndroidAgentPayload, not this build. Say so when
+      # the two differ: the agent was changed without build.sh being run, or
+      # this image's SDK compiles it differently.
+      - name: The agent in the repository matches this build
+        run: |
+          if diff -r "$RUNNER_TEMP/agent" Voly/AndroidAgentPayload; then
+            echo "identical"
+          else
+            echo "::warning::Voly/AndroidAgentPayload differs from a fresh build of AndroidAgent/src"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-agent
+          path: ${{ runner.temp }}/agent

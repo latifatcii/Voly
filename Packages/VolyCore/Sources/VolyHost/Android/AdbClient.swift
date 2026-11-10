@@ -96,28 +96,62 @@ public enum AdbLocator {
     /// This is the one to use whenever it can be told: an adb client of
     /// another version makes the server restart itself, which would cut off
     /// Android Studio's debugger and everything else attached through it.
+    ///
+    /// - Parameters:
+    ///   - processList: `ps -o pid=,args=` output.
+    ///   - executablePath: the file a process runs.
     public static func serverExecutable(
         processList: String,
+        executablePath: (Int32) -> String? = AdbLocator.executablePath(ofProcess:),
         isExecutable: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) -> URL? {
-        for line in processList.split(whereSeparator: \.isNewline) {
-            // `/path/to/adb -L tcp:5037 fork-server server --reply-fd 4`
-            guard let marker = line.range(of: " fork-server server") else { continue }
-            var command = String(line[..<marker.lowerBound])
-            if let listen = command.range(of: " -L ") { command = String(command[..<listen.lowerBound]) }
-            let path = command.trimmingCharacters(in: .whitespaces)
-            if path.hasPrefix("/"), (path as NSString).lastPathComponent == "adb", isExecutable(path) {
+        // The name is checked again on the file: a shell whose command
+        // line merely quotes the server's looks the same in the list.
+        for pid in serverProcessIDs(processList: processList) {
+            if let path = executablePath(pid), path.hasPrefix("/"),
+               (path as NSString).lastPathComponent == "adb", isExecutable(path) {
                 return URL(fileURLWithPath: path)
             }
         }
         return nil
     }
 
-    /// `serverExecutable` for the processes running now.
+    /// Process IDs of what reads as an adb server in `ps -o pid=,args=` output.
+    ///
+    /// The command line tells which process it is but not which file it
+    /// runs: adb starts its server as `adb -L tcp:5037 fork-server server
+    /// --reply-fd 4`, the bare name first, wherever the client was started from.
+    public static func serverProcessIDs(processList: String) -> [Int32] {
+        processList.split(whereSeparator: \.isNewline).compactMap { line -> Int32? in
+            let fields = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard fields.count == 2, let pid = Int32(fields[0]),
+                  let marker = fields[1].range(of: " fork-server server")
+            else { return nil }
+            var program = String(fields[1][..<marker.lowerBound])
+            if let listen = program.range(of: " -L ") { program = String(program[..<listen.lowerBound]) }
+            program = program.trimmingCharacters(in: .whitespaces)
+            return (program as NSString).lastPathComponent == "adb" ? pid : nil
+        }
+    }
+
+    /// The file a process runs, as the system has it.
+    public static func executablePath(ofProcess pid: Int32) -> String? {
+        #if os(Linux)
+        return try? FileManager.default.destinationOfSymbolicLink(atPath: "/proc/\(pid)/exe")
+        #else
+        // PROC_PIDPATHINFO_MAXSIZE
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+        return String(cString: buffer)
+        #endif
+    }
+
+    /// `serverExecutable` for the processes running now. Only this user's
+    /// processes are looked at: the file found here gets run.
     public static func runningServerExecutable() -> URL? {
         let ps = Process()
         ps.executableURL = URL(fileURLWithPath: "/bin/ps")
-        ps.arguments = ["-axww", "-o", "args="]
+        ps.arguments = ["-xww", "-o", "pid=,args="]
         let output = Pipe()
         ps.standardOutput = output
         ps.standardError = FileHandle.nullDevice
@@ -195,6 +229,10 @@ public struct AdbClient: AdbRunning {
         process.standardError = err
         process.standardInput = FileHandle.nullDevice
 
+        // Started before the readers: when it can't be (adb was moved or
+        // removed), nothing ever closes the pipes they would be waiting on.
+        try process.run()
+
         let collected = Collected()
         let readers = DispatchGroup()
         for (pipe, isError) in [(out, false), (err, true)] {
@@ -206,7 +244,6 @@ public struct AdbClient: AdbRunning {
             }
         }
 
-        try process.run()
         let finished = DispatchSemaphore(value: 0)
         DispatchQueue.global(qos: .utility).async {
             process.waitUntilExit()

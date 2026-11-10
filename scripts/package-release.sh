@@ -47,6 +47,7 @@ done
 # The Android agent (Voly/AndroidAgentPayload, built by AndroidAgent/build.sh).
 ANDROID_AGENT="$(find "$APP/Contents/Resources" -name voly-agent.dex | head -1)"
 [ -n "$ANDROID_AGENT" ] || { echo "missing the Android agent (voly-agent.dex) in the app bundle"; exit 1; }
+"$ROOT/scripts/check-android-agent.sh" "$(dirname "$ANDROID_AGENT")" >/dev/null
 
 # Strip debug symbol tables (keeping exported symbols, which the dylibs are
 # loaded by), then sign again inside-out since stripping invalidates the

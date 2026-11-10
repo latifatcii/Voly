@@ -115,7 +115,10 @@ struct AndroidDevicesSection: View {
         if let error = status.error {
             caption(error, color: VolyTheme.danger)
         } else if !status.isIntegrationEnabled {
-            caption("Voly is off for this device.", color: VolyTheme.dim)
+            caption(status.device.isEmulator
+                ? "Voly is off for this device."
+                : "Voly is off for this device. A phone or tablet is left alone until you switch it on.",
+                color: VolyTheme.dim)
         } else if status.apps.isEmpty {
             caption("No app of yours is running. Debug builds are picked up when they start.", color: VolyTheme.dim)
         } else {

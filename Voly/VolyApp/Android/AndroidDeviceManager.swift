@@ -19,6 +19,7 @@ nonisolated(unsafe) private let log = Logger(subsystem: "com.latifatci.Voly", ca
 @Observable
 final class AndroidDeviceManager {
     private static let disabledKey = "voly.android.disabledDevices"
+    private static let enabledKey = "voly.android.enabledDevices"
 
     /// Devices, their running apps, and the agents that can be connected to.
     private(set) var snapshot = AndroidSnapshot.empty
@@ -33,7 +34,9 @@ final class AndroidDeviceManager {
     /// The app exclusions shared with simulator integration.
     var policyProvider: () -> InjectionPolicy = { InjectionPolicy() }
 
-    private var disabledSerials: Set<String>
+    /// What the user chose per device. A device in neither set gets the
+    /// default: see `AndroidDevicePolicy`.
+    private var policy: AndroidDevicePolicy
     private var integration: AndroidIntegration?
     private var adbURL: URL?
     private var lastAdbLookup = Date.distantPast
@@ -42,7 +45,10 @@ final class AndroidDeviceManager {
     private var lastAgents: [AndroidAgentEndpoint] = []
 
     init(defaults: UserDefaults = .standard) {
-        disabledSerials = Set(defaults.stringArray(forKey: Self.disabledKey) ?? [])
+        policy = AndroidDevicePolicy(
+            enabled: Set(defaults.stringArray(forKey: Self.enabledKey) ?? []),
+            disabled: Set(defaults.stringArray(forKey: Self.disabledKey) ?? [])
+        )
     }
 
     #if DEBUG
@@ -93,7 +99,7 @@ final class AndroidDeviceManager {
             publish(.empty)
             return
         }
-        let disabled = disabledSerials
+        let policy = self.policy
         // Only the exclusions carry over: an "instrument only these apps"
         // list made of iOS bundle identifiers must not shut every Android
         // app out.
@@ -104,7 +110,7 @@ final class AndroidDeviceManager {
         only = ScriptedRun.simulators
         #endif
         let fresh = await integration.refresh(
-            wantsDevice: { !disabled.contains($0) },
+            wantsDevice: { policy.wants($0) },
             allowsApp: { !excluded.contains($0) },
             only: only
         )
@@ -157,12 +163,13 @@ final class AndroidDeviceManager {
     // MARK: - Per-device switch
 
     func isEnabled(_ serial: String) -> Bool {
-        !disabledSerials.contains(serial)
+        policy.wants(serial)
     }
 
     func setEnabled(_ enabled: Bool, for serial: String) async {
-        if enabled { disabledSerials.remove(serial) } else { disabledSerials.insert(serial) }
-        UserDefaults.standard.set(disabledSerials.sorted(), forKey: Self.disabledKey)
+        policy.set(enabled, for: serial)
+        UserDefaults.standard.set(policy.enabled.sorted(), forKey: Self.enabledKey)
+        UserDefaults.standard.set(policy.disabled.sorted(), forKey: Self.disabledKey)
         log.notice("Android integration \(enabled ? "on" : "off", privacy: .public) for \(serial, privacy: .public)")
         busySerials.insert(serial)
         defer { busySerials.remove(serial) }

@@ -8,8 +8,16 @@ import Foundation
 public enum AndroidEmulatorApp {
     public static func isEmulator(_ app: NSRunningApplication) -> Bool {
         guard app.bundleIdentifier != "com.apple.iphonesimulator" else { return false }
-        let name = app.executableURL?.lastPathComponent ?? app.localizedName ?? ""
-        return name.hasPrefix("qemu-system-")
+        let path = app.executableURL?.path ?? AdbLocator.executablePath(ofProcess: app.processIdentifier)
+        return path.map(isEmulator(executablePath:)) ?? false
+    }
+
+    /// The Android SDK keeps the emulator's engine in
+    /// `<sdk>/emulator/qemu/<host>/qemu-system-<arch>`. A QEMU from anywhere
+    /// else runs somebody's other virtual machine, which is not Voly's to
+    /// dock next to or to take ⌘E from.
+    static func isEmulator(executablePath path: String) -> Bool {
+        (path as NSString).lastPathComponent.hasPrefix("qemu-system-") && path.contains("/emulator/qemu/")
     }
 
     public static func processIDs() -> Set<pid_t> {

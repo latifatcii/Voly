@@ -62,6 +62,43 @@ public struct AndroidSnapshot: Sendable, Equatable {
     public static let empty = AndroidSnapshot()
 }
 
+/// Which devices Voly attaches to apps on.
+///
+/// An emulator is somewhere apps are run to be looked at, so Voly attaches
+/// there unless told not to. A phone or tablet is the user's own device:
+/// nothing is copied to it and nothing is attached until they switch it on.
+public struct AndroidDevicePolicy: Sendable, Equatable {
+    /// Serials the user switched on.
+    public private(set) var enabled: Set<String>
+    /// Serials the user switched off.
+    public private(set) var disabled: Set<String>
+
+    public init(enabled: Set<String> = [], disabled: Set<String> = []) {
+        self.enabled = enabled
+        self.disabled = disabled
+    }
+
+    public func wants(_ serial: String) -> Bool {
+        if disabled.contains(serial) { return false }
+        return enabled.contains(serial) || Self.isEmulator(serial)
+    }
+
+    public mutating func set(_ wanted: Bool, for serial: String) {
+        if wanted {
+            disabled.remove(serial)
+            enabled.insert(serial)
+        } else {
+            enabled.remove(serial)
+            disabled.insert(serial)
+        }
+    }
+
+    /// adb names every emulator `emulator-<console port>`; a device has its serial number.
+    public static func isEmulator(_ serial: String) -> Bool {
+        serial.hasPrefix("emulator-")
+    }
+}
+
 /// Keeps the Android side in step with what is running: every call to
 /// `refresh` lists the devices adb sees and the user's apps running on
 /// them, attaches the agent to debuggable apps that don't have it yet, and

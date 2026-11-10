@@ -40,7 +40,7 @@ private func makeAndroidIntegration(_ arguments: [String]) throws -> AndroidInte
     let adbURL: URL
     if let explicit = option("--adb", in: arguments) {
         adbURL = URL(fileURLWithPath: explicit)
-    } else if let found = AdbLocator.locate() {
+    } else if let found = AdbLocator.runningServerExecutable() ?? AdbLocator.locate() {
         adbURL = found
     } else {
         throw Failure(AdbError.notFound.localizedDescription)

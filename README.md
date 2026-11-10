@@ -78,7 +78,7 @@ What Android things are called in Voly:
 
 Measuring works from Voly's tree as on iOS (hover another row). In the emulator itself, with a view selected in pick mode, **drag** from it: the distance to whatever is under the pointer is drawn live.
 
-Switch a device off with its toggle in the Simulators tab; exclude an app from its context menu. Voly finds `adb` in the usual places (`~/Library/Android/sdk`, `ANDROID_HOME`, Homebrew); point it elsewhere with:
+Emulators are inspected as soon as they run. A phone or tablet that adb can reach is listed but left alone, with nothing copied to it and nothing attached, until you switch it on with its toggle in the Simulators tab. The same toggle switches an emulator off; exclude an app from its context menu. Voly finds `adb` in the usual places (`~/Library/Android/sdk`, `ANDROID_HOME`, Homebrew); point it elsewhere with:
 
 ```sh
 defaults write com.latifatci.Voly voly.android.adbPath /path/to/adb
@@ -196,7 +196,7 @@ Android:
 
 - **Debug builds only.** Attaching needs a debuggable app (`run-as` and `attach-agent` refuse anything else). Release builds are listed as not inspectable.
 - **Android 8 (API 26) or later.**
-- **Emulators are what is tested.** A physical device that adb can reach goes through the same path and is listed, but that path is not exercised.
+- **Emulators are what is tested.** A physical device that adb can reach goes through the same path once you switch it on, but that path is not exercised.
 - **Jetpack Compose** appears as the view that hosts it; its content is only in the MCP tools (as semantics nodes), not in the inspector's tree, and has no font or color — the same as SwiftUI.
 - **Layout params are not Auto Layout.** What the Layout tab shows as constraints are sizes, margins and ConstraintLayout connections; their constant can be changed, priority and "active" cannot.
 - **Measuring by hovering in the emulator** isn't available (Voly would need to know where the screen sits inside the emulator's window); drag from the selection instead, or hover rows in Voly's tree.
