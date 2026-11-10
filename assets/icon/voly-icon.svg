@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Voly app icon: a white bear peeking over a phone at night.
+       Drawn on the macOS icon grid (824pt shape centred in a 1024pt canvas).
+       The drop shadow is added by scripts/render-icon.sh. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#343F7A"/>
+      <stop offset="1" stop-color="#0E1230"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="512" cy="650" r="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7FD6FF" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#7FD6FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="fur" x1="0" y1="313" x2="0" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".55" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C9EAFF"/>
+    </linearGradient>
+    <linearGradient id="paw" x1="0" y1="588" x2="0" y2="684" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#C4E6FF"/>
+    </linearGradient>
+    <linearGradient id="phone" x1="0" y1="630" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5A6696"/>
+      <stop offset="1" stop-color="#343D68"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="658" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A4EEFF"/>
+      <stop offset="1" stop-color="#4C8DFF"/>
+    </linearGradient>
+    <clipPath id="shape">
+      <rect x="100" y="100" width="824" height="824" rx="185.4"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#shape)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#sky)"/>
+
+    <!-- stars -->
+    <circle cx="520" cy="176" r="6" fill="#FFFFFF" opacity=".7"/>
+    <circle cx="372" cy="232" r="4" fill="#FFFFFF" opacity=".6"/>
+    <circle cx="664" cy="252" r="5" fill="#FFFFFF" opacity=".65"/>
+    <circle cx="872" cy="356" r="6" fill="#FFFFFF" opacity=".55"/>
+    <circle cx="156" cy="392" r="6" fill="#FFFFFF" opacity=".55"/>
+    <circle cx="154" cy="250" r="4" fill="#FFFFFF" opacity=".5"/>
+    <path d="M236 180 Q240 208 268 212 Q240 216 236 244 Q232 216 204 212 Q232 208 236 180 Z" fill="#FFFFFF" opacity=".9"/>
+    <path d="M806 168 Q809 188 829 191 Q809 194 806 214 Q803 194 783 191 Q803 188 806 168 Z" fill="#FFFFFF" opacity=".85"/>
+
+    <!-- light spilling up from the screen -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#halo)"/>
+
+    <!-- bear -->
+    <circle cx="299" cy="380" r="110" fill="#FFFFFF"/>
+    <circle cx="725" cy="380" r="110" fill="#FFFFFF"/>
+    <circle cx="299" cy="380" r="58" fill="#FFC6D3"/>
+    <circle cx="725" cy="380" r="58" fill="#FFC6D3"/>
+    <ellipse cx="512" cy="600" rx="327" ry="287" fill="url(#fur)"/>
+    <circle cx="396" cy="562" r="37" fill="#1B2236"/>
+    <circle cx="628" cy="562" r="37" fill="#1B2236"/>
+    <circle cx="409" cy="548" r="13" fill="#FFFFFF"/>
+    <circle cx="641" cy="548" r="13" fill="#FFFFFF"/>
+    <circle cx="384" cy="577" r="5" fill="#FFFFFF" opacity=".8"/>
+    <circle cx="616" cy="577" r="5" fill="#FFFFFF" opacity=".8"/>
+
+    <!-- phone -->
+    <rect x="170" y="630" width="684" height="420" rx="92" fill="url(#phone)"/>
+    <rect x="198" y="658" width="628" height="420" rx="66" fill="url(#screen)"/>
+    <rect x="432" y="684" width="160" height="42" rx="21" fill="#12162A"/>
+
+    <!-- the views being inspected -->
+    <rect x="250" y="770" width="524" height="46" rx="14" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-dasharray="22 14" opacity=".9"/>
+    <rect x="250" y="842" width="250" height="120" rx="14" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-dasharray="22 14" opacity=".9"/>
+    <rect x="524" y="842" width="250" height="120" rx="14" fill="#FFFFFF" fill-opacity=".4" stroke="#FFFFFF" stroke-width="8"/>
+
+    <!-- paws -->
+    <ellipse cx="300" cy="636" rx="68" ry="48" fill="url(#paw)"/>
+    <ellipse cx="724" cy="636" rx="68" ry="48" fill="url(#paw)"/>
+    <path d="M280 644 V666 M300 648 V670 M320 644 V666 M704 644 V666 M724 648 V670 M744 644 V666" fill="none" stroke="#9FC3E6" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>
