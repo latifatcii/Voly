@@ -18,7 +18,6 @@ import VolyModels
 import VolyProtocol
 
 /// One authenticated round trip to an Android agent.
-@Sendable
 func sendToAndroidAgent(_ endpoint: AndroidAgentEndpoint, _ command: Command) async throws -> Response {
     let client = AgentClient(port: endpoint.port)
     defer { client.close() }
