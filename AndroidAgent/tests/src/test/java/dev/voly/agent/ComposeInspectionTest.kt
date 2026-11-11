@@ -427,15 +427,22 @@ class ComposeInspectionTest {
         val whole = send(dispatcher, """{"describeScreen":{"_0":{}}}""")
             .getJSONObject("screenDescription").getJSONObject("_0")
         val spoken = mutableListOf<String>()
+        val ids = mutableMapOf<String, Long>()
         fun visit(node: JSONObject) {
             node.optJSONArray("accessibilityElements")?.objects()?.forEach { element ->
                 element.optString("label").takeIf { it.isNotEmpty() }?.let { spoken += it }
+                if (element.has("id")) ids[element.optString("identifier")] = element.getLong("id")
             }
             node.getJSONArray("children").objects().forEach(::visit)
         }
         whole.getJSONArray("roots").objects().forEach(::visit)
         // A clickable card speaks for everything in it.
         assertTrue(spoken.toString(), spoken.any { it.contains("519 TL") })
+        // And each thing said names its node in the tree, so it can be asked about like a view.
+        val card0 = find(tree.windows()) { it.optString("accessibilityIdentifier") == "card.0" }!!.getLong("id")
+        assertEquals(ids.toString(), card0, ids["card.0"])
+        assertEquals("Column", send(dispatcher, """{"describeScreen":{"_0":{"rootID":${ids["card.0"]},"maxDepth":0}}}""")
+            .getJSONObject("screenDescription").getJSONObject("_0").getJSONArray("roots").getJSONObject(0).getString("className"))
     }
 
     @Test

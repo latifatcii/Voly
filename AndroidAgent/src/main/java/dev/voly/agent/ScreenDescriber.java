@@ -241,7 +241,7 @@ final class ScreenDescriber {
         }
 
         if (includeAccessibility && visible && ComposeSemantics.isComposeView(view)) {
-            JSONArray elements = ComposeSemantics.elements(view);
+            JSONArray elements = ComposeSemantics.elements(view, registry);
             if (elements != null) Json.put(node, "accessibilityElements", elements);
         }
 

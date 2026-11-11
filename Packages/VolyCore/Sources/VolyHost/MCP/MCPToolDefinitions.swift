@@ -20,7 +20,9 @@ extension MCPToolbox {
         Android apps (debug builds in an emulator, or on a device adb can reach) work through the same \
         tools; list_apps marks them android=. What differs: frames are in dp from the display's top-left \
         corner; a view's id= is its android:id; vc= names the activity or fragment a view is the root of; \
-        Jetpack Compose content appears as ~ lines (semantics nodes: text, role, state, test tag); layout \
+        Jetpack Compose content appears as ~ lines (semantics nodes: text, role, state, test tag), each \
+        with a #id that get_view, select_view and screenshot take like a view's; it is read-only, and \
+        get_screen with root set to such an id lists the layout nodes inside (Row, Box, Spacer and all); layout \
         params are reported as constraints (fixed sizes, margins, ConstraintLayout connections) and \
         get_view lists padding, margins, layout_width/height, text and the like as class-specific \
         properties; user defaults are SharedPreferences (suite = the preferences file); navigate's dismiss \

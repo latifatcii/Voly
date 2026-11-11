@@ -52,11 +52,12 @@ public struct ScreenDescriptionFormatter: Sendable {
 
     /// The same, in Android's words: frames are dp from the display's
     /// top-left corner, `id=` is the view's `android:id`, and `~` lines are
-    /// Jetpack Compose semantics nodes.
+    /// Jetpack Compose semantics nodes, which have ids like views.
     public static let androidLegend = """
         One line per view: Class #id x,y width×height (dp, from the display's top-left corner), then what it \
         shows; id= is the view's android:id and vc= the activity or fragment it is the root of. \
-        Lines starting with ~ are semantics nodes inside a view (how Jetpack Compose content appears). \
+        Lines starting with ~ are semantics nodes inside a view (how Jetpack Compose content appears); \
+        their #id works like a view's, and get_screen with root set to one lists every layout node in it. \
         ⚠ marks a likely layout problem. Use a #id with get_view, screenshot or set_property.
         """
 
@@ -129,6 +130,7 @@ public struct ScreenDescriptionFormatter: Sendable {
 
     public func line(for element: AccessibilityElementDescription) -> String {
         var parts = ["~"]
+        if let id = element.id { parts.append("#\(id)") }
         if let label = element.label, !label.isEmpty { parts.append(quote(label)) }
         if let value = element.value, !value.isEmpty { parts.append("value=\(quote(value))") }
         if !element.traits.isEmpty { parts.append(element.traits.joined(separator: ",")) }

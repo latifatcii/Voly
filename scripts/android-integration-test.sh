@@ -98,6 +98,19 @@ check "a node's modifiers are among its properties" "$BUTTON" "minimumInteractiv
 # Material describes that modifier to the reader in a "README" entry, which is not an argument.
 if grep -q "README" <<<"$BUTTON"; then echo "FAIL a modifier's note to the reader is not shown as its argument"; FAILED=1
 else echo "ok   a modifier's note to the reader is not shown as its argument"; fi
+# What the screen description says of Compose content is all an AI agent sees of it at first.
+SPOKEN_ID="$(python3 -c '
+import json, sys
+def walk(node):
+    for element in node.get("accessibilityElements") or []:
+        if element.get("identifier") == sys.argv[2]:
+            print(element.get("id"))
+    for child in node.get("children") or []:
+        walk(child)
+for root in json.loads(sys.argv[1])["screenDescription"]["_0"]["roots"]:
+    walk(root)
+' "$(send "$DESCRIBE")" compose.button)"
+check "the screen description names a Compose node by its id in the tree" "$SPOKEN_ID" "^$(ids_under compose.button | cut -d' ' -f1)\$"
 
 echo "== a Compose password field keeps what is in it"
 # The sample's password field comes filled in with this, so nothing has to be typed.

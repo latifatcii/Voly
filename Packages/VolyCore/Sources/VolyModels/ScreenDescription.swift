@@ -172,6 +172,10 @@ public struct ViewAncestor: Codable, Sendable, Hashable {
 }
 
 public struct AccessibilityElementDescription: Codable, Sendable, Hashable {
+    /// Set when the element is also a node of the view tree, as Jetpack
+    /// Compose content is: what `get_view` and the like take. A SwiftUI
+    /// element has none.
+    public let id: ObjectID?
     public let label: String?
     public let value: String?
     public let identifier: String?
@@ -180,7 +184,9 @@ public struct AccessibilityElementDescription: Codable, Sendable, Hashable {
     /// In window coordinates, in points.
     public let frame: CGRectCodable
 
-    public init(label: String?, value: String?, identifier: String? = nil, traits: [String], frame: CGRectCodable) {
+    public init(id: ObjectID? = nil, label: String?, value: String?, identifier: String? = nil,
+                traits: [String], frame: CGRectCodable) {
+        self.id = id
         self.label = label
         self.value = value
         self.identifier = identifier

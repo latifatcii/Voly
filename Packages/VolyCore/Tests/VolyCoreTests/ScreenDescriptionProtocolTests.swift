@@ -36,6 +36,9 @@ final class ScreenDescriptionProtocolTests: XCTestCase {
                 label: "Row", value: "On", identifier: "row.1", traits: ["button"],
                 frame: CGRectCodable(x: 0, y: 0, width: 10, height: 10)
             ),
+            AccessibilityElementDescription(
+                id: 22, label: "Compose", value: nil, traits: [], frame: CGRectCodable(x: 0, y: 0, width: 10, height: 10)
+            ),
         ]
         label.layout = LayoutDetails(
             bounds: CGRectCodable(x: 0, y: 0, width: 200, height: 20), usesAutoLayout: true,
@@ -60,5 +63,12 @@ final class ScreenDescriptionProtocolTests: XCTestCase {
         let decoded = try Framing.decodeResponse(try Framing.decodeEnvelope(try Framing.encodeEnvelope(envelope)))
         guard case .screenDescription(let back) = decoded else { return XCTFail("\(decoded)") }
         XCTAssertEqual(back, screen)
+    }
+
+    func test_an_element_from_an_agent_that_sends_no_id_still_reads() throws {
+        let json = #"{"label":"Row","traits":["button"],"frame":{"x":0,"y":0,"width":10,"height":10}}"#
+        let element = try Framing.decoder.decode(AccessibilityElementDescription.self, from: Data(json.utf8))
+        XCTAssertNil(element.id)
+        XCTAssertEqual(element.label, "Row")
     }
 }

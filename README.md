@@ -142,7 +142,7 @@ Good to know:
 - **Changes are live, not saved.** `set_property` and `set_constraint` change the running app only — the agent still has to make the real change in your source.
 - **An agent sees what you can see in Voly**, including the app's `UserDefaults`. Text typed into secure text fields is withheld.
 - **SwiftUI** content is reported through its accessibility elements: text, role and frame, but not font or color. To read it, Voly switches on application accessibility in that simulator the first time an agent asks — the same switch Xcode's Accessibility Inspector uses.
-- **Jetpack Compose** content is reported through its semantics tree in the same way, without changing any setting. A Compose node you select in Voly is read by `get_selection` like a view, with its text style and modifiers.
+- **Jetpack Compose** content is reported through its semantics tree in the same way, without changing any setting. Each node comes with its id, so an agent can ask about it with `get_view`, select it, take its screenshot, or list the layout nodes inside it with `get_screen`. A Compose node you select in Voly is read by `get_selection` like a view, with its text style and modifiers.
 
 ## How it works
 
