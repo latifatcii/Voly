@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -34,6 +35,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.example.volysample.R
@@ -57,6 +60,8 @@ private fun ComposeDemo() {
     var switchOn by rememberSaveable { mutableStateOf(true) }
     var checked by rememberSaveable { mutableStateOf(false) }
     var note by rememberSaveable { mutableStateOf("") }
+    // Filled in, so that what an inspector tells about a password field can be checked without typing.
+    var password by rememberSaveable { mutableStateOf(SAMPLE_PASSWORD) }
 
     MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
         // testTagsAsResourceId exposes the test tags as accessibility resource ids.
@@ -89,6 +94,15 @@ private fun ComposeDemo() {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("compose.textfield"),
                 )
+                TextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text(stringResource(R.string.compose_password_label)) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth().testTag("compose.password"),
+                )
                 LazyColumn(modifier = Modifier.weight(1f).testTag("compose.list")) {
                     items(ROW_COUNT) { index ->
                         Text(
@@ -104,3 +118,4 @@ private fun ComposeDemo() {
 }
 
 private const val ROW_COUNT = 8
+private const val SAMPLE_PASSWORD = "open-sesame-4821"

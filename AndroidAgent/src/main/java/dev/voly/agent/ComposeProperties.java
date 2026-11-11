@@ -397,7 +397,8 @@ final class ComposeProperties {
             while (each.hasNext() && values.size() < 12) {
                 Object entry = each.next();
                 Object name = Reflect.get(entry, "getName");
-                if (name instanceof String) values.put((String) name, Reflect.get(entry, "getValue"));
+                // Material puts a note for the reader under "README"; it is not an argument.
+                if (name instanceof String && !name.equals("README")) values.put((String) name, Reflect.get(entry, "getValue"));
             }
         }
         if (values.isEmpty()) {
