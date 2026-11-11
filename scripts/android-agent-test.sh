@@ -10,9 +10,11 @@
 # Usage: scripts/android-agent-test.sh [<compose version> …]
 #        (default: one release from each end of what is supported, and one between)
 #
-# Needs: a JDK (17+) and the Android SDK (platforms;android-35,
-# build-tools;35.0.0) with ANDROID_HOME set. Gradle and the libraries are
-# downloaded on the first run.
+# Needs: JDK 17 or 21 (the one inside Android Studio will do; Robolectric
+# can't run on a newer one than it knows, and fails every test with
+# "Unsupported class file major version") and the Android SDK
+# (platforms;android-35, build-tools;35.0.0) with ANDROID_HOME set. Gradle
+# and the libraries are downloaded on the first run.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

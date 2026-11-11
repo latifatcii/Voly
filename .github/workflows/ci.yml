@@ -100,6 +100,12 @@ jobs:
         compose: ["1.5.4", "1.7.8", "1.9.5", "1.12.1"]
     steps:
       - uses: actions/checkout@v4
+      # Robolectric rewrites class files as it loads them, and can't read
+      # those of a JDK newer than it knows: the image's default is too new.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Test
         run: scripts/android-agent-test.sh ${{ matrix.compose }}
       - name: Report
