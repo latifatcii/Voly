@@ -67,8 +67,9 @@ final class Screenshots {
         start(() -> captureApplicationNow(completion));
     }
 
-    void captureView(View view, Completion completion) {
-        start(() -> captureViewNow(view, completion));
+    /** A view, or the part of its host view that a node of Compose content takes up. */
+    void capture(Target target, Completion completion) {
+        start(() -> captureViewNow(target, completion));
     }
 
     private void captureApplicationNow(Completion completion) {
@@ -85,32 +86,55 @@ final class Screenshots {
         });
     }
 
-    private void captureViewNow(View view, Completion completion) {
+    private void captureViewNow(Target target, Completion completion) {
         Capture capture = new Capture(completion);
-        if (!view.isAttachedToWindow() || view.getWidth() <= 0 || view.getHeight() <= 0) {
+        View view = target.view;
+        RectF size = target.isAttached() ? target.rectInRoot() : null;
+        if (size == null || size.width() < 1 || size.height() < 1) {
             capture.fail(AgentError.unavailable("That view is not on screen or has no size."));
             return;
         }
         withoutOverlay(capture, () -> {
             View root = view.getRootView();
-            RectF inRoot = Ui.rectInRoot(view);
+            RectF inRoot = target.isAttached() ? target.rectInRoot() : null;
+            if (inRoot == null) {
+                capture.fail(AgentError.unavailable("That view is no longer on screen."));
+                return;
+            }
             Rect source = new Rect(
                 Math.max(0, Math.round(inRoot.left)), Math.max(0, Math.round(inRoot.top)),
                 Math.min(root.getWidth(), Math.round(inRoot.right)), Math.min(root.getHeight(), Math.round(inRoot.bottom)));
             if (source.width() <= 0 || source.height() <= 0) {
                 // Scrolled out of its window: draw it ourselves.
-                Bitmap drawn = draw(view);
+                Bitmap drawn = draw(target);
                 if (drawn != null) capture.finish(drawn);
                 else capture.fail(AgentError.unavailable("That view is outside its window and could not be drawn."));
                 return;
             }
             Bitmap bitmap = Bitmap.createBitmap(source.width(), source.height(), Bitmap.Config.ARGB_8888);
             copy(capture, root, source, bitmap, copied -> {
-                Bitmap drawn = copied ? bitmap : draw(view);
+                Bitmap drawn = copied ? bitmap : draw(target);
                 if (drawn != null) capture.finish(drawn);
                 else capture.fail(AgentError.unavailable("The view could not be captured."));
             });
         });
+    }
+
+    /** Software rendering of a view, or of the part of its host that a Compose node takes up. */
+    private static Bitmap draw(Target target) {
+        Bitmap whole = draw(target.view);
+        if (whole == null || !target.isCompose()) return whole;
+        ComposeTree.Item item = target.item();
+        if (item == null) return null;
+        int left = Math.max(0, Math.round(item.local.left)), top = Math.max(0, Math.round(item.local.top));
+        int right = Math.min(whole.getWidth(), Math.round(item.local.right));
+        int bottom = Math.min(whole.getHeight(), Math.round(item.local.bottom));
+        if (right <= left || bottom <= top) return null;
+        try {
+            return Bitmap.createBitmap(whole, left, top, right - left, bottom - top);
+        } catch (Throwable e) {
+            return null;
+        }
     }
 
     /**

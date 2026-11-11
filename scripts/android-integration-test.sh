@@ -76,6 +76,60 @@ echo "== deep link, Compose, navigation"
 check "deep link" "$(send '{"openURL":{"url":"volysample://demo/compose"}}')" '"success" : true'
 sleep 2
 check "Compose semantics" "$(send "$DESCRIBE")" "compose.button"
+TREE="$(send '{"getHierarchy":{}}')"
+check "Compose content in the view tree" "$TREE" '"accessibilityIdentifier" : "compose.button"'
+ids_under() { # ids_under <test tag>: the node with that tag and everything in it
+  python3 -c '
+import json, sys
+def walk(node):
+    yield node
+    for child in node.get("childrenInline") or []:
+        yield from walk(child)
+tree = json.loads(sys.argv[1])["hierarchy"]["_0"]
+for scene in tree["scenes"]:
+    for window in scene["windowsInline"]:
+        for node in walk(window):
+            if node.get("accessibilityIdentifier") == sys.argv[2]:
+                print(" ".join(str(inside["id"]) for inside in walk(node)))
+' "$TREE" "$1"
+}
+BUTTON="$(send "{\"getProperties\":{\"objectID\":$(ids_under compose.button | cut -d' ' -f1)}}")"
+check "a node's modifiers are among its properties" "$BUTTON" "minimumInteractiveComponentSize"
+# Material describes that modifier to the reader in a "README" entry, which is not an argument.
+if grep -q "README" <<<"$BUTTON"; then echo "FAIL a modifier's note to the reader is not shown as its argument"; FAILED=1
+else echo "ok   a modifier's note to the reader is not shown as its argument"; fi
+# What the screen description says of Compose content is all an AI agent sees of it at first.
+SPOKEN_ID="$(python3 -c '
+import json, sys
+def walk(node):
+    for element in node.get("accessibilityElements") or []:
+        if element.get("identifier") == sys.argv[2]:
+            print(element.get("id"))
+    for child in node.get("children") or []:
+        walk(child)
+for root in json.loads(sys.argv[1])["screenDescription"]["_0"]["roots"]:
+    walk(root)
+' "$(send "$DESCRIBE")" compose.button)"
+check "the screen description names a Compose node by its id in the tree" "$SPOKEN_ID" "^$(ids_under compose.button | cut -d' ' -f1)\$"
+
+echo "== a Compose password field keeps what is in it"
+# The sample's password field comes filled in with this, so nothing has to be typed.
+SECRET="open-sesame-4821"
+absent() { # absent <what> <text>
+  if grep -q -- "$SECRET" <<<"$2"; then echo "FAIL $1"; FAILED=1; else echo "ok   $1"; fi
+}
+absent "the password is not in the view tree" "$TREE"
+absent "nor in the screen's description" "$(send "$DESCRIBE")"
+# The field and everything in it, by id.
+FIELD_IDS="$(ids_under compose.password)"
+BAGS=""
+for ID in $FIELD_IDS; do
+  BAGS+="$(send "{\"getProperties\":{\"objectID\":$ID}}")"
+  BAGS+="$(send "{\"describeScreen\":{\"_0\":{\"rootID\":$ID,\"maxDepth\":0}}}")"
+done
+check "the password field is in the tree" "$FIELD_IDS" "[0-9]"
+absent "nor in the properties or description of any of its nodes" "$BAGS"
+check "its text is reported as secure" "$BAGS" "secure text, ${#SECRET} characters"
 check "pop" "$(send '{"navigate":{"_0":"pop"}}')" '"performed" : true'
 sleep 1
 

@@ -50,6 +50,13 @@ final class Properties {
     // MARK: Reading
 
     JSONObject bag(long id) throws AgentError {
+        Object object = registry.objectFor(id);
+        if (object instanceof ComposeNode) {
+            ComposeNode node = (ComposeNode) object;
+            ComposeTree.Item item = ComposeTree.find(node, ComposeTree.RECENT_ENOUGH_MS);
+            if (item == null) throw AgentError.objectGone(id);
+            return ComposeProperties.bag(id, item, node.host());
+        }
         View view = view(id);
         float density = Ui.density();
 

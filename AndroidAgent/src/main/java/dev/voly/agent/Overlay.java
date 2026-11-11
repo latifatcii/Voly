@@ -29,7 +29,7 @@ import java.util.Map;
  */
 final class Overlay {
     interface PickListener {
-        void onPicked(View view);
+        void onPicked(Target target);
     }
 
     private static final int BLUE = 0xFF0A84FF;
@@ -41,7 +41,7 @@ final class Overlay {
     private boolean picking;
     private boolean suppressed;
 
-    private View highlighted;
+    private Target highlighted;
     private View measureRoot;
     private RectF measureOther;
     private boolean measureTransformed;
@@ -62,10 +62,6 @@ final class Overlay {
 
     boolean isPicking() {
         return picking;
-    }
-
-    View highlightedView() {
-        return highlighted;
     }
 
     // MARK: Pick mode
@@ -93,8 +89,8 @@ final class Overlay {
 
     // MARK: Highlight and measurement
 
-    void highlight(View view) {
-        highlighted = view;
+    void highlight(Target target) {
+        highlighted = target;
         refresh();
         schedule();
     }
@@ -137,8 +133,10 @@ final class Overlay {
     /** Bring every window's drawing and touch handling in line with the current state. */
     private void refresh() {
         List<View> roots = Ui.visibleRoots();
-        if (highlighted != null && !highlighted.isAttachedToWindow()) highlighted = null;
-        View highlightRoot = highlighted != null ? highlighted.getRootView() : null;
+        // A Compose node can be gone while its view stays: what it showed was recomposed away.
+        RectF highlightRect = highlighted != null && highlighted.isAttached() ? highlighted.rectInRoot() : null;
+        if (highlightRect == null) highlighted = null;
+        View highlightRoot = highlighted != null ? highlighted.root() : null;
         if (measureRoot != null && !roots.contains(measureRoot)) measureRoot = highlightRoot;
 
         // Windows that went away take their layer with them.
@@ -162,7 +160,7 @@ final class Overlay {
             }
             layer.setBounds(0, 0, root.getWidth(), root.getHeight());
             layer.tinted = picking;
-            layer.highlight = root == highlightRoot ? Ui.rectInRoot(highlighted) : null;
+            layer.highlight = root == highlightRoot ? highlightRect : null;
             if (root == measureRoot && measureOther != null) {
                 layer.measureOther = measureOther;
                 layer.guides = measureGuides;
@@ -214,8 +212,8 @@ final class Overlay {
                 dragging = false;
                 break;
             case MotionEvent.ACTION_MOVE: {
-                View anchor = highlighted;
-                int slop = anchor != null ? ViewConfiguration.get(anchor.getContext()).getScaledTouchSlop() : 24;
+                Target anchor = highlighted;
+                int slop = anchor != null ? ViewConfiguration.get(anchor.view.getContext()).getScaledTouchSlop() : 24;
                 if (!dragging && Math.hypot(x - downX, y - downY) > slop) dragging = true;
                 // Dragging with a selection measures it against whatever is under the finger.
                 if (dragging && anchor != null) measureAgainst(anchor, Ui.hitTest(x, y));
@@ -225,7 +223,7 @@ final class Overlay {
                 if (dragging) {
                     clearMeasurement();
                 } else {
-                    View picked = Ui.hitTest(x, y);
+                    Target picked = Ui.hitTest(x, y);
                     if (picked != null && pickListener != null) pickListener.onPicked(picked);
                 }
                 dragging = false;
@@ -243,7 +241,7 @@ final class Overlay {
     /** A mouse pointer moving over the window without a button down. */
     boolean onHover(MotionEvent event) {
         if (!picking) return false;
-        View anchor = highlighted;
+        Target anchor = highlighted;
         if (anchor != null && event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE) {
             measureAgainst(anchor, Ui.hitTest(event.getRawX(), event.getRawY()));
         } else if (event.getActionMasked() == MotionEvent.ACTION_HOVER_EXIT) {
@@ -253,14 +251,16 @@ final class Overlay {
     }
 
     /** Measure `anchor` against `other` and draw it. Returns null when there is nothing to draw. */
-    Measure.Result measureAgainst(View anchor, View other) {
-        if (anchor == null || other == null || !anchor.isAttachedToWindow() || !other.isAttachedToWindow()) {
+    Measure.Result measureAgainst(Target anchor, Target other) {
+        RectF anchorRect = anchor != null && anchor.isAttached() ? anchor.rectOnScreen() : null;
+        RectF otherRect = other != null && other.isAttached() ? other.rectOnScreen() : null;
+        if (anchorRect == null || otherRect == null) {
             clearMeasurement();
             return null;
         }
         float density = Ui.density();
-        RectF a = scaled(Ui.rectOnScreen(anchor), 1 / density), b = scaled(Ui.rectOnScreen(other), 1 / density);
-        Measure.Result result = Measure.compute(a, b, Ui.hasTransform(anchor) || Ui.hasTransform(other));
+        RectF a = scaled(anchorRect, 1 / density), b = scaled(otherRect, 1 / density);
+        Measure.Result result = Measure.compute(a, b, anchor.hasTransform() || other.hasTransform());
         if (result == null || result.kind.equals("sameView")) {
             clearMeasurement();
             return result;

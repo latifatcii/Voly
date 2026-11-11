@@ -16,6 +16,10 @@ import java.util.Map;
  * screen is a single Android view (`AndroidComposeView`); what it shows only
  * exists as semantics nodes: text, role, state, test tag and bounds.
  *
+ * `ComposeTree` reads the same content as nodes with ids of their own; an
+ * element here carries the id of the node it is, so what a reader finds in
+ * this short list can be asked about like a view.
+ *
  * Compose is part of the app, not of the platform, so everything here is
  * reflection on its public API and gives nothing when it is absent.
  */
@@ -29,14 +33,14 @@ final class ComposeSemantics {
     }
 
     /** `[AccessibilityElementDescription]`, or null when there is nothing to tell. */
-    static JSONArray elements(View composeView) {
+    static JSONArray elements(View composeView, ObjectRegistry registry) {
         try {
             Object owner = Reflect.call(composeView, "getSemanticsOwner");
             Object root = Reflect.call(owner, "getRootSemanticsNode");
             if (root == null) return null;
             int[] origin = Ui.rootOrigin(composeView.getRootView());
             List<JSONObject> result = new ArrayList<>();
-            collect(root, origin, result, 0);
+            collect(root, origin, result, 0, ComposeTree.content(composeView, ComposeTree.RECENT_ENOUGH_MS), registry);
             if (result.isEmpty()) return null;
             JSONArray array = new JSONArray();
             for (JSONObject element : result) array.put(element);
@@ -47,13 +51,19 @@ final class ComposeSemantics {
         }
     }
 
-    private static void collect(Object node, int[] origin, List<JSONObject> result, int depth) {
+    private static void collect(Object node, int[] origin, List<JSONObject> result, int depth,
+                                ComposeTree.Content content, ObjectRegistry registry) {
         if (node == null || depth > 60 || result.size() >= MAX_ELEMENTS) return;
         JSONObject element = describe(node, origin);
-        if (element != null) result.add(element);
+        if (element != null) {
+            // A node semantics makes up for a role or a description is not in the tree, and has no id.
+            ComposeTree.Item item = content.byId.get(Reflect.getInt(node, "getId", -1));
+            if (item != null) Json.put(element, "id", registry.idFor(item.ref));
+            result.add(element);
+        }
         Object children = Reflect.call(node, "getChildren");
         if (children instanceof List) {
-            for (Object child : (List<?>) children) collect(child, origin, result, depth + 1);
+            for (Object child : (List<?>) children) collect(child, origin, result, depth + 1, content, registry);
         }
     }
 

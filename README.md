@@ -15,7 +15,7 @@ A live UI inspector for the iOS Simulator and the Android Emulator. Voly is a ma
 - Dismiss / pop / pop to root from the inspector
 - Inspect and edit `UserDefaults`, and fire deep links
 - Let an AI coding agent see all of the above through a built-in [MCP server](#ai-agents-mcp)
-- The same for Android apps: views, layout params, SharedPreferences, languages, Jetpack Compose semantics
+- The same for Android apps: views, layout params, SharedPreferences, languages, and Jetpack Compose content
 
 ## Install
 
@@ -73,10 +73,13 @@ What Android things are called in Voly:
 | UserDefaults | SharedPreferences (one "suite" per preferences file) |
 | Language | the app's per-app language on Android 13+; activities are recreated in it |
 | Dismiss / Pop / Pop to Root | close a dialog, bottom sheet or popup / Back / empty the back stack |
+| A view in the tree | also a node of Jetpack Compose content: a `Text`, a `Row`, a `Button` |
 | SwiftUI accessibility elements (MCP) | Jetpack Compose semantics: text, role, state, test tag, bounds |
 | Jump to Source | your Kotlin or Java class, or the layout XML that declares the view's id, opened in Android Studio |
 
 Measuring works as on iOS: with a view selected in pick mode, hover another one in the emulator, or another row in Voly's tree, and the distance is drawn live. Dragging from the selected view in the emulator does the same. Hovering needs no Accessibility permission here; it works when the emulator window shows just the display under its title bar, not when it draws a device frame around it.
+
+**Jetpack Compose.** A Compose screen is a single Android view, and what it shows are not views. Voly's tree goes on into it all the same: under the `AndroidComposeView` are the nodes Compose lays out — `Column`, `Row`, `Box`, `Spacer`, `Text`, `Image`, `Button`, `LazyColumn` — each with its text and test tag next to it. They are picked with a click, highlighted, measured against each other or against views, and captured, like views. A node's frame is the box you see it in: for `padding(8.dp).background(white).padding(12.dp)` that is where the white is, so measuring a card against its neighbour gives the 8 and measuring a text against its card gives the 12. The Properties tab shows what the node says (text, role, state, test tag), how its text is styled (size, weight, family, color) and its modifiers in the order they apply, with their arguments. All of it is read-only: see [Limitations](#limitations).
 
 Emulators are inspected as soon as they run. A phone or tablet that adb can reach is listed but left alone, with nothing copied to it and nothing attached, until you switch it on with its toggle in the Simulators tab. The same toggle switches an emulator off; exclude an app from its context menu. Voly finds `adb` in the usual places (`~/Library/Android/sdk`, `ANDROID_HOME`, Homebrew); point it elsewhere with:
 
@@ -139,7 +142,7 @@ Good to know:
 - **Changes are live, not saved.** `set_property` and `set_constraint` change the running app only — the agent still has to make the real change in your source.
 - **An agent sees what you can see in Voly**, including the app's `UserDefaults`. Text typed into secure text fields is withheld.
 - **SwiftUI** content is reported through its accessibility elements: text, role and frame, but not font or color. To read it, Voly switches on application accessibility in that simulator the first time an agent asks — the same switch Xcode's Accessibility Inspector uses.
-- **Jetpack Compose** content is reported through its semantics tree in the same way, without changing any setting.
+- **Jetpack Compose** content is reported through its semantics tree in the same way, without changing any setting. Each node comes with its id, so an agent can ask about it with `get_view`, select it, take its screenshot, or list the layout nodes inside it with `get_screen`. A Compose node you select in Voly is read by `get_selection` like a view, with its text style and modifiers.
 
 ## How it works
 
@@ -197,7 +200,10 @@ Android:
 - **Debug builds only.** Attaching needs a debuggable app (`run-as` and `attach-agent` refuse anything else). Release builds are listed as not inspectable.
 - **Android 8 (API 26) or later.**
 - **Emulators are what is tested.** A physical device that adb can reach goes through the same path once you switch it on, but that path is not exercised.
-- **Jetpack Compose** appears as the view that hosts it; its content is only in the MCP tools (as semantics nodes), not in the inspector's tree, and has no font or color — the same as SwiftUI.
+- **Jetpack Compose content can be read, not changed.** A view keeps its own values; a composable's are the arguments it was called with, and the next recomposition passes them again. So no live edits, and no constraints: sizes and spacing are modifiers, listed with the properties.
+- **Compose nodes are named for what they are**, not for the function that emitted them: a `ProductCard()` is the `Column` it lays out. Which composable a node came from is only in tooling data that Voly doesn't read. Jump to Source therefore goes to the fragment or activity that hosts the content (or to the file of an app-defined custom `Layout`).
+- **Listing every Compose node depends on Compose internals.** Everything Voly reads from a node is public API except one thing: a node's children. If a Compose release moves that, the tree falls back to the nodes that have semantics — texts, buttons, images with a description, anything with a test tag — and containers that only arrange their content are missing from it. Checked against Compose 1.5 to 1.12 (`scripts/android-agent-test.sh`); on 1.4 the tree works and text style isn't read.
+- **An app's own modifiers** are listed by name, with the fields they have. Voly can't tell whether one of them paints, so it doesn't count for where a node's frame is.
 - **Layout params are not Auto Layout.** What the Layout tab shows as constraints are sizes, margins and ConstraintLayout connections; their constant can be changed, priority and "active" cannot.
 - **Measuring by hovering in the emulator** needs a window without a device frame: Voly finds the display from the window's shape, and can't tell where it sits inside a drawn phone. With a frame, drag from the selection instead, or hover rows in Voly's tree.
 - **No resizable preview**, and DataStore isn't read — SharedPreferences only.

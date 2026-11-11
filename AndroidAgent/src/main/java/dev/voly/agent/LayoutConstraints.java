@@ -88,6 +88,8 @@ final class LayoutConstraints {
 
     JSONArray constraints(long id) throws AgentError {
         Object object = registry.objectFor(id);
+        // Compose content has no layout params: its sizes and spacing are modifiers, listed with its properties.
+        if (object instanceof ComposeNode) return new JSONArray();
         if (!(object instanceof View)) throw AgentError.objectGone(id);
         View view = (View) object;
         List<JSONObject> list = new ArrayList<>();

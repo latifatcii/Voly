@@ -86,3 +86,29 @@ jobs:
         with:
           name: android-agent
           path: ${{ runner.temp }}/agent
+
+  # The agent reads Compose content by reflection, and Compose has renamed
+  # what it reads before. One release from each end of the supported range,
+  # and two between.
+  android-agent-compose:
+    name: Android agent reads Compose ${{ matrix.compose }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compose: ["1.5.4", "1.7.8", "1.9.5", "1.12.1"]
+    steps:
+      - uses: actions/checkout@v4
+      # Robolectric rewrites class files as it loads them, and can't read
+      # those of a JDK newer than it knows: the image's default is too new.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Test
+        run: scripts/android-agent-test.sh ${{ matrix.compose }}
+      - name: Report
+        if: failure()
+        run: |
+          find AndroidAgent/tests/build/test-results -name '*.xml' -exec grep -h -A12 '<failure' {} + | head -200 || true

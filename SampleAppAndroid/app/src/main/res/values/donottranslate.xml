@@ -61,6 +61,7 @@
     <string name="compose_button">Clicked %1$d times</string>
     <string name="compose_toggles_state">switch=%1$s, checkbox=%2$s</string>
     <string name="compose_note_label">Note</string>
+    <string name="compose_password_label">Password</string>
     <string name="compose_row">Lazy row %1$d</string>
 
     <!-- Dialogs -->

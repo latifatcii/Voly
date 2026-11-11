@@ -71,6 +71,13 @@ final class ScreenDescriptionFormatterTests: XCTestCase {
             frame: CGRectCodable(x: 20, y: 150, width: 353, height: 44)
         )
         XCTAssertEqual(formatter.line(for: element), "~ \"Add to cart\" value=\"2\" button,selected 20,150 353×44 id=cart.add")
+
+        // Jetpack Compose content is in the tree too, and says under which id.
+        let node = AccessibilityElementDescription(
+            id: 22, label: "Clicked 0 times", value: nil, identifier: "compose.button", traits: ["button"],
+            frame: CGRectCodable(x: 16, y: 152, width: 144, height: 40)
+        )
+        XCTAssertEqual(formatter.line(for: node), "~ #22 \"Clicked 0 times\" button 16,152 144×40 id=compose.button")
     }
 
     func test_plain_wrappers_of_the_same_size_fold_onto_one_line() {

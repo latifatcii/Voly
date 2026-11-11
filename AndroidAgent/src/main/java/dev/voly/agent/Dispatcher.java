@@ -45,10 +45,10 @@ final class Dispatcher {
     private Localization localization;
 
     Dispatcher(EventSink events) {
-        overlay.setPickListener(view -> {
+        overlay.setPickListener(target -> {
             // Pick mode stays on, so the next tap can select another view.
-            overlay.highlight(view);
-            events.send(Json.enumCase("selectionChanged", registry.idFor(view)));
+            overlay.highlight(target);
+            events.send(Json.enumCase("selectionChanged", registry.idFor(target.key())));
         });
     }
 
@@ -68,10 +68,11 @@ final class Dispatcher {
         return localization;
     }
 
-    private View view(long id) throws AgentError {
-        Object object = registry.objectFor(id);
-        if (!(object instanceof View)) throw AgentError.objectGone(id);
-        return (View) object;
+    /** The view or Compose node an id stands for. */
+    private Target target(long id) throws AgentError {
+        Target target = Target.of(registry.objectFor(id));
+        if (target == null) throw AgentError.objectGone(id);
+        return target;
     }
 
     /** `{"error":{"_0":…}}` */
@@ -123,8 +124,9 @@ final class Dispatcher {
                 return Json.enumCase("properties", properties.bag(arguments.optLong("objectID")));
             case "setProperty": {
                 JSONObject request = required(arguments);
-                properties.apply(request);
                 final long id = request.optLong("objectID");
+                if (registry.objectFor(id) instanceof ComposeNode) throw ComposeProperties.notEditable();
+                properties.apply(request);
                 afterLayout(reply, () -> Json.enumCase("subtree", snapshots.subtree(id, 1)));
                 return null;
             }
@@ -144,19 +146,21 @@ final class Dispatcher {
                 overlay.exitPickMode();
                 return Json.enumCase("pickModeChanged", false);
             case "selectAt": {
-                View found = hit(arguments);
+                Target found = hit(arguments);
                 if (found == null) return Json.enumCase("selection", 0L);
                 overlay.highlight(found);
-                return Json.enumCase("selection", registry.idFor(found));
+                return Json.enumCase("selection", registry.idFor(found.key()));
             }
             case "hoverAt": {
-                View found = hit(arguments);
-                return found == null ? Json.enumCase("hoverResult") : Json.enumCase("hoverResult", registry.idFor(found));
+                Target found = hit(arguments);
+                return found == null
+                    ? Json.enumCase("hoverResult")
+                    : Json.enumCase("hoverResult", registry.idFor(found.key()));
             }
             case "measureHover":
                 return measureHover(arguments);
             case "highlight":
-                overlay.highlight(view(arguments.optLong("objectID")));
+                overlay.highlight(target(arguments.optLong("objectID")));
                 return Json.enumCase("ack");
             case "clearSelection":
                 overlay.clear();
@@ -182,7 +186,7 @@ final class Dispatcher {
 
             // Source
             case "resolveSource":
-                return Json.enumCase("sourceInfo", Sources.info(view(arguments.optLong("objectID"))));
+                return Json.enumCase("sourceInfo", Sources.info(target(arguments.optLong("objectID"))));
 
             // Language
             case "localizationState":
@@ -206,7 +210,7 @@ final class Dispatcher {
                 if (target.has("view")) {
                     Object id = Json.caseValue(target);
                     if (!(id instanceof Number)) throw AgentError.invalidCommand("captureScreenshot without a view id");
-                    screenshots.captureView(view(((Number) id).longValue()), completion);
+                    screenshots.capture(target(((Number) id).longValue()), completion);
                 } else {
                     screenshots.captureApplication(completion);
                 }
@@ -277,22 +281,22 @@ final class Dispatcher {
 
     // MARK: Hit testing and measurement
 
-    /** The view under a point given in display points. */
-    private static View hit(JSONObject arguments) {
+    /** The view, or the node of Compose content, under a point given in display points. */
+    private static Target hit(JSONObject arguments) {
         float density = Ui.density();
         return Ui.hitTest((float) arguments.optDouble("x", -1) * density, (float) arguments.optDouble("y", -1) * density);
     }
 
     private JSONObject measureHover(JSONObject arguments) {
-        Object anchor = registry.objectFor(arguments.optLong("anchorID"));
-        View other = hit(arguments);
+        Target anchor = Target.of(registry.objectFor(arguments.optLong("anchorID")));
+        Target other = hit(arguments);
         JSONObject result = Json.object();
-        if (!(anchor instanceof View) || other == null) {
+        if (anchor == null || other == null) {
             overlay.clearMeasurement();
             return Json.enumCaseLabeled("measureHoverResult", result);
         }
-        Measure.Result measured = overlay.measureAgainst((View) anchor, other);
-        Json.put(result, "otherID", registry.idFor(other));
+        Measure.Result measured = overlay.measureAgainst(anchor, other);
+        Json.put(result, "otherID", registry.idFor(other.key()));
         if (measured != null) Json.put(result, "summary", measured.summary());
         return Json.enumCaseLabeled("measureHoverResult", result);
     }

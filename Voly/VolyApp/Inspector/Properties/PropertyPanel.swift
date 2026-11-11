@@ -14,20 +14,25 @@ struct PropertyPanel: View {
         ScrollView {
             if let bag = session.state.propertyBag {
                 VStack(alignment: .leading, spacing: 14) {
-                    section("View", isExpanded: $viewExpanded) {
-                        ForEach(bag.view.keys.sorted(), id: \.self) { key in
-                            if let value = bag.view[key] {
-                                PropertyRow(name: key, value: value, readOnly: false) { newValue in
-                                    set(key, to: newValue, scope: .view, on: bag.objectID)
+                    // Compose content has neither group: nothing of it can be edited.
+                    if !bag.view.isEmpty {
+                        section("View", isExpanded: $viewExpanded) {
+                            ForEach(bag.view.keys.sorted(), id: \.self) { key in
+                                if let value = bag.view[key] {
+                                    PropertyRow(name: key, value: value, readOnly: false) { newValue in
+                                        set(key, to: newValue, scope: .view, on: bag.objectID)
+                                    }
                                 }
                             }
                         }
                     }
-                    section("Layer", isExpanded: $layerExpanded) {
-                        ForEach(bag.layer.keys.sorted(), id: \.self) { key in
-                            if let value = bag.layer[key] {
-                                PropertyRow(name: key, value: value, readOnly: false) { newValue in
-                                    set(key, to: newValue, scope: .layer, on: bag.objectID)
+                    if !bag.layer.isEmpty {
+                        section("Layer", isExpanded: $layerExpanded) {
+                            ForEach(bag.layer.keys.sorted(), id: \.self) { key in
+                                if let value = bag.layer[key] {
+                                    PropertyRow(name: key, value: value, readOnly: false) { newValue in
+                                        set(key, to: newValue, scope: .layer, on: bag.objectID)
+                                    }
                                 }
                             }
                         }
