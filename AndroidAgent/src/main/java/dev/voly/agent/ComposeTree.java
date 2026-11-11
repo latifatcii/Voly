@@ -68,6 +68,8 @@ final class ComposeTree {
         boolean clips;
         /** Shows something itself, or is someone's to tap; not just room between other nodes. */
         boolean solid;
+        /** Rotated or scaled by a modifier of its own. */
+        boolean transformed;
         Item parent;
         final List<Item> children = new ArrayList<>();
 
@@ -84,6 +86,8 @@ final class ComposeTree {
         final Map<Integer, Item> byId = new HashMap<>();
         /** Every layout node is in it, not only those with semantics. */
         boolean complete;
+        /** Less than there is: reading layout nodes failed part-way, or the node limit was reached. */
+        boolean partial;
         long builtAt;
     }
 
@@ -125,9 +129,11 @@ final class ComposeTree {
     private static final Runnable FORGET = RECENT::clear;
     private static final long KEEP_MS = 500;
     /**
-     * How old a tree may be for pointing and highlighting. Reading a screen
-     * that is all Compose takes a while, on the app's main thread; while
-     * something is being picked the app is not being used, and changes little.
+     * How old a tree may be for pointing and highlighting, and for the
+     * questions about one node that arrive together (its description, its
+     * properties, its source). Reading a screen that is all Compose takes a
+     * while, on the app's main thread; while something is being picked the
+     * app is not being used, and changes little.
      */
     static final long RECENT_ENOUGH_MS = 250;
 
@@ -146,8 +152,8 @@ final class ComposeTree {
         RECENT.put(host, built);
         Ui.MAIN.removeCallbacks(FORGET);
         Ui.MAIN.postDelayed(FORGET, KEEP_MS);
-        // A read that came up empty says nothing about which nodes still exist.
-        if (!built.byId.isEmpty()) ComposeNode.retain(host, built.byId.keySet());
+        // A read that came up empty or short says nothing about which nodes still exist.
+        if (!built.byId.isEmpty() && !built.partial) ComposeNode.retain(host, built.byId.keySet());
         return built;
     }
 
@@ -156,6 +162,25 @@ final class ComposeTree {
         View host = node == null ? null : node.host();
         if (host == null || !host.isAttachedToWindow()) return null;
         return content(host, maxAgeMs).byId.get(node.id);
+    }
+
+    /**
+     * Whether a node read earlier is still on screen, bringing its bounds
+     * up to date: one node's worth of reading, where `find` reads the whole
+     * host. For what keeps asking about the same node, like a highlight.
+     */
+    static boolean refresh(View host, Item item) {
+        Object info = item == null ? null : item.info;
+        if (info == null || host == null || !host.isAttachedToWindow()) return false;
+        if (!Reflect.getBool(info, "isAttached", true) || !Reflect.getBool(info, "isPlaced", true)
+            || Reflect.getBool(info, "isDeactivated", false)) {
+            return false;
+        }
+        Object root = Reflect.get(Reflect.get(host, "getRoot"), "getCoordinates");
+        RectF local = bounds(host, root, info, listOrEmpty(Reflect.get(info, "getModifierInfo")), null);
+        if (local == null) return false;
+        item.local = local;
+        return true;
     }
 
     /** The deepest node under a point in the host's coordinates (pixels). */
@@ -196,6 +221,7 @@ final class ComposeTree {
         if (rootInfo == null) rootInfo = Reflect.get(host, "getRoot");
         if (rootInfo == null) return new Content();
 
+        boolean failed = false;
         try {
             List<?> top = useLayoutNodes ? childrenOf(rootInfo) : null;
             if (top != null) {
@@ -203,9 +229,11 @@ final class ComposeTree {
                 builder.indexSemantics(semanticsRoot, 0);
                 for (Object child : top) builder.addLayoutNode(child, null, 0);
                 builder.content.complete = true;
+                builder.content.partial = builder.count >= MAX_NODES;
                 return builder.content;
             }
         } catch (Throwable e) {
+            failed = true;
             Log.w("reading Compose layout nodes failed, using semantics: " + e);
         }
         try {
@@ -214,6 +242,7 @@ final class ComposeTree {
             if (children instanceof List) {
                 for (Object child : (List<?>) children) builder.addSemanticsNode(child, null, 0);
             }
+            builder.content.partial = failed || builder.count >= MAX_NODES;
             return builder.content;
         } catch (Throwable e) {
             Log.w("reading Compose semantics failed: " + e);
@@ -271,7 +300,7 @@ final class ComposeTree {
             item.modifiers = listOrEmpty(Reflect.get(node, "getModifierInfo"));
             Object semantics = semanticsById.get(id);
             if (semantics != null) item.semantics = properties(Reflect.get(semantics, "getConfig"));
-            item.local = bounds(node, item.modifiers, semantics);
+            item.local = bounds(host, rootCoordinates, node, item.modifiers, semantics);
             if (item.local == null) return;
             if (!add(item, id, parent)) return;
 
@@ -290,7 +319,7 @@ final class ComposeTree {
             item.info = Reflect.get(node, "getLayoutInfo");
             if (item.info != null) item.modifiers = listOrEmpty(Reflect.get(item.info, "getModifierInfo"));
             item.semantics = properties(Reflect.get(node, "getConfig"));
-            item.local = bounds(item.info, item.modifiers, node);
+            item.local = bounds(host, rootCoordinates, item.info, item.modifiers, node);
             if (item.local == null || !add(item, id, parent)) return;
 
             Object children = Reflect.get(node, "getChildren");
@@ -316,7 +345,8 @@ final class ComposeTree {
         private void finish(Item item) {
             item.testTag = string(item.semantics.get("TestTag"));
             String text = joined(item.semantics.get("Text"));
-            if (text == null) text = string(item.semantics.get("EditableText"));
+            // What is typed into a password field stays in the app, whatever Compose puts here.
+            if (text == null && !item.semantics.containsKey("Password")) text = string(item.semantics.get("EditableText"));
             if (text == null) text = joined(item.semantics.get("ContentDescription"));
             item.label = shortened(text);
             item.solid = !item.semantics.isEmpty() || Reflect.get(item.info, "getInteropView") != null;
@@ -329,35 +359,48 @@ final class ComposeTree {
                 if (className.contains("GraphicsLayer") && Boolean.TRUE.equals(Reflect.field(element, "clip"))) {
                     item.clips = true;
                 }
+                if (className.contains("GraphicsLayer") && rotatesOrScales(element)) item.transformed = true;
             }
         }
 
-        // MARK: Bounds
+    }
 
-        /**
-         * Where the node is, in the host's coordinates. Unclipped: a card
-         * half scrolled out of its list has its whole frame, like a view.
-         */
-        private RectF bounds(Object info, List<?> modifiers, Object semantics) {
-            Object coordinates = visibleBox(info, modifiers);
-            if (coordinates != null && rootCoordinates != null && Reflect.getBool(coordinates, "isAttached", false)
-                && Reflect.getBool(rootCoordinates, "isAttached", false)) {
-                RectF rect = rect(boundingBox(rootCoordinates, coordinates));
-                // Compose answers "nowhere" for a box without an area; a spacer is 8dp high and nothing wide.
-                if (rect != null && (rect.width() <= 0 || rect.height() <= 0)) {
-                    RectF placed = emptyBox(coordinates);
-                    if (placed != null) rect = placed;
-                }
-                if (rect != null) return rect;
+    // MARK: Bounds
+
+    /**
+     * Where the node is, in the host's coordinates. Unclipped: a card
+     * half scrolled out of its list has its whole frame, like a view.
+     */
+    private static RectF bounds(View host, Object rootCoordinates, Object info, List<?> modifiers, Object semantics) {
+        Object coordinates = visibleBox(info, modifiers);
+        if (coordinates != null && rootCoordinates != null && Reflect.getBool(coordinates, "isAttached", false)
+            && Reflect.getBool(rootCoordinates, "isAttached", false)) {
+            RectF rect = rect(boundingBox(rootCoordinates, coordinates));
+            // Compose answers "nowhere" for a box without an area; a spacer is 8dp high and nothing wide.
+            if (rect != null && (rect.width() <= 0 || rect.height() <= 0)) {
+                RectF placed = emptyBox(coordinates);
+                if (placed != null) rect = placed;
             }
-            // What accessibility is told: in the window's coordinates, and clipped to what is visible.
-            RectF inWindow = rect(Reflect.get(semantics, "getBoundsInWindow"));
-            if (inWindow == null) return null;
-            int[] location = new int[2];
-            host.getLocationInWindow(location);
-            inWindow.offset(-location[0], -location[1]);
-            return inWindow;
+            if (rect != null) return rect;
         }
+        // What accessibility is told: in the window's coordinates, and clipped to what is visible.
+        RectF inWindow = rect(Reflect.get(semantics, "getBoundsInWindow"));
+        if (inWindow == null) return null;
+        int[] location = new int[2];
+        host.getLocationInWindow(location);
+        inWindow.offset(-location[0], -location[1]);
+        return inWindow;
+    }
+
+    /** A graphics layer that turns or resizes what it holds, as `rotate()` and `scale()` make. */
+    private static boolean rotatesOrScales(Object layer) {
+        String[] names = {"scaleX", "scaleY", "rotationX", "rotationY", "rotationZ"};
+        float[] idle = {1, 1, 0, 0, 0};
+        for (int index = 0; index < names.length; index++) {
+            Object value = Reflect.field(layer, names[index]);
+            if (value instanceof Float && (Float) value != idle[index]) return true;
+        }
+        return false;
     }
 
     /**

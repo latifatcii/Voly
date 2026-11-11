@@ -72,7 +72,7 @@ final class ScreenDescriber {
         if (rootObject instanceof ComposeNode) {
             // A node of Compose content, selected in the inspector: described like a view.
             ComposeNode composeNode = (ComposeNode) rootObject;
-            ComposeTree.Item item = ComposeTree.find(composeNode, 0);
+            ComposeTree.Item item = ComposeTree.find(composeNode, ComposeTree.RECENT_ENOUGH_MS);
             View host = composeNode.host();
             if (item == null || host == null) throw AgentError.objectGone(request.optLong("rootID"));
             ancestors = ancestors(host, true);

@@ -307,6 +307,9 @@ final class ComposeProperties {
     // MARK: Modifiers
 
     private static void modifiers(ComposeTree.Item item, View host, Rows rows) {
+        // A password field's modifiers hold what was typed in ways that can't
+        // be told from their other arguments: they are named, and not read.
+        boolean secure = item.semantics.containsKey("Password");
         int listed = 0;
         for (Object modifier : item.modifiers) {
             Object element = Reflect.get(modifier, "getModifier");
@@ -323,7 +326,7 @@ final class ComposeProperties {
                     rows.string(name, graphicsLayer(element, host));
                     continue;
                 }
-                rows.string(name, described(element, host));
+                rows.string(name, secure ? "" : described(element, host));
             } catch (Throwable e) {
                 rows.string(name, "");
             }

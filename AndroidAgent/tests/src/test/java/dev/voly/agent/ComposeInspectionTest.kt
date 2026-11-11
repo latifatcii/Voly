@@ -25,13 +25,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.password
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,6 +49,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -447,7 +452,70 @@ class ComposeInspectionTest {
         assertNull(target.rectOnScreen())
     }
 
+    // MARK: Watching one node, secrets, transforms
+
+    @Test
+    fun aNodeThatIsWatchedIsAskedAgainWithoutReadingTheWholeHost() {
+        val price = item(ComposeTree.content(host, 0), tag = "price.0")
+        val target = Target.of(price.ref)
+        val first = target.item()
+        val before = target.rectInRoot()
+        // Long after any tree that was read has been dropped, as a highlight that stays on is.
+        shadowOf(Looper.getMainLooper()).idleFor(2, java.util.concurrent.TimeUnit.SECONDS)
+        assertSame("the node itself was asked, no new tree was read", first, target.item())
+        assertEquals(before, target.rectInRoot())
+
+        show { BasicText("Nothing else") }
+        assertFalse(ComposeTree.refresh(host, first))
+        assertFalse(target.isAttached)
+    }
+
+    @Test
+    fun whatIsTypedIntoAPasswordFieldStaysInTheApp() {
+        // Marked as a password and nothing more: Compose hands out the text as it was typed.
+        show {
+            BasicTextField(
+                value = "hunter2", onValueChange = {},
+                modifier = Modifier.testTag("secret").semantics { password() },
+            )
+        }
+        val dispatcher = Dispatcher { }
+        val tree = send(dispatcher, """{"getHierarchy":{}}""")
+        assertFalse("the tree", tree.toString().contains("hunter2"))
+        val field = find(tree.getJSONObject("hierarchy").getJSONObject("_0").windows()) {
+            it.optString("accessibilityIdentifier") == "secret"
+        }!!
+        val id = field.getLong("id")
+        val bag = send(dispatcher, """{"getProperties":{"objectID":$id}}""").toString()
+        assertFalse("its properties: $bag", bag.contains("hunter2"))
+        assertTrue(bag, bag.contains("secure text, 7 characters"))
+        val described = send(dispatcher, """{"describeScreen":{"_0":{"rootID":$id,"maxDepth":0}}}""").toString()
+        assertFalse("its description: $described", described.contains("hunter2"))
+    }
+
+    @Test
+    fun contentTurnedByAModifierSaysSo() {
+        show {
+            Column {
+                Box(Modifier.testTag("tilted").rotate(30f).size(80.dp)) {
+                    BasicText("turned", modifier = Modifier.testTag("turned"))
+                }
+                BasicText("level", modifier = Modifier.testTag("level"))
+            }
+        }
+        val content = ComposeTree.content(host, 0)
+        assertTrue(item(content, tag = "tilted").transformed)
+        // What is inside is turned with it.
+        assertTrue(Target.of(item(content, tag = "turned").ref).hasTransform())
+        assertFalse(Target.of(item(content, tag = "level").ref).hasTransform())
+    }
+
     // MARK: Helpers
+
+    private fun show(content: @Composable () -> Unit) {
+        (host.parent as ComposeView).setContent(content)
+        idle()
+    }
 
     private fun tap(x: Double, y: Double) {
         val now = SystemClock.uptimeMillis()

@@ -50,6 +50,10 @@ android {
 }
 
 kotlin {
+    // Robolectric rewrites class files as it loads them and can't read those
+    // of a JDK newer than it knows, which the one Gradle runs on may be (the
+    // one inside Android Studio is). The tests get a JDK of their own.
+    jvmToolchain(21)
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
     }

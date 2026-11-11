@@ -14,6 +14,8 @@ final class Target {
     final View view;
     /** Null for a view. */
     final ComposeNode node;
+    /** The node as it was last read. */
+    private ComposeTree.Item seen;
 
     private Target(View view, ComposeNode node) {
         this.view = view;
@@ -45,9 +47,17 @@ final class Target {
         return node != null;
     }
 
-    /** The Compose node as it is now; null for a view, or when the node is gone. */
+    /**
+     * The Compose node as it is now; null for a view, or when the node is
+     * gone. Asked again and again by whoever keeps a target (a highlight),
+     * so a node already read is only asked where it is now: reading the
+     * whole host each time would be the app's main thread several times a
+     * second.
+     */
     ComposeTree.Item item() {
-        return node == null ? null : ComposeTree.find(node, ComposeTree.RECENT_ENOUGH_MS);
+        if (node == null) return null;
+        if (!ComposeTree.refresh(view, seen)) seen = ComposeTree.find(node, ComposeTree.RECENT_ENOUGH_MS);
+        return seen;
     }
 
     boolean isAttached() {
@@ -75,7 +85,12 @@ final class Target {
         return rect;
     }
 
+    /** Rotated or scaled, itself or through something above it. */
     boolean hasTransform() {
-        return node == null && Ui.hasTransform(view);
+        if (Ui.hasTransform(view)) return true;
+        for (ComposeTree.Item item = item(); item != null; item = item.parent) {
+            if (item.transformed) return true;
+        }
+        return false;
     }
 }

@@ -65,7 +65,7 @@ final class Snapshots {
         Object object = registry.objectFor(id);
         if (object instanceof ComposeNode) {
             ComposeNode node = (ComposeNode) object;
-            ComposeTree.Item item = ComposeTree.find(node, 0);
+            ComposeTree.Item item = ComposeTree.find(node, ComposeTree.RECENT_ENOUGH_MS);
             if (item == null) throw AgentError.objectGone(id);
             return composeNode(node.host(), item, depth);
         }
