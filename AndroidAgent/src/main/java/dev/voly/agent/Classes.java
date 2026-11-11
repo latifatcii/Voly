@@ -18,6 +18,19 @@ final class Classes {
         return true;
     }
 
+    /**
+     * The class a lambda or local class was written in, by name: the part
+     * before the first `$`. Lambdas the build tools generate
+     * (`CardKt$$ExternalSyntheticLambda0`) have no enclosing class to ask
+     * for, only this name.
+     */
+    static Class<?> fileClass(Class<?> type) {
+        String name = type.getName();
+        int dollar = name.indexOf('$');
+        Class<?> named = dollar <= 0 ? null : Reflect.classOrNull(name.substring(0, dollar), type.getClassLoader());
+        return named != null ? named : outermost(type);
+    }
+
     /** `com.example.app.ui.BadgeView$Dot` → `BadgeView.Dot` */
     static String displayName(Class<?> type) {
         return Reflect.simpleName(type);

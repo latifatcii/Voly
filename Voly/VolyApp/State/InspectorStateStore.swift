@@ -109,7 +109,9 @@ final class InspectorStateStore {
             childIDs: target.childIDs,
             childrenInline: newChildren,
             classInheritance: target.classInheritance,
-            hasNonIdentityTransform: target.hasNonIdentityTransform
+            hasNonIdentityTransform: target.hasNonIdentityTransform,
+            windowFrame: target.windowFrame,
+            label: target.label
         )
     }
 

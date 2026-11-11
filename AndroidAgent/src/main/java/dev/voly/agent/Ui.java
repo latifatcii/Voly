@@ -237,7 +237,12 @@ final class Ui {
      * included, like `convert(bounds, to: nil)` on UIKit.
      */
     static RectF rectInRoot(View view) {
-        RectF rect = new RectF(0, 0, view.getWidth(), view.getHeight());
+        return rectInRoot(view, new RectF(0, 0, view.getWidth(), view.getHeight()));
+    }
+
+    /** A rectangle given in `view`'s own coordinates, in its root view's coordinates. */
+    static RectF rectInRoot(View view, RectF local) {
+        RectF rect = new RectF(local);
         View current = view;
         while (true) {
             Matrix matrix = current.getMatrix();
@@ -291,18 +296,44 @@ final class Ui {
 
     /**
      * The deepest visible view under a display point (pixels), looking at
-     * the top-most window first. Ignores whether views are clickable: a
-     * plain TextView must be pickable too.
+     * the top-most window first — or, where that view is Compose content,
+     * the deepest node of it. Ignores whether views are clickable: a plain
+     * TextView must be pickable too.
      */
-    static View hitTest(float screenX, float screenY) {
+    static Target hitTest(float screenX, float screenY) {
         List<View> roots = visibleRoots();
         for (int index = roots.size() - 1; index >= 0; index--) {
             View root = roots.get(index);
             int[] origin = rootOrigin(root);
             View found = deepest(root, screenX - origin[0], screenY - origin[1]);
-            if (found != null) return found;
+            if (found == null) continue;
+            View host = ComposeTree.hostFor(found);
+            if (host == null) return Target.of(found);
+            float[] point = pointIn(host, screenX - origin[0], screenY - origin[1]);
+            ComposeTree.Item item = ComposeTree.hit(host, point[0], point[1]);
+            return item != null ? Target.of(item.ref) : Target.of(host);
         }
         return null;
+    }
+
+    /** A point given in the root view's coordinates, in `view`'s own. */
+    static float[] pointIn(View view, float rootX, float rootY) {
+        List<View> chain = new ArrayList<>();
+        for (View current = view; current.getParent() instanceof View; current = (View) current.getParent()) {
+            chain.add(0, current);
+        }
+        float[] point = {rootX, rootY};
+        for (View child : chain) {
+            View parent = (View) child.getParent();
+            point[0] += parent.getScrollX() - child.getLeft();
+            point[1] += parent.getScrollY() - child.getTop();
+            Matrix matrix = child.getMatrix();
+            if (matrix != null && !matrix.isIdentity()) {
+                Matrix inverse = new Matrix();
+                if (matrix.invert(inverse)) inverse.mapPoints(point);
+            }
+        }
+        return point;
     }
 
     private static View deepest(View view, float x, float y) {
@@ -336,9 +367,9 @@ final class Ui {
         return group.getBackground() == null && group.getForeground() == null && group.willNotDraw();
     }
 
-    /** The root view that contains `view`, or the top-most visible one. */
-    static View rootFor(View view) {
-        if (view != null && view.isAttachedToWindow()) return view.getRootView();
+    /** The root view that contains `target`, or the top-most visible one. */
+    static View rootFor(Target target) {
+        if (target != null && target.view.isAttachedToWindow()) return target.root();
         List<View> roots = visibleRoots();
         return roots.isEmpty() ? null : roots.get(roots.size() - 1);
     }

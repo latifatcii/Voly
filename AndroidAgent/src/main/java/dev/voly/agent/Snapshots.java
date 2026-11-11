@@ -62,6 +62,13 @@ final class Snapshots {
     }
 
     JSONObject subtree(long id, int depth) throws AgentError {
+        Object object = registry.objectFor(id);
+        if (object instanceof ComposeNode) {
+            ComposeNode node = (ComposeNode) object;
+            ComposeTree.Item item = ComposeTree.find(node, 0);
+            if (item == null) throw AgentError.objectGone(id);
+            return composeNode(node.host(), item, depth);
+        }
         return node(view(id), depth, Fragments.viewOwners());
     }
 
@@ -82,6 +89,14 @@ final class Snapshots {
                 View child = group.getChildAt(index);
                 childIds.put(registry.idFor(child));
                 if (children != null) children.put(node(child, remainingDepth - 1, owners));
+            }
+        }
+        // What a Compose host shows is not views. Its content comes after the
+        // helper views Compose keeps in the host, as it is drawn over them.
+        if (ComposeTree.isHost(view) && view.isAttachedToWindow()) {
+            for (ComposeTree.Item item : ComposeTree.content(view, 0).roots) {
+                childIds.put(registry.idFor(item.ref));
+                if (children != null) children.put(composeNode(view, item, remainingDepth - 1));
             }
         }
 
@@ -110,6 +125,63 @@ final class Snapshots {
         Json.put(node, "classInheritance", inheritance(view.getClass()));
         Json.put(node, "hasNonIdentityTransform", Ui.hasTransform(view));
         RectF onScreen = Ui.rectOnScreen(view);
+        Json.put(node, "windowFrame", Ui.points(onScreen));
+        return node;
+    }
+
+    /**
+     * `ViewNode` for a node of Compose content: the same shape as a view's,
+     * with its frame relative to the node (or host view) above it.
+     */
+    JSONObject composeNode(View host, ComposeTree.Item item, int remainingDepth) {
+        float density = Ui.density();
+        JSONArray childIds = new JSONArray();
+        JSONArray children = remainingDepth > 0 ? new JSONArray() : null;
+        for (ComposeTree.Item child : item.children) {
+            childIds.put(registry.idFor(child.ref));
+            if (children != null) children.put(composeNode(host, child, remainingDepth - 1));
+        }
+
+        RectF local = item.local;
+        float parentLeft = item.parent != null ? item.parent.local.left : 0;
+        float parentTop = item.parent != null ? item.parent.local.top : 0;
+        double left = (local.left - parentLeft) / density, top = (local.top - parentTop) / density;
+        double width = local.width() / density, height = local.height() / density;
+
+        JSONObject layer = Json.object();
+        Json.put(layer, "cornerRadius", 0.0);
+        Json.put(layer, "borderWidth", 0.0);
+        Json.put(layer, "shadowOpacity", 0.0);
+        Json.put(layer, "shadowRadius", 0.0);
+        Json.put(layer, "shadowOffset", Json.size(0, 0));
+        Json.put(layer, "masksToBounds", false);
+        Json.put(layer, "shouldRasterize", false);
+        Json.put(layer, "rasterizationScale", (double) density);
+        Json.put(layer, "opacity", 1.0);
+        Json.put(layer, "isOpaque", false);
+        Json.put(layer, "contentsScale", (double) density);
+
+        JSONObject node = Json.object();
+        Json.put(node, "id", registry.idFor(item.ref));
+        Json.put(node, "className", item.name());
+        Json.put(node, "accessibilityIdentifier", item.testTag);
+        Json.put(node, "label", item.label);
+        Json.put(node, "frame", Json.rect(left, top, width, height));
+        Json.put(node, "bounds", Json.rect(0, 0, width, height));
+        Json.put(node, "center", Json.point(left + width / 2, top + height / 2));
+        Json.put(node, "isHidden", false);
+        Json.put(node, "alpha", 1.0);
+        Json.put(node, "layer", layer);
+        Json.put(node, "clipsToBounds", false);
+        Json.put(node, "contentMode", 0);
+        Json.put(node, "constraintIDs", new JSONArray());
+        Json.put(node, "childIDs", childIds);
+        if (children != null) Json.put(node, "childrenInline", children);
+        Json.put(node, "classInheritance", Json.strings(item.name()));
+        Json.put(node, "hasNonIdentityTransform", false);
+        RectF onScreen = Ui.rectInRoot(host, local);
+        int[] origin = Ui.rootOrigin(host.getRootView());
+        onScreen.offset(origin[0], origin[1]);
         Json.put(node, "windowFrame", Ui.points(onScreen));
         return node;
     }

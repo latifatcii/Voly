@@ -63,8 +63,39 @@ device, so a new build is picked up without cleaning anything.
 | `view` / `layer` properties | alpha, visibility, background and tint colors; corner radius, border, elevation |
 | Custom properties | text, text size and color, padding, margins, `layout_width`/`height`, weight, bias, …, plus getter/setter pairs of the app's own view classes |
 | Constraints | fixed sizes, non-zero margins and every ConstraintLayout connection, with the margin as the constant |
+| A view (`ViewNode`) | a view, or a node of Jetpack Compose content inside an `AndroidComposeView` |
 | SwiftUI accessibility elements | Jetpack Compose semantics nodes: text, role, state, test tag, bounds |
 | UserDefaults | SharedPreferences; a suite is a preferences file |
 | Language override | per-app language (`LocaleManager`) on Android 13+, a configuration override before |
 | Dismiss / pop / pop to root | close a dialog, sheet or popup / Back / empty the back stacks |
 | Source lookup | class names and the view's id, resolved on the Mac by searching the project |
+
+## Jetpack Compose
+
+A Compose screen is one view. Its content is layout nodes, which
+`ViewGroup.getChildAt` never returns, so the view tree would end at
+`AndroidComposeView`. `ComposeTree` reads them and the rest of the agent
+treats them like views: `Snapshots` adds them to the tree, `Ui.hitTest`
+finds the node under a point, and everything that only needs to know where
+a thing is (`Overlay`, `Screenshots`, measuring) takes a `Target`, which is
+a view or a node.
+
+Compose is part of the app, so all of it is reflection, and nearly all of
+it on public API: a node is a `LayoutInfo`, with its coordinates, modifiers
+and semantics. The exception is a node's children (`LayoutNode.zSortedChildren`,
+or the `internal` `children`, whose compiled name changed from
+`getChildren$ui_release` to `getChildren$ui` in Compose 1.10). When neither
+is there, the tree is built from the semantics tree instead: fewer nodes,
+the same frames, the same ids.
+
+| | |
+| --- | --- |
+| Identity | `ComposeNode`: the host view and Compose's own id for the node (`semanticsId`). Stable from one snapshot to the next. |
+| Name | The semantics role, `Text` for text, else the class of the measure policy: `RowMeasurePolicy` is a `Row`. Not the composable function: that is not in the node. |
+| Frame | The box of the outermost modifier that paints or takes taps (background, border, clip, clickable), else the node's content box. Padding outside that is spacing; padding inside it is part of the node. Unclipped. |
+| Properties | Semantics, text style (from the text modifier's `TextStyle`), and each modifier with what it tells Compose's own inspector, or else its fields. Read-only. |
+
+`scripts/android-agent-test.sh` runs `tests/` — the agent against a real
+Compose on the JVM (Robolectric), for whichever releases of Compose it is
+given. CI runs it for four of them. Run it with a new release before
+relying on that release.

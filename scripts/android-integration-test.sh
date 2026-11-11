@@ -76,6 +76,7 @@ echo "== deep link, Compose, navigation"
 check "deep link" "$(send '{"openURL":{"url":"volysample://demo/compose"}}')" '"success" : true'
 sleep 2
 check "Compose semantics" "$(send "$DESCRIBE")" "compose.button"
+check "Compose content in the view tree" "$(send '{"getHierarchy":{}}')" '"accessibilityIdentifier" : "compose.button"'
 check "pop" "$(send '{"navigate":{"_0":"pop"}}')" '"performed" : true'
 sleep 1
 

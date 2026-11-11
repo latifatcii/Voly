@@ -66,30 +66,39 @@ final class ScreenDescriber {
 
         List<View> roots = new ArrayList<>();
         JSONArray ancestors = null;
+        JSONArray described = new JSONArray();
         boolean rooted = request.has("rootID") && !request.isNull("rootID");
-        if (rooted) {
-            long rootId = request.optLong("rootID");
-            Object object = registry.objectFor(rootId);
-            if (!(object instanceof View)) throw AgentError.objectGone(rootId);
-            View view = (View) object;
-            roots.add(view);
-            List<View> chain = new ArrayList<>();
-            for (Object parent = view.getParent(); parent instanceof View; parent = ((View) parent).getParent()) {
-                chain.add(0, (View) parent);
-            }
-            ancestors = new JSONArray();
-            for (View ancestor : chain) {
+        Object rootObject = rooted ? registry.objectFor(request.optLong("rootID")) : null;
+        if (rootObject instanceof ComposeNode) {
+            // A node of Compose content, selected in the inspector: described like a view.
+            ComposeNode composeNode = (ComposeNode) rootObject;
+            ComposeTree.Item item = ComposeTree.find(composeNode, 0);
+            View host = composeNode.host();
+            if (item == null || host == null) throw AgentError.objectGone(request.optLong("rootID"));
+            ancestors = ancestors(host, true);
+            List<ComposeTree.Item> above = new ArrayList<>();
+            for (ComposeTree.Item parent = item.parent; parent != null; parent = parent.parent) above.add(0, parent);
+            for (ComposeTree.Item parent : above) {
                 JSONObject entry = Json.object();
-                Json.put(entry, "id", registry.idFor(ancestor));
-                Json.put(entry, "className", Classes.displayName(ancestor.getClass()));
-                Json.put(entry, "viewController", ownerName(ancestor));
+                Json.put(entry, "id", registry.idFor(parent.ref));
+                Json.put(entry, "className", parent.name());
                 ancestors.put(entry);
             }
+            JSONObject node = describeCompose(host, item, 0);
+            if (node != null) {
+                Json.put(node, "layout", composeLayout(host, item));
+                described.put(node);
+            }
+        } else if (rooted) {
+            long rootId = request.optLong("rootID");
+            if (!(rootObject instanceof View)) throw AgentError.objectGone(rootId);
+            View view = (View) rootObject;
+            roots.add(view);
+            ancestors = ancestors(view, false);
         } else {
             roots.addAll(includeHidden ? Ui.allRoots() : Ui.visibleRoots());
         }
 
-        JSONArray described = new JSONArray();
         for (View root : roots) {
             JSONObject node = describe(root, 0, false, false);
             if (node == null) continue;
@@ -130,6 +139,24 @@ final class ScreenDescriber {
         } catch (Throwable ignored) {
         }
         return app.getPackageName();
+    }
+
+    /** The views above `view`, outermost first; with `inclusive`, `view` itself is the last of them. */
+    private JSONArray ancestors(View view, boolean inclusive) {
+        List<View> chain = new ArrayList<>();
+        if (inclusive) chain.add(view);
+        for (Object parent = view.getParent(); parent instanceof View; parent = ((View) parent).getParent()) {
+            chain.add(0, (View) parent);
+        }
+        JSONArray ancestors = new JSONArray();
+        for (View ancestor : chain) {
+            JSONObject entry = Json.object();
+            Json.put(entry, "id", registry.idFor(ancestor));
+            Json.put(entry, "className", Classes.displayName(ancestor.getClass()));
+            Json.put(entry, "viewController", ownerName(ancestor));
+            ancestors.put(entry);
+        }
+        return ancestors;
     }
 
     /** Class of the fragment or activity whose root view this is. */
@@ -223,6 +250,136 @@ final class ScreenDescriber {
         Json.put(node, "children", children);
         Json.put(node, "omittedChildren", omitted);
         return node;
+    }
+
+    // MARK: One node of Compose content
+
+    /** `ViewDescription` of a Compose node, from what its semantics and modifiers tell. */
+    private JSONObject describeCompose(View host, ComposeTree.Item item, int depth) {
+        if (remaining <= 0) return null;
+        remaining--;
+        count++;
+
+        ComposeProperties.Rows rows = ComposeProperties.read(item, host);
+        RectF onScreen = Ui.rectInRoot(host, item.local);
+        int[] origin = Ui.rootOrigin(host.getRootView());
+        onScreen.offset(origin[0], origin[1]);
+
+        JSONObject node = Json.object();
+        Json.put(node, "id", registry.idFor(item.ref));
+        Json.put(node, "className", item.name());
+        Json.put(node, "frame", Ui.points(onScreen));
+        Json.put(node, "isHidden", false);
+        Json.put(node, "alpha", 1.0);
+        Json.put(node, "clipsToBounds", item.clips);
+        Json.put(node, "accessibilityIdentifier", item.testTag);
+        Json.put(node, "accessibilityLabel", rows.get("contentDescription", String.class));
+        Json.put(node, "text", rows.get("text", String.class));
+        Json.put(node, "placeholder", rows.get("hint", String.class));
+        String value = rows.get("toggleableState", String.class);
+        Json.put(node, "value", value != null ? value : rows.get("stateDescription", String.class));
+
+        List<String> font = new ArrayList<>();
+        String family = rows.get("fontFamily", String.class), weight = rows.get("fontWeight", String.class);
+        if (family != null) font.add(family);
+        // "Medium (500)" → "Medium"
+        if (weight != null) font.add(weight.contains(" ") ? weight.substring(0, weight.indexOf(' ')) : weight);
+        if (Boolean.TRUE.equals(rows.get("isItalic", Boolean.class))) font.add("Italic");
+        Double size = rows.get("textSize", Double.class);
+        if (size != null) font.add(Properties.trim(size) + "sp");
+        else if (rows.get("textSize", String.class) != null) font.add(rows.get("textSize", String.class));
+        if (!font.isEmpty()) Json.put(node, "font", android.text.TextUtils.join(" ", font));
+        Integer textColor = rows.get("textColor", Integer.class);
+        if (textColor != null) Json.put(node, "textColor", Json.hex(textColor));
+        String align = rows.get("textAlign", String.class);
+        if (align != null && !align.equals("Start") && !align.equals("Left")) {
+            Json.put(node, "textAlignment", align.toLowerCase(java.util.Locale.US));
+        }
+        Double lines = rows.get("maxLines", Double.class);
+        if (lines != null) Json.put(node, "numberOfLines", lines.intValue());
+
+        Integer background = rows.get("background", Integer.class);
+        if (background != null && (background >>> 24) != 0) Json.put(node, "backgroundColor", Json.hex(background));
+        Double radius = cornerRadius(rows.get("backgroundShape", String.class));
+        if (radius != null && radius > 0) Json.put(node, "cornerRadius", radius);
+
+        List<String> state = new ArrayList<>();
+        if (Boolean.FALSE.equals(rows.get("isEnabled", Boolean.class))) state.add("disabled");
+        if (Boolean.TRUE.equals(rows.get("isSelected", Boolean.class))) state.add("selected");
+
+        int omitted = 0;
+        JSONArray children = new JSONArray();
+        if (maxDepth != null && depth >= maxDepth) {
+            omitted = item.children.size();
+        } else {
+            for (ComposeTree.Item child : item.children) {
+                JSONObject described = describeCompose(host, child, depth + 1);
+                if (described != null) children.put(described);
+                else omitted++;
+            }
+        }
+        Json.put(node, "state", Json.array(state));
+        Json.put(node, "flags", new JSONArray());
+        Json.put(node, "children", children);
+        Json.put(node, "omittedChildren", omitted);
+        return node;
+    }
+
+    /** `RoundedCornerShape(12dp)` → 12; null for a shape that isn't one radius in dp. */
+    private static Double cornerRadius(String shape) {
+        if (shape == null || !shape.startsWith("RoundedCornerShape(") || !shape.endsWith("dp)")) return null;
+        try {
+            return Double.parseDouble(shape.substring("RoundedCornerShape(".length(), shape.length() - 3));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** `LayoutDetails` for a Compose node: there are no layout params, the modifiers are the layout. */
+    private JSONObject composeLayout(View host, ComposeTree.Item item) {
+        double width = item.local.width() / density, height = item.local.height() / density;
+        JSONObject details = Json.object();
+        Json.put(details, "bounds", Json.rect(0, 0, width, height));
+        Json.put(details, "usesAutoLayout", false);
+        Json.put(details, "huggingHorizontal", 0.0);
+        Json.put(details, "huggingVertical", 0.0);
+        Json.put(details, "compressionResistanceHorizontal", 0.0);
+        Json.put(details, "compressionResistanceVertical", 0.0);
+        double[] insets = systemInsets(host);
+        Json.put(details, "safeAreaInsets", Json.insets(insets[0], insets[1], insets[2], insets[3]));
+        Json.put(details, "layoutMargins", Json.insets(0, 0, 0, 0));
+
+        ComposeProperties.Rows rows = ComposeProperties.read(item, host);
+        List<String> parts = new ArrayList<>();
+        parts.add("Jetpack Compose content, read-only; child of "
+            + (item.parent != null ? item.parent.name() : Classes.displayName(host.getClass())));
+        String policy = rows.get("measurePolicy", String.class);
+        if (policy != null) parts.add("measured by " + policy);
+        // As they are written in source: padding(8dp) → background(#FFFFFFFF, RoundedCornerShape(12dp)) → …
+        List<String> names = new ArrayList<>();
+        List<String> arguments = new ArrayList<>();
+        for (ComposeProperties.Row row : rows.list) {
+            if (!row.modifier) continue;
+            String argument = row.type.equals("color") ? Json.hex((Integer) row.value) : String.valueOf(row.value);
+            // The panel needs unique names ("padding 2") and one value a row ("backgroundShape").
+            String name = row.name.replaceAll(" \\d+$", "");
+            int last = names.size() - 1;
+            if (last >= 0 && name.startsWith(names.get(last)) && name.length() > names.get(last).length()) {
+                String detail = name.endsWith("Alpha") ? "alpha " + argument : argument;
+                arguments.set(last, arguments.get(last).isEmpty() ? detail : arguments.get(last) + ", " + detail);
+                continue;
+            }
+            names.add(name);
+            arguments.add(argument);
+        }
+        List<String> modifiers = new ArrayList<>();
+        for (int index = 0; index < names.size(); index++) {
+            modifiers.add(arguments.get(index).isEmpty() ? names.get(index) : names.get(index) + "(" + arguments.get(index) + ")");
+        }
+        if (!modifiers.isEmpty()) parts.add("modifiers, outermost first: " + android.text.TextUtils.join(" → ", modifiers));
+        parts.add("size " + Properties.trim(width) + "×" + Properties.trim(height) + " dp");
+        Json.put(details, "summary", android.text.TextUtils.join("; ", parts));
+        return details;
     }
 
     /** What was read from a view, for the checks that depend on it. */

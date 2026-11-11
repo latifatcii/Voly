@@ -157,16 +157,13 @@ private struct NodeRow: View {
     private func filtered(_ nodes: [ViewNode]) -> [ViewNode] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return nodes }
-        return nodes.filter { node in
-            node.className.lowercased().contains(q) ||
-                (node.accessibilityIdentifier?.lowercased().contains(q) ?? false) ||
-                node.childrenInline?.contains(where: { matches($0, q: q) }) ?? false
-        }
+        return nodes.filter { matches($0, q: q) }
     }
 
     private func matches(_ node: ViewNode, q: String) -> Bool {
         if node.className.lowercased().contains(q) { return true }
         if node.accessibilityIdentifier?.lowercased().contains(q) ?? false { return true }
+        if node.label?.lowercased().contains(q) ?? false { return true }
         return node.childrenInline?.contains(where: { matches($0, q: q) }) ?? false
     }
 }
@@ -192,6 +189,13 @@ private struct NodeLabel: View {
                     .foregroundStyle(VolyTheme.dim)
                     .lineLimit(1)
             }
+            if let label = node.label, !label.isEmpty {
+                Text("“\(label)”")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(VolyTheme.dim)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
             Spacer(minLength: 0)
             if isPinned {
                 Image(systemName: "pin.fill")
@@ -209,11 +213,12 @@ private struct NodeLabel: View {
     private var iconName: String {
         switch node.className {
         case "UIWindow": return "rectangle.on.rectangle"
-        case "UILabel": return "textformat"
-        case "UIImageView": return "photo"
-        case "UIButton": return "button.horizontal"
-        case "UIStackView": return "rectangle.stack"
-        case "UIScrollView", "UITableView", "UICollectionView": return "rectangle.grid.3x2"
+        case "UILabel", "Text", "TextField": return "textformat"
+        case "UIImageView", "Image": return "photo"
+        case "UIButton", "Button": return "button.horizontal"
+        case "UIStackView", "Row", "Column": return "rectangle.stack"
+        case "UIScrollView", "UITableView", "UICollectionView", "LazyColumn", "LazyRow", "LazyGrid":
+            return "rectangle.grid.3x2"
         default: return "square.dashed"
         }
     }
@@ -227,7 +232,7 @@ private struct SearchField: View {
                 .font(.system(size: 11))
                 .foregroundStyle(VolyTheme.dim)
             TextField("", text: $text,
-                      prompt: Text("Filter by class or accessibility id").foregroundStyle(VolyTheme.faint))
+                      prompt: Text("Filter by class, accessibility id or text").foregroundStyle(VolyTheme.faint))
                 .textFieldStyle(.plain)
                 .font(VolyTheme.body)
             if !text.isEmpty {
